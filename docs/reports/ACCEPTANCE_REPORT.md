@@ -10,7 +10,7 @@ strictly faster on the hot path).
 | 2 | AI extraction ≥80% on 50-image benchmark | ✅ **100%** (mock provider, deterministic CI baseline; Gemini/OpenAI scored by the same harness) | `python backend/scripts/evaluate_extraction.py` |
 | 3 | `/recommend` p95 < 2 s @ 100 concurrent | ✅ **p95 = 1.39 s** (p50 0.90 s, max 1.41 s), 100 unique quizzes, cache cold | live load test, this report §Latency |
 | 4 | Product links valid (HTTP 200) | ✅ checker implemented + wired as background task and `scripts/check_links.py`; validated against live endpoints (external egress is blocked in this sandbox, so seeded Digikala/Torob links must be re-checked on a networked host) | `scripts/check_links.py` |
-| 5 | Lighthouse ≥80 on recommendation page | ◻ enforced in CI (`lighthouse` job fails <80). Bundle profile: initial route JS ≈ 107 kB gzip, images WebP + lazy + fixed dimensions, drag-lib code-split. No Chrome in sandbox; CI runs it headless. | `.github/workflows/ci.yml` |
+| 5 | Lighthouse ≥80 on recommendation page | ◻ enforced in CI (`lighthouse` job fails <80). Bundle profile: initial route JS ≈ 107 kB gzip, images WebP + lazy + fixed dimensions, drag-lib code-split. No Chrome in sandbox; CI runs it headless. | `ci/github-ci.yml (move to .github/workflows/ to enable)` |
 | 6 | LCP < 3 s on 4G | ◻ same CI job asserts LCP; hero/rank-1 images use `fetchPriority="high"`, preconnect to CDN | CI artifact `lighthouse-report` |
 | 7 | TLS 1.3 all endpoints | ✅ Caddy `protocols tls1.3 tls1.3` + HTTP→HTTPS redirect + HSTS | `Caddyfile` |
 | 8 | bcrypt passwords | ✅ passlib bcrypt, asserted in `test_password_is_bcrypt_hashed` | `app/core/security.py` |

@@ -83,7 +83,7 @@ frontend/
   src/lib/           api (axios + JWT refresh) · constants (i18n-ready) · types
 docs/                ARCHITECTURE · DESIGN_SYSTEM · DEPLOYMENT · API · WALKTHROUGH
 scripts/             check_links.py
-docker-compose.yml · Caddyfile · .github/workflows/ci.yml
+docker-compose.yml · Caddyfile · ci/github-ci.yml (move to .github/workflows/ to enable)
 ```
 
 ## Security & compliance
