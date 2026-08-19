@@ -232,8 +232,9 @@ def test_23_matched_materials_listed(db):
 
 
 def test_24_calculate_score_final_is_weighted_sum(db):
-    from app.models.product import Product
     from sqlalchemy import select
+
+    from app.models.product import Product
 
     product = db.scalar(select(Product).where(Product.is_verified.is_(True)).limit(1))
     quiz = make_quiz()

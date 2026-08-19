@@ -9,7 +9,7 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_designer
+from app.api.deps import require_designer
 from app.db.session import get_db
 from app.models.base import utcnow
 from app.models.project import Project, ShareLink

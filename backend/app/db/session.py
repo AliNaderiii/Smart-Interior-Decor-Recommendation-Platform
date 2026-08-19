@@ -17,9 +17,14 @@ connect_args = {}
 if settings.DATABASE_URL.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
 
+# Pool sized for the 100-concurrent /recommend acceptance test:
+# 2 uvicorn workers x (25 + 75 overflow) comfortably covers burst traffic.
 engine = create_engine(
     settings.DATABASE_URL,
     pool_pre_ping=True,
+    pool_size=25,
+    max_overflow=75,
+    pool_timeout=10,
     connect_args=connect_args,
 )
 
