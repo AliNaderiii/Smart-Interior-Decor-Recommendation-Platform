@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     # ---- Redis ----
     REDIS_URL: str = ""  # empty -> fakeredis (dev/test only)
     RECOMMEND_CACHE_TTL: int = 3600
+    RECOMMEND_RATE_LIMIT_PER_MINUTE: int = 20  # 0 disables (load tests)
 
     # ---- AI ----
     AI_PROVIDER: Literal["gemini", "openai", "mock"] = "mock"

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from ai.embedding_service import get_embedding, quiz_to_text
 from app.api.deps import get_current_user
+from app.core.rate_limit import enforce_rate_limit
 from app.db.session import get_db
 from app.models.quiz import StyleQuiz
 from app.models.user import User
@@ -92,7 +93,12 @@ def recommend_endpoint(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Get ranked recommendations either from a saved quiz or an inline payload."""
+    """Get ranked recommendations either from a saved quiz or an inline payload.
+
+    Rate-limited to 20 req/min per user — each cold call costs an embedding +
+    vector search (AI cost control; cached hits are cheap but still counted).
+    """
+    enforce_rate_limit(f"recommend:{user.id}")
     if quiz_id:
         quiz = db.get(StyleQuiz, quiz_id)
         if quiz is None or quiz.user_id != user.id:

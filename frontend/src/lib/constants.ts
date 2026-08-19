@@ -36,8 +36,14 @@ export const CATEGORY_LABELS: Record<string, string> = {
   curtain: "Curtains",
 };
 
-/** Persian price format: 45,000,000 تومان */
+/** Persian price format with fa-IR digits: ۴۵٬۰۰۰٬۰۰۰ تومان */
+const faNumber = new Intl.NumberFormat("fa-IR");
 export function formatToman(value: number): string {
+  return `${faNumber.format(value)} تومان`;
+}
+
+/** Latin-digit variant for admin tables / logs where fa digits hinder scanning. */
+export function formatTomanLatin(value: number): string {
   return `${value.toLocaleString("en-US")} تومان`;
 }
 

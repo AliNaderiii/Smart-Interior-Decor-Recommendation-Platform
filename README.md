@@ -31,6 +31,23 @@ The backend auto-migrates (Alembic) and seeds 100 products + demo accounts on fi
 | Designer | designer@smartdecor.dev | Design123! |
 | Admin | admin@smartdecor.dev | Admin123! |
 
+## Dev vs Production data engines — read this
+
+| | Dev / CI | Production |
+|---|---|---|
+| Database | SQLite fallback (vector column degrades to JSON, cosine in Python) | **PostgreSQL 16 + pgvector required** — fused `<=>` query + HNSW index |
+| Embeddings | deterministic 512-dim hash (offline, hermetic tests) | **real CLIP ViT-B/32** — `python scripts/seed_products.py --real-embeddings` once, or `--from-json` with the committed `backend/seed_data/embeddings_real.json` |
+| Extraction | `AI_PROVIDER=mock` heuristic | `AI_PROVIDER=gemini` (or `openai`) + API key; validate with `python scripts/evaluate_extraction.py --real` |
+| Redis | in-process fakeredis (per-worker!) | real Redis (`REDIS_URL`) — shared cache, JWT blacklist and rate limiting |
+
+Postgres parity is proven: the full 45-test suite passes against real
+Postgres+pgvector (see `docs/reports/postgres_parity.md`). To run it yourself:
+
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.test.yml \
+  run --rm backend sh -c "alembic upgrade head && pytest tests/ -v"
+```
+
 ## Local development (no Docker)
 
 ```bash

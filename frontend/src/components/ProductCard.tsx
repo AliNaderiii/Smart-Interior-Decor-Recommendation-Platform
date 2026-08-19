@@ -63,7 +63,34 @@ function ProductCardInner({ product, rank, onAdd, added }: Props) {
             <Badge tone="warning">Material: {exp.matched_materials.join(", ")}</Badge>
           )}
         </div>
-        <p className="text-xs leading-relaxed text-stone">{exp.summary}</p>
+        <details className="group text-xs">
+          <summary className="cursor-pointer select-none font-semibold text-clay-dark hover:underline">
+            Why this {product.category.replace("_", " ")}?
+          </summary>
+          <ul className="mt-1.5 space-y-1 rounded-lg bg-sand/60 p-2.5 leading-relaxed text-stone">
+            <li>
+              <span className="font-medium text-walnut">Style:</span> {exp.style_match}% match
+              {product.styles.length > 0 && <> — this piece is {product.styles.join(" / ")}</>}
+            </li>
+            <li>
+              <span className="font-medium text-walnut">Color:</span> {exp.color_match}% match to your palette
+              <span className="ml-1 inline-flex gap-0.5 align-middle">
+                {product.colors.slice(0, 3).map((c) => (
+                  <span key={c} className="inline-block h-3 w-3 rounded-full border border-[#e5ded3]" style={{ backgroundColor: c }} />
+                ))}
+              </span>
+            </li>
+            <li>
+              <span className="font-medium text-walnut">Budget:</span> {exp.budget_fit}% fit — {formatToman(product.price_toman)}
+            </li>
+            <li>
+              <span className="font-medium text-walnut">Material:</span>{" "}
+              {exp.matched_materials.length > 0
+                ? <>{exp.matched_materials.join(", ")} <span className="text-sage">✓ matches your choice</span></>
+                : product.materials.join(", ") || "—"}
+            </li>
+          </ul>
+        </details>
         <div className="mt-auto flex items-center gap-2 pt-2">
           {onAdd && (
             <Button

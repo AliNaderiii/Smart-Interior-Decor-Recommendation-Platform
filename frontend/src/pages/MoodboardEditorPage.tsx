@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useMemo, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { get, patch } from "@/lib/api";
@@ -41,13 +41,28 @@ export default function MoodboardEditorPage() {
     onSuccess: () => setSaved(true),
   });
 
+  // Debounced autosave (500ms): drags fire onLayoutChange rapidly — we only
+  // persist once the layout has been stable for half a second (no DB spam).
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveRef = useRef(save.mutate);
+  saveRef.current = save.mutate;
+
   const onLayoutChange = useCallback(
     (next: readonly { i: string; x: number; y: number; w: number; h: number }[]) => {
-      setLayoutOverride(next.map((l) => ({ i: l.i, x: l.x, y: l.y, w: l.w, h: l.h })));
+      const items = next.map((l) => ({ i: l.i, x: l.x, y: l.y, w: l.w, h: l.h }));
+      setLayoutOverride(items);
       setSaved(false);
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        saveRef.current(items.map((l) => ({ product_id: l.i, x: l.x, y: l.y, w: l.w, h: l.h })));
+      }, 500);
     },
     [],
   );
+
+  useEffect(() => () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+  }, []);
 
   const addAllToShoppingList = useMutation({
     mutationFn: () => {
@@ -70,7 +85,7 @@ export default function MoodboardEditorPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-walnut">{board.title}</h1>
-          <p className="mt-1 text-sm text-stone">Drag & resize products. Layout saves to your account.</p>
+          <p className="mt-1 text-sm text-stone">Drag & resize products — changes autosave after you stop moving.</p>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs text-stone">{saved ? "All changes saved" : "Unsaved changes"}</span>

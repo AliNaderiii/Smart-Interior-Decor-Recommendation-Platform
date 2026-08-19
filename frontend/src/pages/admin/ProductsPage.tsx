@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, get, patch, post } from "@/lib/api";
 import type { Envelope } from "@/lib/api";
@@ -22,11 +22,19 @@ export default function AdminProductsPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploadResult, setUploadResult] = useState<string>("");
 
+  const [sortLowConfidence, setSortLowConfidence] = useState(false);
+
   const query = filter === "all" ? "" : `&is_verified=${filter === "verified"}`;
   const { data, isLoading } = useQuery({
     queryKey: ["admin-products", page, filter],
     queryFn: () => get<ProductList>(`/products?page=${page}&page_size=15${query}`),
   });
+
+  const items = useMemo(() => {
+    const rows = data?.items ?? [];
+    if (!sortLowConfidence) return rows;
+    return [...rows].sort((a, b) => a.extraction_confidence - b.extraction_confidence);
+  }, [data, sortLowConfidence]);
 
   const verify = useMutation({
     mutationFn: (id: string) => post(`/products/${id}/verify`),
@@ -102,14 +110,22 @@ export default function AdminProductsPage() {
               <tr className="border-b border-[#eee7db] text-left text-xs uppercase tracking-wide text-stone">
                 <th className="px-4 py-3">Product</th>
                 <th className="px-4 py-3">AI features</th>
-                <th className="px-4 py-3">Confidence</th>
+                <th className="px-4 py-3">
+                  <button
+                    onClick={() => setSortLowConfidence((v) => !v)}
+                    className="uppercase tracking-wide hover:text-ink"
+                    title="Sort lowest confidence first to prioritize review"
+                  >
+                    Confidence {sortLowConfidence ? "↑" : "·"}
+                  </button>
+                </th>
                 <th className="px-4 py-3">Price</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {(data?.items ?? []).map((p) => (
+              {items.map((p) => (
                 <tr key={p.id} className="border-b border-[#f5f0e8] align-top last:border-0">
                   <td className="max-w-[240px] px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -131,7 +147,16 @@ export default function AdminProductsPage() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <span className={p.extraction_confidence >= 0.8 ? "text-sage" : "text-amber-700"}>
+                    <span
+                      className={
+                        p.extraction_confidence >= 0.9
+                          ? "rounded-full bg-[#e7efe4] px-2 py-0.5 font-semibold text-sage"
+                          : p.extraction_confidence >= 0.7
+                            ? "rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-800"
+                            : "rounded-full bg-red-100 px-2 py-0.5 font-semibold text-red-800"
+                      }
+                      title={p.extraction_confidence < 0.7 ? "Low confidence — review carefully" : undefined}
+                    >
                       {(p.extraction_confidence * 100).toFixed(0)}%
                     </span>
                   </td>

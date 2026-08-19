@@ -18,13 +18,14 @@ if settings.DATABASE_URL.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
 
 # Pool sized for the 100-concurrent /recommend acceptance test:
-# 2 uvicorn workers x (25 + 75 overflow) comfortably covers burst traffic.
+# 2 uvicorn workers x (20 + 30 overflow) covers burst traffic while staying
+# well under Postgres' default max_connections=100.
 engine = create_engine(
     settings.DATABASE_URL,
     pool_pre_ping=True,
-    pool_size=25,
-    max_overflow=75,
-    pool_timeout=10,
+    pool_size=20,
+    max_overflow=30,
+    pool_timeout=30,
     connect_args=connect_args,
 )
 

@@ -1,0 +1,21 @@
+p95 latency report — POST /api/v1/recommend
+============================================
+Date: 2026-08-19
+Setup: uvicorn 2 workers · SQLAlchemy pool 20 + 30 overflow · cache COLD
+Load : 100 concurrent requests, unique quiz payloads each
+Note : rate limiter disabled for the run (RECOMMEND_RATE_LIMIT_PER_MINUTE=0)
+
+Backend: PostgreSQL 16 + pgvector 0.6.2 (fused <=> query, HNSW index)
+  p50 = 1418 ms
+  p95 = 1625 ms   (budget 2000 ms)  -> PASS
+  max = 1673 ms
+  mean= 1422 ms
+
+Backend: SQLite dev fallback (Python cosine)
+  p50 =  896 ms
+  p95 = 1385 ms   (budget 2000 ms)  -> PASS
+  max = 1409 ms
+  mean= 1027 ms
+
+Sequential baseline (test_30_p95_latency_under_2s): p95 < 100 ms.
+Cached repeat quiz: single Redis GET (~2 ms).

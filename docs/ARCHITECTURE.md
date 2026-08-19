@@ -54,6 +54,23 @@ Python — same math, same results.
 The fallback is automatic — CLIP load failure logs a warning and switches backends;
 the platform never hard-fails on missing internet.
 
+**Dev vs Prod embeddings — explicit policy (PM P0-2):**
+- **CI / offline dev** uses hash embeddings so tests are deterministic and
+  hermetic. The 100% benchmark score in CI is a *harness baseline*, not a
+  vision-model quality claim.
+- **Production** must run real vectors. Two supported paths:
+  1. On a networked machine: `python scripts/seed_products.py --real-embeddings`
+     — forces CLIP (fails loudly if unavailable), seeds the DB, and exports
+     `backend/seed_data/embeddings_real.json` for reuse.
+  2. Offline deploys: commit that JSON once, then seed anywhere with
+     `python scripts/seed_products.py --from-json`.
+- Real extraction quality: `python scripts/evaluate_extraction.py --real
+  [--sample N]` with `AI_PROVIDER=gemini` + `GEMINI_API_KEY` scores the same
+  50-image ground truth against the live model and writes
+  `docs/reports/extraction_report.json`. If accuracy < 80% the human-in-the-loop
+  gate is the safety net: low-confidence extractions stay unverified and never
+  enter recommendations.
+
 ## ADR-005 — Three-stage hybrid recommender
 
 `backend/app/services/recommender.py`:
@@ -112,6 +129,13 @@ precision (0.5); acceptance ≥ 80 %.
 The interface (`encrypt`/`decrypt`) is identical to a cloud KMS envelope-encryption
 wrapper; migrating to AWS KMS / Arvan Vault means replacing the key source inside
 `KMSClient` only. Postgres volumes should additionally use provider disk encryption.
+
+**Key rotation path:** Fernet supports `MultiFernet([new_key, old_key])` —
+rotation is: (1) add the new key first in the keyring, (2) run a background
+re-encrypt job (`MultiFernet.rotate(token)`) over stored ciphertexts, (3) drop
+the old key. With a cloud KMS the same flow becomes "create new key version →
+re-wrap data keys → disable old version"; the `KMSClient` facade keeps both
+paths behind one interface.
 
 ## ADR-009 — Storage abstraction
 

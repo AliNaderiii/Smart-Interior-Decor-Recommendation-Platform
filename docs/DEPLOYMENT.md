@@ -24,7 +24,11 @@ Services: `postgres` (ankane/pgvector), `redis`, `backend` (runs
 - [ ] `AI_PROVIDER=gemini` (or `openai`) with API key; optionally
       `EMBEDDING_BACKEND=clip` (uncomment torch/sentence-transformers in
       `backend/requirements.txt`; first boot downloads ~600 MB)
-- [ ] Run `python scripts/check_links.py` after seeding real catalog
+- [ ] Seed with real CLIP vectors: `python backend/scripts/seed_products.py --real-embeddings`
+      (or `--from-json` if `backend/seed_data/embeddings_real.json` is committed)
+- [ ] Validate real extraction quality: `python backend/scripts/evaluate_extraction.py --real --sample 10`
+- [ ] Run `python scripts/check_links.py --report docs/reports/links.json` after seeding real catalog
+- [ ] Enable CI if not yet active: `./scripts/enable_ci.sh` (needs a token with `workflow` scope)
 - [ ] Postgres volume on encrypted disk; scheduled `pg_dump` backups
 
 ## 2. Deploy to a VPS / EC2

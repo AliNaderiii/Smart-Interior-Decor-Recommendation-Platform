@@ -1,0 +1,6 @@
+{
+  "mode": "MOCK",
+  "images": 50,
+  "accuracy": 1.0,
+  "failures": []
+}

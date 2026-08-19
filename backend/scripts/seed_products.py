@@ -1,8 +1,19 @@
 """Seed 100 realistic living-room products with precomputed embeddings.
 
 Usage:
-    python scripts/seed_products.py            # always seed (skip duplicates)
-    python scripts/seed_products.py --if-empty # only when products table empty
+    python scripts/seed_products.py                    # seed (skip if present)
+    python scripts/seed_products.py --if-empty         # only when table empty
+    python scripts/seed_products.py --real-embeddings  # force CLIP ViT-B/32 and
+                                                       # export seed_data/embeddings_real.json
+    python scripts/seed_products.py --from-json        # load precomputed real
+                                                       # embeddings from that JSON
+                                                       # (no model download needed)
+
+Embedding strategy (see docs/ARCHITECTURE.md ADR-004):
+  * CI / offline dev: deterministic hash embeddings (EMBEDDING_BACKEND=hash)
+  * Production: real CLIP vectors — generate once on a networked machine with
+    `--real-embeddings`, commit `seed_data/embeddings_real.json`, then any
+    offline deploy can seed with `--from-json`.
 
 Also creates default accounts:
     admin@smartdecor.dev    / Admin123! (admin)
@@ -97,8 +108,35 @@ SELLER_LINKS = [
 PATTERNS = ["solid", "geometric", "floral", "striped", "abstract", "persian"]
 
 
-def build_products() -> list[Product]:
+EMBEDDINGS_JSON = Path(__file__).resolve().parents[1] / "seed_data" / "embeddings_real.json"
+
+
+def _load_real_embeddings() -> dict[str, list[float]] | None:
+    """Load committed real-CLIP embeddings keyed by product title, if present."""
+    if EMBEDDINGS_JSON.exists():
+        import json
+
+        return json.loads(EMBEDDINGS_JSON.read_text())
+    return None
+
+
+def _export_real_embeddings(products: list[Product]) -> None:
+    """Write {title: embedding} JSON so offline deploys can reuse real vectors."""
+    import json
+
+    EMBEDDINGS_JSON.parent.mkdir(parents=True, exist_ok=True)
+    payload = {p.title: list(p.style_embedding) for p in products}
+    EMBEDDINGS_JSON.write_text(json.dumps(payload))
+    print(f"exported {len(payload)} real embeddings -> {EMBEDDINGS_JSON}")
+
+
+def build_products(real_from_json: bool = False) -> list[Product]:
     """Generate 100 deterministic, realistic products across 8 categories."""
+    precomputed = _load_real_embeddings() if real_from_json else None
+    if real_from_json and precomputed is None:
+        print("WARNING: seed_data/embeddings_real.json not found — "
+              "falling back to the configured EMBEDDING_BACKEND. "
+              "Generate it with: python scripts/seed_products.py --real-embeddings")
     products: list[Product] = []
     styles = list(STYLE_DEFS.keys())
     categories = list(CATEGORY_DEFS.keys())
@@ -142,16 +180,34 @@ def build_products() -> list[Product]:
             extraction_confidence=round(random.uniform(0.82, 0.97), 2),
             is_verified=True,
         )
-        product.style_embedding = get_embedding(
-            product_to_text(title, [style], colors, materials, description, [pattern])
-        )
+        if precomputed and title in precomputed:
+            product.style_embedding = precomputed[title]
+        else:
+            product.style_embedding = get_embedding(
+                product_to_text(title, [style], colors, materials, description, [pattern])
+            )
         products.append(product)
         i += 1
     return products
 
 
-def seed(if_empty: bool = False) -> None:
+def seed(if_empty: bool = False, real_embeddings: bool = False, from_json: bool = False) -> None:
     """Create tables (dev), seed products and default accounts."""
+    if real_embeddings:
+        # Force the CLIP backend regardless of env; fails loudly if the model
+        # can't be loaded so we never silently commit hash vectors as "real".
+        import ai.embedding_service as es
+
+        es._backend = None  # reset resolution cache
+        from app.core.config import settings as _s
+
+        object.__setattr__(_s, "EMBEDDING_BACKEND", "clip")
+        if es._load_clip() is None:
+            raise SystemExit(
+                "ERROR: --real-embeddings requires the CLIP model "
+                "(pip install sentence-transformers torch + internet on first run)."
+            )
+
     Base.metadata.create_all(engine)
     db = SessionLocal()
     try:
@@ -159,10 +215,13 @@ def seed(if_empty: bool = False) -> None:
         if if_empty and count > 0:
             print(f"products table already has {count} rows; skipping seed")
         else:
-            for product in build_products():
+            products = build_products(real_from_json=from_json)
+            for product in products:
                 db.add(product)
             db.commit()
             print("seeded 100 products")
+            if real_embeddings:
+                _export_real_embeddings(products)
 
         defaults = [
             ("admin@smartdecor.dev", "Admin123!", "admin", "Platform Admin"),
@@ -186,4 +245,8 @@ def seed(if_empty: bool = False) -> None:
 
 
 if __name__ == "__main__":
-    seed(if_empty="--if-empty" in sys.argv)
+    seed(
+        if_empty="--if-empty" in sys.argv,
+        real_embeddings="--real-embeddings" in sys.argv,
+        from_json="--from-json" in sys.argv,
+    )

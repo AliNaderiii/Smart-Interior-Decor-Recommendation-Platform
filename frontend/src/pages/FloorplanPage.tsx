@@ -95,6 +95,27 @@ export default function FloorplanPage() {
   const usedArea = items.reduce((s, i) => s + i.w * i.d, 0);
   const roomArea = width * length;
 
+  /** AABB overlap check: flag pairs overlapping >50% of the smaller item. */
+  const collisions = useMemo(() => {
+    const pairs: [string, string][] = [];
+    const colliding = new Set<string>();
+    for (let a = 0; a < items.length; a++) {
+      for (let b = a + 1; b < items.length; b++) {
+        const A = items[a], B = items[b];
+        const ox = Math.max(0, Math.min(A.x + A.w, B.x + B.w) - Math.max(A.x, B.x));
+        const oy = Math.max(0, Math.min(A.y + A.d, B.y + B.d) - Math.max(A.y, B.y));
+        const overlap = ox * oy;
+        const smaller = Math.min(A.w * A.d, B.w * B.d);
+        if (smaller > 0 && overlap / smaller > 0.5) {
+          pairs.push([A.label, B.label]);
+          colliding.add(A.id);
+          colliding.add(B.id);
+        }
+      }
+    }
+    return { pairs, colliding };
+  }, [items]);
+
   return (
     <div>
       <h1 className="text-2xl font-bold text-walnut">2D Floorplan preview</h1>
@@ -124,7 +145,10 @@ export default function FloorplanPage() {
             {items.map((item) => (
               <g key={item.id} onPointerDown={(e) => onPointerDown(e, item)} className="cursor-move">
                 <rect x={item.x} y={item.y} width={item.w} height={item.d}
-                      fill={item.color} fillOpacity={0.75} rx={6} />
+                      fill={collisions.colliding.has(item.id) ? "#B91C1C" : item.color}
+                      fillOpacity={0.75} rx={6}
+                      stroke={collisions.colliding.has(item.id) ? "#7F1D1D" : "none"}
+                      strokeWidth={collisions.colliding.has(item.id) ? 3 : 0} />
                 <text x={item.x + item.w / 2} y={item.y + item.d / 2}
                       textAnchor="middle" dominantBaseline="middle"
                       fontSize={Math.max(12, width / 40)} fill="#fff" fontWeight={600}
@@ -140,6 +164,11 @@ export default function FloorplanPage() {
           {overflows.length > 0 && (
             <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
               ⚠ {overflows.map((o) => o.label).join(", ")} do{overflows.length === 1 ? "es" : ""} not fit this room.
+            </p>
+          )}
+          {collisions.pairs.length > 0 && (
+            <p className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">
+              ⚠ Overlapping furniture: {collisions.pairs.map(([a, b]) => `${a} × ${b}`).join(", ")} — move them apart.
             </p>
           )}
         </Card>
