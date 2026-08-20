@@ -13,6 +13,9 @@ os.environ.setdefault("STORAGE_BACKEND", "local")
 os.environ.setdefault("PAYMENT_PROVIDER", "mock")
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
 os.environ.setdefault("APP_ENV", "test")
+# TestClient talks plain HTTP, and httpx (correctly) refuses to store `Secure`
+# cookies over http:// — so exercise the cookie path with Secure off.
+os.environ.setdefault("COOKIE_SECURE", "false")
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -89,3 +92,17 @@ def admin_headers(client, db):
     assert resp.status_code == 200, resp.text
     token = resp.json()["data"]["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+# ---------------------------------------------------------------- V2 fixtures
+
+@pytest.fixture()
+def demo_user():
+    """Credentials of the seeded homeowner account."""
+    return {"email": "demo@smartdecor.dev", "password": "Demo1234!"}
+
+
+@pytest.fixture()
+def bearer_headers(auth_headers):
+    """Just the Authorization header (auth_headers returns a (headers, data) tuple)."""
+    return auth_headers[0]

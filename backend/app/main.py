@@ -20,8 +20,13 @@ from app.api.routes import (
     users,
 )
 from app.core.config import settings
+from app.core.security_headers import SecurityHeadersMiddleware
 
 logging.basicConfig(level=logging.INFO)
+
+# V2 (OWASP A02/A04): refuse to start production with weak secrets, no Redis,
+# or insecure cookies. No-op outside production.
+settings.validate_runtime()
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -29,21 +34,32 @@ app = FastAPI(
     description="Smart Interior Decor Recommendation Platform — living room MVP.",
 )
 
+# Order matters: middleware added last runs first on the response path, so
+# SecurityHeadersMiddleware is added after CORS to stamp every response
+# (including CORS preflights and error envelopes).
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.FRONTEND_ORIGIN, "http://localhost:5173", "http://localhost:4173"],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # V2 (A05): narrowed from "*" to exactly what the SPA uses.
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
+    max_age=600,
 )
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 @app.exception_handler(StarletteHTTPException)
 async def http_exception_handler(_: Request, exc: StarletteHTTPException):
-    """Consistent envelope for errors: {success: false, error: ...}."""
+    """Consistent envelope for errors: {success: false, error: ...}.
+
+    V2 fix: the v1 handler dropped ``exc.headers``, which silently swallowed
+    the ``Retry-After`` header on every 429 (and ``WWW-Authenticate`` on 401).
+    """
     return JSONResponse(
         status_code=exc.status_code,
         content={"success": False, "data": None, "error": str(exc.detail)},
+        headers=getattr(exc, "headers", None),
     )
 
 
