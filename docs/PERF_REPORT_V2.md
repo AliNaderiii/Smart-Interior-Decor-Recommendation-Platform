@@ -311,6 +311,22 @@ gone (~38 KB saved). CSS gzip fell 7.50 → 6.97 KB in the process.
 Verified: `grep -rn "<img" src --include=*.tsx` returns only the single tag
 *inside* `OptimizedImage` itself.
 
+**Three bugs caught by dumping the component's real SSR markup** (worth noting,
+because all three were invisible to `tsc` and to the build):
+
+1. `derive()` used `new URL(src, window.location.origin)`, which throws where
+   `window` is undefined, and the `catch` returned `src` unchanged. The result
+   was a `srcset` whose five candidates were all the *same* URL — so the
+   browser happily downloaded the full-size original at every breakpoint,
+   i.e. the component silently did nothing. Now string-based.
+2. The image faded in from `opacity-0` **including the `priority` one** —
+   delaying the largest paint by the transition duration, degrading the exact
+   metric the flag exists to protect. `priority` images now start visible.
+3. A cached image can complete before React attaches `onLoad`, so the event
+   never fires and the image stays at `opacity-0` — invisible, permanently.
+   Now reconciled against `img.complete` after mount, plus a `src`-change
+   effect so a recycled component re-arms the fade.
+
 ### 9.4 Two real bugs found while swapping the HTTP client
 
 - `RecommendationsPage` called `api.post<Envelope<T>>(...)` and then unwrapped
