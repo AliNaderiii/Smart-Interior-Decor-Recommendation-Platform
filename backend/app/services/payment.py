@@ -11,8 +11,10 @@ from abc import ABC, abstractmethod
 import httpx
 
 from app.core.config import settings
+from app.core.datasets import homeowner_plan
 
-PRO_PLAN_PRICE_TOMAN = 490_000
+# Dataset-backed public price; safe fallback preserves offline startup.
+PRO_PLAN_PRICE_TOMAN = int(homeowner_plan("homeowner_premium").get("price_monthly", 99_000))
 
 
 class PaymentGateway(ABC):

@@ -9,15 +9,29 @@
     "seller": "digikala",
     "seller_link": "https://www.digikala.com/product/dkp-4585217/مبل-راحتی-سه-نفره-طوسی-مدرن",
     "image_url": "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&q=80&fm=webp",
-    "dimensions_cm": {"length": 220, "width": 95, "height": 85},
-    "color_palette": ["#CFCFD1", "#2E2E2E", "#8A8A8A"],
-    "style_tags": ["modern", "minimal"],
-    "material_tags": ["fabric", "metal"],
+    "dimensions_cm": {
+      "length": 220,
+      "width": 95,
+      "height": 85
+    },
+    "color_palette": [
+      "#CFCFD1",
+      "#2E2E2E",
+      "#8A8A8A"
+    ],
+    "style_tags": [
+      "modern",
+      "minimal"
+    ],
+    "material_tags": [
+      "fabric",
+      "metal"
+    ],
     "description_for_embedding": "modern minimal light gray 3-seater sofa with black metal legs, linen fabric, clean-lined"
   },
   {
     "id": "prod_002",
-    "title_fa": "مبل چستر کلاسیک چرم عسلی 2 نفره",
+    "title_fa": "مبل چستر عسلی 2 نفره - چرم کلاسیک",
     "title_en": "Chesterfield Leather Sofa 2-Seater Honey",
     "category": "sofa",
     "room_type": "living_room",
@@ -25,10 +39,23 @@
     "seller": "torob",
     "seller_link": "https://torob.com/p/7c3b8a9e/مبل-چستر-چرم-عسلی-دو-نفره/",
     "image_url": "https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?w=800&q=80&fm=webp",
-    "dimensions_cm": {"length": 180, "width": 90, "height": 78},
-    "color_palette": ["#C49A6C", "#3E2C1C", "#D4AF37"],
-    "style_tags": ["classic"],
-    "material_tags": ["leather", "wood"],
+    "dimensions_cm": {
+      "length": 180,
+      "width": 90,
+      "height": 78
+    },
+    "color_palette": [
+      "#C49A6C",
+      "#3E2C1C",
+      "#D4AF37"
+    ],
+    "style_tags": [
+      "classic"
+    ],
+    "material_tags": [
+      "leather",
+      "wood"
+    ],
     "description_for_embedding": "classic chesterfield honey leather 2-seater sofa, tufted, timeless elegant"
   },
   {
@@ -41,10 +68,24 @@
     "seller": "digikala",
     "seller_link": "https://www.digikala.com/product/dkp-5123890/مبل-اسکاندیناوی-چوب-بلوط",
     "image_url": "https://images.unsplash.com/photo-1567016432779-094069958ea5?w=800&q=80&fm=webp",
-    "dimensions_cm": {"length": 200, "width": 85, "height": 80},
-    "color_palette": ["#F2E8D5", "#D9CBB3", "#FFFFFF"],
-    "style_tags": ["scandinavian", "minimal"],
-    "material_tags": ["wood", "fabric"],
+    "dimensions_cm": {
+      "length": 200,
+      "width": 85,
+      "height": 80
+    },
+    "color_palette": [
+      "#F2E8D5",
+      "#D9CBB3",
+      "#FFFFFF"
+    ],
+    "style_tags": [
+      "scandinavian",
+      "minimal"
+    ],
+    "material_tags": [
+      "wood",
+      "fabric"
+    ],
     "description_for_embedding": "scandinavian light oak sofa off-white boucle fabric, airy hygge minimal"
   },
   {
@@ -57,10 +98,24 @@
     "seller": "khoonehroya",
     "seller_link": "https://khoonehroya.ir/product/industrial-walnut-sofa-black/",
     "image_url": "https://images.unsplash.com/photo-1550254478-ead40cc54513?w=800&q=80&fm=webp",
-    "dimensions_cm": {"length": 210, "width": 90, "height": 82},
-    "color_palette": ["#1A1A1A", "#8B4513", "#5B5B5B"],
-    "style_tags": ["industrial"],
-    "material_tags": ["metal", "wood", "leather"],
+    "dimensions_cm": {
+      "length": 210,
+      "width": 90,
+      "height": 82
+    },
+    "color_palette": [
+      "#1A1A1A",
+      "#8B4513",
+      "#5B5B5B"
+    ],
+    "style_tags": [
+      "industrial"
+    ],
+    "material_tags": [
+      "metal",
+      "wood",
+      "leather"
+    ],
     "description_for_embedding": "industrial walnut metal black leather sofa, raw steel loft reclaimed"
   },
   {
@@ -73,10 +128,24 @@
     "seller": "digikala",
     "seller_link": "https://www.digikala.com/product/dkp-3984521/میز-جلومبلی-گردو-فلز-مشکی",
     "image_url": "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800&q=80&fm=webp",
-    "dimensions_cm": {"length": 120, "width": 60, "height": 42},
-    "color_palette": ["#8B4513", "#1A1A1A", "#C8A165"],
-    "style_tags": ["modern", "industrial"],
-    "material_tags": ["wood", "metal"],
+    "dimensions_cm": {
+      "length": 120,
+      "width": 60,
+      "height": 42
+    },
+    "color_palette": [
+      "#8B4513",
+      "#1A1A1A",
+      "#C8A165"
+    ],
+    "style_tags": [
+      "modern",
+      "industrial"
+    ],
+    "material_tags": [
+      "wood",
+      "metal"
+    ],
     "description_for_embedding": "modern walnut coffee table black metal legs 120cm, sleek contemporary"
   },
   {
@@ -89,10 +158,23 @@
     "seller": "torob",
     "seller_link": "https://torob.com/p/2a1b4c5d/میز-جلومبلی-اسکاندیناوی-بیضی/",
     "image_url": "https://images.unsplash.com/photo-1538688525198-9b88f6f53126?w=800&q=80&fm=webp",
-    "dimensions_cm": {"length": 110, "width": 65, "height": 38},
-    "color_palette": ["#F2E8D5", "#FFFFFF", "#D9CBB3"],
-    "style_tags": ["scandinavian", "minimal"],
-    "material_tags": ["wood"],
+    "dimensions_cm": {
+      "length": 110,
+      "width": 65,
+      "height": 38
+    },
+    "color_palette": [
+      "#F2E8D5",
+      "#FFFFFF",
+      "#D9CBB3"
+    ],
+    "style_tags": [
+      "scandinavian",
+      "minimal"
+    ],
+    "material_tags": [
+      "wood"
+    ],
     "description_for_embedding": "scandinavian oval light oak coffee table, airy minimal"
   },
   {
@@ -105,10 +187,23 @@
     "seller": "digikala",
     "seller_link": "https://www.digikala.com/product/dkp-6234510/میز-عسلی-حصیری-بوهو/",
     "image_url": "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=800&q=80&fm=webp",
-    "dimensions_cm": {"length": 50, "width": 50, "height": 45},
-    "color_palette": ["#D9A05B", "#E8D5B7", "#4C6444"],
-    "style_tags": ["boho"],
-    "material_tags": ["rattan", "wood"],
+    "dimensions_cm": {
+      "length": 50,
+      "width": 50,
+      "height": 45
+    },
+    "color_palette": [
+      "#D9A05B",
+      "#E8D5B7",
+      "#4C6444"
+    ],
+    "style_tags": [
+      "boho"
+    ],
+    "material_tags": [
+      "rattan",
+      "wood"
+    ],
     "description_for_embedding": "boho woven rattan wood side tables eclectic earthy set"
   },
   {
@@ -121,10 +216,23 @@
     "seller": "digikala",
     "seller_link": "https://www.digikala.com/product/dkp-7845123/فرش-مدرن-انتزاعی-طوسی-کرم/",
     "image_url": "https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?w=800&q=80&fm=webp",
-    "dimensions_cm": {"length": 300, "width": 200, "height": 2},
-    "color_palette": ["#CFCFCF", "#EDEDED", "#2E2E2E"],
-    "style_tags": ["modern", "minimal"],
-    "material_tags": ["fabric"],
+    "dimensions_cm": {
+      "length": 300,
+      "width": 200,
+      "height": 2
+    },
+    "color_palette": [
+      "#CFCFCF",
+      "#EDEDED",
+      "#2E2E2E"
+    ],
+    "style_tags": [
+      "modern",
+      "minimal"
+    ],
+    "material_tags": [
+      "fabric"
+    ],
     "description_for_embedding": "modern abstract rug gray cream minimal pared-back"
   },
   {
@@ -137,10 +245,22 @@
     "seller": "torob",
     "seller_link": "https://torob.com/p/9f8e7d6c/فرش-دستباف-کلاسیک-لاکی/",
     "image_url": "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&q=80&fm=webp",
-    "dimensions_cm": {"length": 350, "width": 250, "height": 2},
-    "color_palette": ["#7B1E26", "#D4AF37", "#3E2C1C"],
-    "style_tags": ["classic"],
-    "material_tags": ["fabric"],
+    "dimensions_cm": {
+      "length": 350,
+      "width": 250,
+      "height": 2
+    },
+    "color_palette": [
+      "#7B1E26",
+      "#D4AF37",
+      "#3E2C1C"
+    ],
+    "style_tags": [
+      "classic"
+    ],
+    "material_tags": [
+      "fabric"
+    ],
     "description_for_embedding": "classic persian handwoven red rug ornate timeless elegant"
   },
   {
@@ -153,10 +273,23 @@
     "seller": "khoonehroya",
     "seller_link": "https://khoonehroya.ir/product/boho-jute-rug/",
     "image_url": "https://images.unsplash.com/photo-1600166898405-da9535204843?w=800&q=80&fm=webp",
-    "dimensions_cm": {"length": 230, "width": 160, "height": 1},
-    "color_palette": ["#E8D5B7", "#D9A05B", "#8B4513"],
-    "style_tags": ["boho", "scandinavian"],
-    "material_tags": ["fabric"],
+    "dimensions_cm": {
+      "length": 230,
+      "width": 160,
+      "height": 1
+    },
+    "color_palette": [
+      "#E8D5B7",
+      "#D9A05B",
+      "#8B4513"
+    ],
+    "style_tags": [
+      "boho",
+      "scandinavian"
+    ],
+    "material_tags": [
+      "fabric"
+    ],
     "description_for_embedding": "boho jute woven rug cream brown eclectic natural"
   },
   {
@@ -169,10 +302,25 @@
     "seller": "digikala",
     "seller_link": "https://www.digikala.com/product/dkp-4123658/چراغ-ایستاده-مدرن-سه-پایه/",
     "image_url": "https://images.unsplash.com/photo-1507473885765-e6ed057f782c?w=800&q=80&fm=webp",
-    "dimensions_cm": {"length": 50, "width": 50, "height": 160},
-    "color_palette": ["#1A1A1A", "#C8A165", "#FFFFFF"],
-    "style_tags": ["modern", "scandinavian"],
-    "material_tags": ["metal", "wood", "fabric"],
+    "dimensions_cm": {
+      "length": 50,
+      "width": 50,
+      "height": 160
+    },
+    "color_palette": [
+      "#1A1A1A",
+      "#C8A165",
+      "#FFFFFF"
+    ],
+    "style_tags": [
+      "modern",
+      "scandinavian"
+    ],
+    "material_tags": [
+      "metal",
+      "wood",
+      "fabric"
+    ],
     "description_for_embedding": "modern tripod floor lamp black wood legs linen shade"
   },
   {
@@ -185,10 +333,21 @@
     "seller": "torob",
     "seller_link": "https://torob.com/p/1b2c3d4e/لوستر-صنعتی-مشکی-6-شعله/",
     "image_url": "https://images.unsplash.com/photo-1540932239986-30128078f3c5?w=800&q=80&fm=webp",
-    "dimensions_cm": {"length": 80, "width": 80, "height": 40},
-    "color_palette": ["#1A1A1A", "#5B5B5B"],
-    "style_tags": ["industrial"],
-    "material_tags": ["metal"],
+    "dimensions_cm": {
+      "length": 80,
+      "width": 80,
+      "height": 40
+    },
+    "color_palette": [
+      "#1A1A1A",
+      "#5B5B5B"
+    ],
+    "style_tags": [
+      "industrial"
+    ],
+    "material_tags": [
+      "metal"
+    ],
     "description_for_embedding": "industrial black metal chandelier 6 lights loft raw"
   },
   {
@@ -201,10 +360,25 @@
     "seller": "digikala",
     "seller_link": "https://www.digikala.com/product/dkp-6985412/آباژور-بوهو-حصیری/",
     "image_url": "https://images.unsplash.com/photo-1513506003901-1e6a229e2d15?w=800&q=80&fm=webp",
-    "dimensions_cm": {"length": 35, "width": 35, "height": 55},
-    "color_palette": ["#D9A05B", "#E8D5B7", "#F2E8D5"],
-    "style_tags": ["boho", "scandinavian"],
-    "material_tags": ["rattan", "wood", "fabric"],
+    "dimensions_cm": {
+      "length": 35,
+      "width": 35,
+      "height": 55
+    },
+    "color_palette": [
+      "#D9A05B",
+      "#E8D5B7",
+      "#F2E8D5"
+    ],
+    "style_tags": [
+      "boho",
+      "scandinavian"
+    ],
+    "material_tags": [
+      "rattan",
+      "wood",
+      "fabric"
+    ],
     "description_for_embedding": "boho rattan table lamp wood base woven warm light"
   },
   {
@@ -217,10 +391,24 @@
     "seller": "digikala",
     "seller_link": "https://www.digikala.com/product/dkp-5214789/صندلی-لهستانی-چوبی/",
     "image_url": "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=800&q=80&fm=webp",
-    "dimensions_cm": {"length": 65, "width": 60, "height": 82},
-    "color_palette": ["#D9CBB3", "#CFCFD1", "#8A8A8A"],
-    "style_tags": ["scandinavian", "modern"],
-    "material_tags": ["wood", "fabric"],
+    "dimensions_cm": {
+      "length": 65,
+      "width": 60,
+      "height": 82
+    },
+    "color_palette": [
+      "#D9CBB3",
+      "#CFCFD1",
+      "#8A8A8A"
+    ],
+    "style_tags": [
+      "scandinavian",
+      "modern"
+    ],
+    "material_tags": [
+      "wood",
+      "fabric"
+    ],
     "description_for_embedding": "mid-century scandinavian wood chair gray fabric minimal"
   },
   {
@@ -233,10 +421,23 @@
     "seller": "khoonehroya",
     "seller_link": "https://khoonehroya.ir/product/boho-rocking-rattan/",
     "image_url": "https://images.unsplash.com/photo-1598300042247-d088f8ab3a91?w=800&q=80&fm=webp",
-    "dimensions_cm": {"length": 75, "width": 85, "height": 95},
-    "color_palette": ["#D9A05B", "#E8D5B7", "#4C6444"],
-    "style_tags": ["boho"],
-    "material_tags": ["rattan", "wood"],
+    "dimensions_cm": {
+      "length": 75,
+      "width": 85,
+      "height": 95
+    },
+    "color_palette": [
+      "#D9A05B",
+      "#E8D5B7",
+      "#4C6444"
+    ],
+    "style_tags": [
+      "boho"
+    ],
+    "material_tags": [
+      "rattan",
+      "wood"
+    ],
     "description_for_embedding": "boho rattan rocking chair woven eclectic armchair"
   },
   {
@@ -249,10 +450,24 @@
     "seller": "digikala",
     "seller_link": "https://www.digikala.com/product/dkp-6325418/بوفه-مدرن-گردو-180/",
     "image_url": "https://images.unsplash.com/photo-1594026112284-02bb6f3352fe?w=800&q=80&fm=webp",
-    "dimensions_cm": {"length": 180, "width": 45, "height": 75},
-    "color_palette": ["#8B4513", "#1A1A1A", "#C8A165"],
-    "style_tags": ["modern", "minimal"],
-    "material_tags": ["wood", "metal"],
+    "dimensions_cm": {
+      "length": 180,
+      "width": 45,
+      "height": 75
+    },
+    "color_palette": [
+      "#8B4513",
+      "#1A1A1A",
+      "#C8A165"
+    ],
+    "style_tags": [
+      "modern",
+      "minimal"
+    ],
+    "material_tags": [
+      "wood",
+      "metal"
+    ],
     "description_for_embedding": "modern walnut sideboard 180cm 3 doors sleek metal legs"
   },
   {
@@ -265,10 +480,23 @@
     "seller": "torob",
     "seller_link": "https://torob.com/p/5e6f7a8b/شلف-دیواری-صنعتی-ست-3تایی/",
     "image_url": "https://images.unsplash.com/photo-1532372320572-cda25653a694?w=800&q=80&fm=webp",
-    "dimensions_cm": {"length": 80, "width": 20, "height": 25},
-    "color_palette": ["#8B4513", "#1A1A1A"],
-    "style_tags": ["industrial", "modern"],
-    "material_tags": ["wood", "metal"],
+    "dimensions_cm": {
+      "length": 80,
+      "width": 20,
+      "height": 25
+    },
+    "color_palette": [
+      "#8B4513",
+      "#1A1A1A"
+    ],
+    "style_tags": [
+      "industrial",
+      "modern"
+    ],
+    "material_tags": [
+      "wood",
+      "metal"
+    ],
     "description_for_embedding": "industrial wood metal floating wall shelves set"
   },
   {
@@ -281,10 +509,24 @@
     "seller": "digikala",
     "seller_link": "https://www.digikala.com/product/dkp-7451236/مبل-تختخوابشو-مدرن-طوسی/",
     "image_url": "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&q=80&fm=webp",
-    "dimensions_cm": {"length": 200, "width": 90, "height": 85},
-    "color_palette": ["#8A8A8A", "#2E2E2E", "#CFCFD1"],
-    "style_tags": ["modern", "minimal"],
-    "material_tags": ["fabric", "metal"],
+    "dimensions_cm": {
+      "length": 200,
+      "width": 90,
+      "height": 85
+    },
+    "color_palette": [
+      "#8A8A8A",
+      "#2E2E2E",
+      "#CFCFD1"
+    ],
+    "style_tags": [
+      "modern",
+      "minimal"
+    ],
+    "material_tags": [
+      "fabric",
+      "metal"
+    ],
     "description_for_embedding": "modern gray sofa bed metal frame convertible minimal"
   },
   {
@@ -297,10 +539,23 @@
     "seller": "digikala",
     "seller_link": "https://www.digikala.com/product/dkp-8541236/میز-تلویزیون-گردو-200/",
     "image_url": "https://images.unsplash.com/photo-1618220179428-22790b461013?w=800&q=80&fm=webp",
-    "dimensions_cm": {"length": 200, "width": 40, "height": 50},
-    "color_palette": ["#8B4513", "#2E2E2E"],
-    "style_tags": ["modern", "minimal"],
-    "material_tags": ["wood", "metal"],
+    "dimensions_cm": {
+      "length": 200,
+      "width": 40,
+      "height": 50
+    },
+    "color_palette": [
+      "#8B4513",
+      "#2E2E2E"
+    ],
+    "style_tags": [
+      "modern",
+      "minimal"
+    ],
+    "material_tags": [
+      "wood",
+      "metal"
+    ],
     "description_for_embedding": "modern walnut tv stand 200cm low profile"
   },
   {
@@ -313,10 +568,24 @@
     "seller": "digikala",
     "seller_link": "https://www.digikala.com/product/dkp-9632145/کوسن-مخمل-سبز-یشمی/",
     "image_url": "https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?w=800&q=80&fm=webp",
-    "dimensions_cm": {"length": 45, "width": 45, "height": 15},
-    "color_palette": ["#4C6444", "#2E8B57", "#F2E8D5"],
-    "style_tags": ["boho", "modern", "classic"],
-    "material_tags": ["fabric"],
+    "dimensions_cm": {
+      "length": 45,
+      "width": 45,
+      "height": 15
+    },
+    "color_palette": [
+      "#4C6444",
+      "#2E8B57",
+      "#F2E8D5"
+    ],
+    "style_tags": [
+      "boho",
+      "modern",
+      "classic"
+    ],
+    "material_tags": [
+      "fabric"
+    ],
     "description_for_embedding": "velvet emerald green cushion 45x45 decorative"
   }
 ]

@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { get, patch, post } from "@/lib/api";
 import type { AdminProduct } from "@/lib/types";
-import { CATEGORY_LABELS, formatToman } from "@/lib/constants";
+import { CATEGORY_LABELS, STYLES, formatToman } from "@/lib/constants";
 import { Badge, Button, Card, Skeleton } from "@/components/ui";
 import { EmptyState, ErrorState } from "@/components/states";
 import { OptimizedImage } from "@/components/OptimizedImage";
@@ -114,6 +114,15 @@ export default function AdminProductsPage() {
     setEditJson(JSON.stringify(editableOf(p), null, 2));
   }
 
+  function toggleEditorStyle(styleId: string) {
+    try {
+      const parsed = JSON.parse(editJson) as Record<string, unknown>;
+      const current = Array.isArray(parsed.styles) ? parsed.styles as string[] : [];
+      parsed.styles = current.includes(styleId) ? current.filter((id) => id !== styleId) : [...current, styleId];
+      setEditJson(JSON.stringify(parsed, null, 2));
+    } catch { /* textarea validation already explains malformed JSON */ }
+  }
+
   function toggleSelected(id: string) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -140,6 +149,12 @@ export default function AdminProductsPage() {
 
   const jsonValid = useMemo(() => {
     try { JSON.parse(editJson); return true; } catch { return false; }
+  }, [editJson]);
+  const editorStyles = useMemo(() => {
+    try {
+      const value = (JSON.parse(editJson) as { styles?: unknown }).styles;
+      return Array.isArray(value) ? value as string[] : [];
+    } catch { return []; }
   }, [editJson]);
 
   useCommands(
@@ -368,6 +383,18 @@ export default function AdminProductsPage() {
             <p className="mt-1 text-xs text-[var(--color-muted)]">
               Human-in-the-loop: correct what the model got wrong, check the diff, then save.
             </p>
+            <fieldset className="mt-4">
+              <legend className="text-xs font-semibold text-[var(--color-muted)]">Style taxonomy</legend>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {STYLES.map((style) => (
+                  <button key={style.id} type="button" onClick={() => toggleEditorStyle(style.id)}
+                          aria-pressed={editorStyles.includes(style.id)}
+                          className={`rounded-full border px-3 py-1 text-xs ${editorStyles.includes(style.id) ? "border-[var(--color-accent)] bg-[var(--color-accent)]/10" : "border-[var(--color-line)]"}`}>
+                    {style.icon} {style.fa}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
             <textarea
               value={editJson}
               onChange={(e) => setEditJson(e.target.value)}

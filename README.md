@@ -117,3 +117,14 @@ only) · no secrets in the repo. See `docs/DEPLOYMENT.md` §7 for the full mappi
 - [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — Docker, Liara, Arvan, EC2, runbook
 - [docs/API.md](docs/API.md) — endpoint reference (interactive at `/docs`)
 - [docs/WALKTHROUGH.md](docs/WALKTHROUGH.md) — 10-minute demo script
+
+## Realistic datasets (V3)
+
+Docker now seeds a 150-row Persian sample catalog with Toman prices, real-world dimensions and product-level Digikala/Torob links. The style quiz, taxonomy and plans read the committed files in `datasets/`; mock AI/hash embeddings remain available offline.
+
+```bash
+python datasets/expand_products.py
+python backend/scripts/load_realistic_products.py --realistic --expand-to 150 --clear
+```
+
+The expanded catalog is demo data derived from 20 curated examples—not a live stock feed. For production replacement fields and required service keys, read [the client dataset request](docs/CLIENT_DATASETS_REQUEST.md) and [deployment guide](docs/DEPLOYMENT.md).

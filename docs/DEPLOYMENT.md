@@ -90,3 +90,25 @@ docker compose exec backend alembic revision --autogenerate -m "…"
 | No payment data | `payments` table stores authority/ref_id only |
 | JWT 15 min / 7 d + blacklist | `app/core/security.py`, `app/api/routes/auth.py` |
 | No secrets in repo | all via `.env`; `.env` gitignored; `.env.example` documented |
+
+## V3: from offline demo to production data
+
+The default Docker seed now loads `backend/seed_data/products_realistic_150.json`. It is realistic **sample structure**, not a live inventory feed.
+
+1. Validate the client's export against `datasets/products_realistic.json` and replace the committed/imported catalog through a controlled data release.
+2. Set `AI_PROVIDER=gemini` (or `openai`) and provide its key. Keep `EMBEDDING_BACKEND=hash` until CLIP vectors are generated on a networked machine:
+   ```bash
+   pip install torch sentence-transformers
+   python backend/scripts/seed_products.py --real-embeddings
+   ```
+3. Configure Arvan/Liara/AWS with `STORAGE_BACKEND=s3` and `S3_*`; use licensed product images and a CDN base URL.
+4. Set `PAYMENT_PROVIDER=zarinpal`, the merchant ID and HTTPS callback. Card data is never stored; only gateway authority/reference IDs are persisted.
+5. Set `EMAIL_PROVIDER=resend`, `RESEND_API_KEY` and a verified `EMAIL_FROM` domain.
+6. Generate strong `SECRET_KEY` and `FERNET_KEY`, set production origins/cookies, and store all values in the platform secret manager.
+7. Run the loader and checks:
+   ```bash
+   python backend/scripts/load_realistic_products.py --realistic --expand-to 150 --clear --from-json
+   python scripts/check_links.py
+   ```
+
+Without keys, the supported offline path remains mock AI + hash embeddings + local storage + mock payment/email. See `.env.example`, `.env.example.v2`, and `docs/CLIENT_DATASETS_REQUEST.md`.

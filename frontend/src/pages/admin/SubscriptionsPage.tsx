@@ -76,7 +76,7 @@ export default function AdminSubscriptionsPage() {
                   {s.is_active ? <Badge tone="success">active</Badge> : <Badge>inactive</Badge>}
                 </td>
                 <td className="px-4 py-3 text-[var(--color-muted)]">
-                  {s.expires_at ? new Date(s.expires_at).toLocaleDateString() : "—"}
+                  {s.expires_at ? new Date(s.expires_at).toLocaleDateString("fa-IR") : "—"}
                 </td>
               </tr>
             ))}

@@ -1,0 +1,127 @@
+{
+  "taxonomy_version": "2.0",
+  "inspired_by": ["Houzz", "Wayfair", "West Elm", "Article", "Made.com"],
+  "styles": [
+    {
+      "id": "modern",
+      "name_fa": "مدرن",
+      "name_en": "Modern",
+      "description_fa": "خطوط تمیز، متریال‌های براق، رنگ‌های خنثی تیره و روشن، مینیمال ولی گرم",
+      "description_en": "Clean lines, glossy materials, dark and light neutrals, minimal but warm",
+      "colors": ["#2E2E2E", "#FFFFFF", "#8A8A8A", "#3B5B7A", "#1A1A1A"],
+      "materials": ["metal", "glass", "leather", "fabric"],
+      "adjectives": ["sleek", "contemporary", "clean-lined", "low-profile"],
+      "icon": "◆",
+      "sample_image": "https://images.unsplash.com/photo-1555041469-a586c61ea9bc",
+      "wayfair_keywords": ["mid-century", "contemporary", "sleek"],
+      "price_tier": "medium-high"
+    },
+    {
+      "id": "scandinavian",
+      "name_fa": "اسکاندیناوی",
+      "name_en": "Scandinavian",
+      "description_fa": "چوب بلوط روشن، پارچه‌های بافتنی، رنگ‌های روشن و هوا، حس Hygge و آرامش",
+      "description_en": "Light oak, bouclé fabrics, light airy colors, Hygge and calm feeling",
+      "colors": ["#F2E8D5", "#D9CBB3", "#C8A165", "#FFFFFF", "#EDEDED"],
+      "materials": ["wood", "fabric"],
+      "adjectives": ["light oak", "airy", "hygge", "boucle", "pared-back"],
+      "icon": "○",
+      "sample_image": "https://images.unsplash.com/photo-1567016432779-094069958ea5",
+      "wayfair_keywords": ["nordic", "light wood", "airy"],
+      "price_tier": "medium"
+    },
+    {
+      "id": "industrial",
+      "name_fa": "صنعتی",
+      "name_en": "Industrial",
+      "description_fa": "فلز مشکی، چوب گردوی تیره، چرم، حس لافت نیویورکی، خام و جسور",
+      "description_en": "Black metal, dark walnut, leather, NYC loft feeling, raw and bold",
+      "colors": ["#1A1A1A", "#8B4513", "#5B5B5B", "#6D4C33"],
+      "materials": ["metal", "wood", "leather"],
+      "adjectives": ["raw steel", "loft", "reclaimed", "exposed", "bold"],
+      "icon": "⬢",
+      "sample_image": "https://images.unsplash.com/photo-1550254478-ead40cc54513",
+      "wayfair_keywords": ["loft", "raw", "metal frame"],
+      "price_tier": "medium-high"
+    },
+    {
+      "id": "boho",
+      "name_fa": "بوهو / بوهمی",
+      "name_en": "Bohemian",
+      "description_fa": "حصیر، جوت، رنگ‌های خاکی گرم، بافت‌های دست‌بافت، حس آزاد و سفری",
+      "description_en": "Rattan, jute, warm earthy colors, handmade textures, free and traveled feeling",
+      "colors": ["#D9A05B", "#E8D5B7", "#C1633F", "#4C6444", "#F2E8D5"],
+      "materials": ["rattan", "fabric", "wood"],
+      "adjectives": ["woven", "eclectic", "earthy", "handmade", "layered"],
+      "icon": "✦",
+      "sample_image": "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85",
+      "wayfair_keywords": ["rattan", "woven", "eclectic"],
+      "price_tier": "low-medium"
+    },
+    {
+      "id": "minimal",
+      "name_fa": "مینیمال",
+      "name_en": "Minimal",
+      "description_fa": "سفید و طوسی، خطوط بسیار تمیز، بدون تزئین اضافه، آرامش مطلق",
+      "description_en": "White and gray, very clean lines, no extra decoration, absolute calm",
+      "colors": ["#FFFFFF", "#EDEDED", "#CFCFCF", "#1A1A1A", "#8A8A8A"],
+      "materials": ["wood", "metal", "fabric"],
+      "adjectives": ["pared-back", "essential", "quiet", "monochrome", "clean"],
+      "icon": "─",
+      "sample_image": "https://images.unsplash.com/photo-1586023492125-27b2c045efd7",
+      "wayfair_keywords": ["minimalist", "monochrome", "quiet"],
+      "price_tier": "medium-high"
+    },
+    {
+      "id": "classic",
+      "name_fa": "کلاسیک",
+      "name_en": "Classic",
+      "description_fa": "چوب تیره منبت‌کاری، مخمل، رنگ‌های غنی زرشکی و طلایی، حس جاودانگی",
+      "description_en": "Dark carved wood, velvet, rich burgundy and gold, timeless feeling",
+      "colors": ["#6D4C33", "#7B1E26", "#D4AF37", "#3E2C1C", "#E8D5B7"],
+      "materials": ["wood", "fabric", "leather"],
+      "adjectives": ["ornate", "timeless", "elegant", "tufted", "carved"],
+      "icon": "❧",
+      "sample_image": "https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e",
+      "wayfair_keywords": ["chesterfield", "tufted", "ornate"],
+      "price_tier": "high"
+    }
+  ],
+  "color_psychology": {
+    "inspired_by": "West Elm color naming",
+    "palettes": [
+      {
+        "id": "warm_neutrals",
+        "name_fa": "خنثی گرم",
+        "colors": ["#F2E8D5", "#D9CBB3", "#E8D5B7"],
+        "mood": "آرام، دنج، اسکاندیناوی"
+      },
+      {
+        "id": "earthy_boho",
+        "name_fa": "خاکی بوهو",
+        "colors": ["#D9A05B", "#C1633F", "#4C6444"],
+        "mood": "گرم، سفری، بوهو"
+      },
+      {
+        "id": "modern_mono",
+        "name_fa": "مونوکروم مدرن",
+        "colors": ["#2E2E2E", "#8A8A8A", "#FFFFFF"],
+        "mood": "مینیمال، شهری، مدرن"
+      },
+      {
+        "id": "deep_industrial",
+        "name_fa": "تیره صنعتی",
+        "colors": ["#1A1A1A", "#8B4513", "#5B5B5B"],
+        "mood": "جسور، لافت، صنعتی"
+      }
+    ]
+  },
+  "materials_taxonomy": {
+    "wood": {"name_fa": "چوب", "subtypes": ["بلوط روشن", "گردو تیره", "کاج", "منگنه"]},
+    "metal": {"name_fa": "فلز", "subtypes": ["فلز مشکی مات", "برنجی", "استیل", "آهن خام"]},
+    "fabric": {"name_fa": "پارچه", "subtypes": ["کتان", "بوکله", "مخمل", "کتان بافت"]},
+    "leather": {"name_fa": "چرم", "subtypes": ["چرم طبیعی", "چرم مصنوعی"]},
+    "rattan": {"name_fa": "حصیر", "subtypes": ["حصیر طبیعی", "جوت", "کنف"]},
+    "glass": {"name_fa": "شیشه", "subtypes": ["شیشه شفاف", "دودی"]}
+  }
+}

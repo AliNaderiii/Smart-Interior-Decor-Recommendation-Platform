@@ -45,7 +45,11 @@ def _load_clip():
             _model = SentenceTransformer("clip-ViT-B-32")
             logger.info("CLIP ViT-B/32 loaded and cached in memory")
         except Exception as exc:  # pragma: no cover - env dependent
-            logger.warning("CLIP unavailable (%s); falling back to hash backend", exc)
+            logger.warning(
+                "CLIP unavailable (%s). Using hash fallback, not real CLIP - "
+                "generate embeddings_real.json with --real-embeddings on networked machine",
+                exc,
+            )
             _model = None
     return _model
 
