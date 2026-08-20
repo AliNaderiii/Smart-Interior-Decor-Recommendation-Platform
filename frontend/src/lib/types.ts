@@ -57,6 +57,9 @@ export interface RecommendedProduct {
   final_score: number;
   explanation: Explanation;
   locked?: boolean;
+  /** +1 / -1 when this user has already rated the product (V2 Phase 3). */
+  feedback?: number;
+  is_verified?: boolean;
 }
 
 export interface RecommendResult {

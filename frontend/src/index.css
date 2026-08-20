@@ -12,6 +12,24 @@
   --color-stone: #8a8178;
   --font-sans: "Inter Variable", "Vazirmatn", ui-sans-serif, system-ui, sans-serif;
 
+  /* ---- V2 design system (docs/DESIGN_SYSTEM_V2.md) ---- */
+  --color-canvas:  #FAF8F5;   /* never pure white */
+  --color-surface: #FFFFFF;
+  --color-ink:     #111827;
+  --color-muted:   #6B7280;
+  --color-faint:   #9CA3AF;
+  --color-line:    #F3F4F6;
+  --color-accent:  #0F172A;   /* the single accent */
+  --color-ok:      #047857;
+  --color-warn:    #B45309;
+  --color-danger:  #B91C1C;
+
+  --radius-card: 16px;
+
+  --shadow-card:  0 1px 3px rgb(17 24 39 / 0.04), 0 8px 30px rgb(17 24 39 / 0.04);
+  --shadow-hover: 0 2px 6px rgb(17 24 39 / 0.06), 0 12px 40px rgb(17 24 39 / 0.08);
+  --shadow-float: 0 8px 40px rgb(17 24 39 / 0.12);
+
   /* Shimmer sweep used by <Skeleton> (Tailwind v4 generates .animate-shimmer) */
   --animate-shimmer: shimmer 1.6s infinite;
 }
@@ -20,12 +38,96 @@
   100% { transform: translateX(100%); }
 }
 
+/* ---------------------------------------------------------------------------
+   CSS motion for the EAGER shell (page transitions, toasts, card hover).
+   ---------------------------------------------------------------------------
+   These three effects are pure fade / translate / shadow. Framer Motion's core
+   is ~35 KB gzip even behind LazyMotion, which alone would blow the <120 KB
+   initial-JS budget — a 35 KB physics engine to move something 20px is not a
+   trade worth making. Framer Motion is still used for everything that genuinely
+   needs it (shared-element layoutId tabs, drag, AnimatePresence exit
+   choreography, crossfades), but all of those live in lazily-loaded route
+   chunks, so they cost nothing on first paint.
+
+   Timings intentionally mirror DESIGN_SYSTEM_V2 §4 so the shell and the routes
+   feel like one system: ~250ms, ease-out, no bounce.
+   -------------------------------------------------------------------------- */
+
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.page-enter {
+  animation: page-enter 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.toast-in {
+  animation: toast-in 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Card hover lift — DESIGN_SYSTEM_V2 §4 (y:-2 + shadow). */
+.card-lift {
+  transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.2s ease-out;
+}
+.card-lift:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
+.card-lift:active { transform: translateY(0) scale(0.99); }
+
+/* prefers-reduced-motion is a hard requirement, not a nicety (§4). */
+@media (prefers-reduced-motion: reduce) {
+  .page-enter, .toast-in { animation: none; }
+  .card-lift, .card-lift:hover, .card-lift:active { transition: none; transform: none; }
+}
+
+/* Dark mode is class-based so the in-app toggle can override the OS. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 html {
-  background-color: var(--color-cream);
+  background-color: var(--color-canvas);
   color: var(--color-ink);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
+
+html.dark {
+  --color-canvas:  #0F172A;
+  --color-surface: #1E293B;
+  --color-ink:     #F1F5F9;
+  --color-muted:   #94A3B8;
+  --color-faint:   #64748B;
+  --color-line:    #334155;
+  --color-accent:  #F1F5F9;
+  --color-sand:    #334155;
+  /* Shadows are invisible on dark; elevation comes from a lighter surface.
+     Keep a faint ring so cards still have an edge. */
+  --shadow-card:  0 0 0 1px rgb(148 163 184 / 0.10);
+  --shadow-hover: 0 0 0 1px rgb(148 163 184 / 0.20);
+  --shadow-float: 0 8px 40px rgb(0 0 0 / 0.50);
+}
+
+/* Chrome flips, photography does not. */
+html.dark img { filter: none; }
+
+::selection { background: color-mix(in srgb, var(--color-clay) 25%, transparent); }
+
+/* Focus ring: always visible, never removed (DESIGN_SYSTEM_V2 §6). */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Headings: weight 650 + tight tracking, Latin only. Negative tracking
+   corrupts Vazirmatn's letterform joins, so it is scoped, never global. */
+.h-display { font-size: 3rem;    line-height: 1.1; font-weight: 650; letter-spacing: -0.03em; text-wrap: balance; }
+.h1        { font-size: 2rem;    line-height: 1.2; font-weight: 650; letter-spacing: -0.02em; text-wrap: balance; }
+.h2        { font-size: 1.5rem;  line-height: 1.3; font-weight: 650; letter-spacing: -0.02em; text-wrap: balance; }
+.h3        { font-size: 1.125rem;line-height: 1.4; font-weight: 600; letter-spacing: -0.01em; }
+:is(.h-display, .h1, .h2, .h3):lang(fa) { letter-spacing: normal; }
+
+.micro { font-size: 0.6875rem; line-height: 1.4; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
 
 /* react-grid-layout minimal styles (bundled to avoid extra CSS request) */
 .react-grid-layout { position: relative; transition: height 200ms ease; }

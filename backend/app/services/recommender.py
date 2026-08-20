@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 from ai.embedding_service import cosine_similarity, get_embedding, quiz_to_text
 from app.core.config import settings
 from app.core.redis_client import get_redis
+from app.models.feedback import ProductFeedback
 from app.models.product import CATEGORIES, Product
 
 logger = logging.getLogger(__name__)
@@ -256,6 +257,59 @@ def _product_payload(p: Product) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Feedback re-ranking (V2 Phase 3)
+# ---------------------------------------------------------------------------
+# RESEARCH_V2 §2 (Havenly): feedback must visibly change the next result set,
+# otherwise the thumbs are decorative. We apply a bounded post-score adjustment
+# rather than retraining anything:
+#
+#   👍 -> +FEEDBACK_BOOST on final_score
+#   👎 -> -FEEDBACK_PENALTY, and the item is demoted below all un-rated items
+#
+# The penalty is larger than the boost because "no" is a stronger, more
+# reliable signal than "yes" — a user who dislikes a sofa really does not want
+# to keep seeing it, whereas a like is often mild interest.
+FEEDBACK_BOOST = 0.12
+FEEDBACK_PENALTY = 0.35
+
+
+def load_feedback(db: Session, user_id: str | None) -> dict[str, int]:
+    """Map product_id -> signal for one user. Empty for anonymous callers."""
+    if not user_id:
+        return {}
+    try:
+        rows = db.execute(
+            select(ProductFeedback.product_id, ProductFeedback.signal).where(
+                ProductFeedback.user_id == user_id
+            )
+        ).all()
+    except Exception as exc:  # never break recommendations over a side table
+        logger.warning("feedback load failed: %s", exc)
+        return {}
+    return {pid: sig for pid, sig in rows}
+
+
+def apply_feedback(
+    ranked: list[dict[str, Any]], feedback: dict[str, int]
+) -> list[dict[str, Any]]:
+    """Adjust and re-sort one category's ranked list in place-safe fashion."""
+    if not feedback:
+        return ranked
+    for row in ranked:
+        sig = feedback.get(row.get("id", ""))
+        if not sig:
+            continue
+        if sig > 0:
+            row["final_score"] = min(1.0, row["final_score"] + FEEDBACK_BOOST)
+            row["feedback"] = 1
+        else:
+            row["final_score"] = max(0.0, row["final_score"] - FEEDBACK_PENALTY)
+            row["feedback"] = -1
+    ranked.sort(key=lambda r: r["final_score"], reverse=True)
+    return ranked
+
+
+# ---------------------------------------------------------------------------
 # Cache stampede protection (V2 Phase 2)
 # ---------------------------------------------------------------------------
 # Measured on the 20.7k-row catalog: a single cold /recommend costs ~139 ms
@@ -324,11 +378,20 @@ def recommend(
          budget_min_toman, budget_max_toman, materials: [..], patterns: [..]}
     """
     categories = categories or CATEGORIES
-    cache_key = quiz_cache_key({**quiz, "_categories": categories}, user_id)
+    feedback = load_feedback(db, user_id)
+    # Feedback is part of the cache identity: a thumbs-down that did not
+    # invalidate the cached payload would appear to do nothing until the TTL
+    # expired, which is exactly the "dead key" failure mode we are fixing.
+    fingerprint = {
+        **quiz,
+        "_categories": categories,
+        "_fb": sorted(feedback.items()) if feedback else None,
+    }
+    cache_key = quiz_cache_key(fingerprint, user_id)
     redis = get_redis()
 
     if not use_cache:
-        return _compute(db, quiz, categories)
+        return _compute(db, quiz, categories, feedback)
 
     hit = _read_cache(redis, cache_key)
     if hit is not None:
@@ -339,7 +402,7 @@ def recommend(
     acquired = lock.acquire(timeout=_SINGLEFLIGHT_TIMEOUT_S)
     if not acquired:
         logger.warning("single-flight wait timed out for %s; computing anyway", cache_key)
-        return _compute(db, quiz, categories)
+        return _compute(db, quiz, categories, feedback)
     try:
         # Re-check: the leader we queued behind has just populated the cache.
         hit = _read_cache(redis, cache_key)
@@ -347,7 +410,7 @@ def recommend(
             return hit
 
         started = time.perf_counter()
-        result = _compute(db, quiz, categories)
+        result = _compute(db, quiz, categories, feedback)
         try:
             redis.setex(cache_key, settings.RECOMMEND_CACHE_TTL, orjson.dumps(result))
         except Exception as exc:
@@ -362,7 +425,10 @@ def recommend(
 
 
 def _compute(
-    db: Session, quiz: dict[str, Any], categories: list[str]
+    db: Session,
+    quiz: dict[str, Any],
+    categories: list[str],
+    feedback: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     """Run the actual 3-stage pipeline (uncached)."""
     user_emb = quiz.get("quiz_embedding") or get_embedding(
@@ -389,6 +455,10 @@ def _compute(
             score = calculate_score(product, quiz, style_sim)
             ranked.append({**_product_payload(product), **score})
         ranked.sort(key=lambda r: r["final_score"], reverse=True)
+        # Stage D: personal feedback. Applied AFTER scoring so the explainable
+        # breakdown still reflects the objective match, with the personal
+        # adjustment visible as a separate `feedback` field.
+        ranked = apply_feedback(ranked, feedback or {})
         if ranked:
             result_categories[category] = ranked[:MAX_RESULTS]
 

@@ -1,9 +1,11 @@
 import { lazy, Suspense } from "react";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Layout from "@/components/Layout";
 import { RequireAuth } from "@/components/guards";
 import { Spinner } from "@/components/ui";
+import { ToastProvider } from "@/components/Toast";
+import { CommandPaletteProvider } from "@/components/CommandPalette";
 import HomePage from "@/pages/HomePage";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
@@ -32,12 +34,20 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
 });
 
-export default function App() {
+/** Page transition: fade + 20px rise (DESIGN_SYSTEM_V2 §4).
+ *
+ *  Done in CSS, not Framer Motion. Keying the wrapper on pathname remounts it
+ *  per route, which restarts the `page-enter` animation — same visual result as
+ *  AnimatePresence for an enter-only transition, at zero JS cost on the
+ *  critical path. (Framer's core is ~35 KB gzip; the initial-JS budget is
+ *  120 KB. See src/index.css for the full rationale.) */
+function AnimatedRoutes() {
+  const location = useLocation();
   return (
-    <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+    <>
+      <div key={location.pathname} className="page-enter">
         <Suspense fallback={<Spinner />}>
-          <Routes>
+          <Routes location={location}>
             <Route element={<Layout />}>
               <Route path="/" element={<HomePage />} />
               <Route path="/login" element={<LoginPage />} />
@@ -61,6 +71,22 @@ export default function App() {
             </Route>
           </Routes>
         </Suspense>
+      </div>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        {/* Palette needs a Router (it navigates); Toast wraps everything so any
+            page can report success/failure. */}
+        <CommandPaletteProvider>
+          <ToastProvider>
+            <AnimatedRoutes />
+          </ToastProvider>
+        </CommandPaletteProvider>
       </BrowserRouter>
     </QueryClientProvider>
   );

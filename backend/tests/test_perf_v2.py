@@ -61,7 +61,7 @@ class TestSingleFlight:
 
         calls: list[float] = []
 
-        def slow_compute(db, quiz, categories):
+        def slow_compute(db, quiz, categories, feedback=None):
             calls.append(time.perf_counter())
             time.sleep(0.2)  # stand in for five pgvector searches
             return {"categories": {"sofa": []}, "cached": False}
@@ -77,6 +77,9 @@ class TestSingleFlight:
 
         monkeypatch.setattr(rec, "_compute", slow_compute)
         monkeypatch.setattr(rec, "get_redis", lambda: FakeRedis())
+        # Phase 3 added a feedback lookup ahead of the cache read; these tests
+        # pass db=None deliberately, so stub it out.
+        monkeypatch.setattr(rec, "load_feedback", lambda db, uid: {})
 
         results: list[dict] = []
 
@@ -108,8 +111,9 @@ class TestSingleFlight:
             def setex(self, k, ttl, v):
                 store[k] = v
 
-        monkeypatch.setattr(rec, "_compute", lambda db, q, c: {"categories": {}, "cached": False})
+        monkeypatch.setattr(rec, "_compute", lambda db, q, c, f=None: {"categories": {}, "cached": False})
         monkeypatch.setattr(rec, "get_redis", lambda: FakeRedis())
+        monkeypatch.setattr(rec, "load_feedback", lambda db, uid: {})
         rec._INFLIGHT.clear()
         rec.recommend(None, QUIZ, user_id="drain-test")
         assert rec._INFLIGHT == {}
@@ -119,9 +123,10 @@ class TestSingleFlight:
 
         seen = []
         monkeypatch.setattr(
-            rec, "_compute", lambda db, q, c: seen.append(1) or {"categories": {}, "cached": False}
+            rec, "_compute", lambda db, q, c, f=None: seen.append(1) or {"categories": {}, "cached": False}
         )
         monkeypatch.setattr(rec, "get_redis", lambda: None)
+        monkeypatch.setattr(rec, "load_feedback", lambda db, uid: {})
         rec.recommend(None, QUIZ, use_cache=False)
         assert seen == [1]
 

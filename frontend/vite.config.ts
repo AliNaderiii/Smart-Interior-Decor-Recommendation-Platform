@@ -49,8 +49,21 @@ export default defineConfig({
           ) {
             return undefined;
           }
+          // Same trap as react-grid-layout above: NAMING these would put them
+          // in the static entry graph and emit a modulepreload, defeating the
+          // LazyMotion / lazy-palette split. They must stay unnamed so Rollup
+          // derives their chunks from the dynamic import() boundaries.
+          if (
+            id.includes("framer-motion") ||
+            id.includes("motion-dom") ||
+            id.includes("motion-utils") ||
+            id.includes("cmdk") ||
+            id.includes("@radix-ui")
+          ) {
+            return undefined;
+          }
           if (id.includes("@tanstack") || id.includes("zustand")) return "query";
-          if (id.includes("node_modules/react") || id.includes("react-router")) return "vendor";
+          if (id.includes("node_modules/react-router") || id.includes("node_modules/react/") || id.includes("node_modules/react-dom/") || id.includes("node_modules/scheduler")) return "vendor";
           return undefined;
         },
       },

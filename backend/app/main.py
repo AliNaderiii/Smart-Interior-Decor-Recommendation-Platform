@@ -12,6 +12,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.api.routes import (
     admin,
     auth,
+    feedback,
     moodboards,
     products,
     projects,
@@ -86,6 +87,7 @@ for router in (
     auth.router,
     users.router,
     quiz.router,
+    feedback.router,
     products.router,
     moodboards.router,
     projects.router,
