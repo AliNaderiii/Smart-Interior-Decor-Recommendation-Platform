@@ -84,8 +84,21 @@ export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   );
 }
 
+/** Shimmer placeholder (V2): a moving gradient sweep, not a pulsing grey box.
+ *  Honours prefers-reduced-motion by falling back to a static tint. */
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={clsx("animate-pulse rounded-xl bg-sand", className)} />;
+  return (
+    <div
+      aria-hidden="true"
+      className={clsx(
+        "relative overflow-hidden rounded-xl bg-sand",
+        "before:absolute before:inset-0 before:-translate-x-full before:animate-shimmer",
+        "before:bg-gradient-to-r before:from-transparent before:via-white/60 before:to-transparent",
+        "motion-reduce:before:hidden",
+        className,
+      )}
+    />
+  );
 }
 
 export function EmptyState({ title, hint, action }: { title: string; hint?: string; action?: ReactNode }) {

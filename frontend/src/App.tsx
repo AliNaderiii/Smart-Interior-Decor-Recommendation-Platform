@@ -7,10 +7,15 @@ import { Spinner } from "@/components/ui";
 import HomePage from "@/pages/HomePage";
 import LoginPage from "@/pages/LoginPage";
 import RegisterPage from "@/pages/RegisterPage";
-import QuizPage from "@/pages/QuizPage";
-import RecommendationsPage from "@/pages/RecommendationsPage";
+
+// Perf (V2 Phase 2): every route below is auth-gated, so none of it can be
+// the first paint — an anonymous visitor always lands on /, /login or a
+// /share link. Keeping Quiz + Recommendations eager cost ~4 KB gzip in the
+// entry chunk for code no logged-out user can reach.
 
 // Route-level code splitting keeps the recommendation page bundle lean (LCP).
+const QuizPage = lazy(() => import("@/pages/QuizPage"));
+const RecommendationsPage = lazy(() => import("@/pages/RecommendationsPage"));
 const MoodboardsPage = lazy(() => import("@/pages/MoodboardsPage"));
 const MoodboardEditorPage = lazy(() => import("@/pages/MoodboardEditorPage"));
 const FloorplanPage = lazy(() => import("@/pages/FloorplanPage"));

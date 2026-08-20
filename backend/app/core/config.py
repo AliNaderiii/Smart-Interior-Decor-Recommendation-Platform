@@ -53,6 +53,15 @@ class Settings(BaseSettings):
     # ---- Redis ----
     REDIS_URL: str = ""  # empty -> fakeredis (dev/test only)
     RECOMMEND_CACHE_TTL: int = 3600
+
+    # pgvector HNSW search breadth (V2 Phase 2). The pgvector default of 40 is
+    # tuned for unfiltered nearest-neighbour search. Our Stage A/B query is a
+    # *post-filtered* ANN search (category + budget + is_verified applied on
+    # top of the index scan), so the index must walk far more than 40 nodes to
+    # still yield CANDIDATE_LIMIT survivors. Measured on a 20.7k-row catalog:
+    # ef_search=40 returned 14/100 candidates, 200 -> 58/100, 400 -> 100/100.
+    # 400 costs ~9 ms vs ~7 ms and remains faster than the 14 ms exact scan.
+    HNSW_EF_SEARCH: int = 400
     RECOMMEND_RATE_LIMIT_PER_MINUTE: int = 20  # 0 disables (load tests)
 
     # ---- AI ----

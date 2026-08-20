@@ -2,6 +2,7 @@ import { memo } from "react";
 import type { RecommendedProduct } from "@/lib/types";
 import { formatToman } from "@/lib/constants";
 import { Badge, Button, Card } from "@/components/ui";
+import { OptimizedImage } from "@/components/OptimizedImage";
 
 interface Props {
   product: RecommendedProduct;
@@ -15,13 +16,14 @@ function ProductCardInner({ product, rank, onAdd, added }: Props) {
   if (product.locked) {
     return (
       <Card className="relative overflow-hidden">
-        <img
+        <OptimizedImage
           src={product.image_url}
           alt={product.title}
           width={400}
           height={260}
-          loading="lazy"
-          className="h-40 w-full object-cover blur-md"
+          sizes="(max-width: 768px) 100vw, 33vw"
+          wrapperClassName="h-40 w-full"
+          className="blur-md"
         />
         <div className="absolute inset-0 grid place-items-center bg-white/40 p-4 text-center">
           <div>
@@ -39,14 +41,14 @@ function ProductCardInner({ product, rank, onAdd, added }: Props) {
   return (
     <Card className="flex flex-col overflow-hidden">
       <div className="relative">
-        <img
+        <OptimizedImage
           src={product.image_url}
           alt={product.title}
           width={400}
           height={260}
-          loading={rank === 0 ? "eager" : "lazy"}
-          fetchPriority={rank === 0 ? "high" : undefined}
-          className="h-40 w-full object-cover"
+          priority={rank === 0}
+          sizes="(max-width: 768px) 100vw, 33vw"
+          wrapperClassName="h-40 w-full"
         />
         <span className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-0.5 text-xs font-bold text-walnut">
           #{rank + 1}

@@ -109,7 +109,7 @@ def recommend_endpoint(
     else:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "quiz_id or body required")
 
-    result = recommend(db, payload)
+    result = recommend(db, payload, user_id=str(user.id))
 
     # Paywall: free users see full data for the top product per category,
     # remaining items are stripped to teaser fields (server-side enforcement).

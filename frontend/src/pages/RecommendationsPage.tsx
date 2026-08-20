@@ -1,21 +1,20 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@/lib/api";
-import type { Envelope, } from "@/lib/api";
+import { post } from "@/lib/api";
 import type { RecommendResult, RecommendedProduct } from "@/lib/types";
 import { CATEGORY_LABELS } from "@/lib/constants";
 import { useMoodboardStore } from "@/stores/moodboardStore";
 import { ProductCard } from "@/components/ProductCard";
 import { Button, EmptyState, ErrorState, Skeleton } from "@/components/ui";
+import { ProductCardSkeleton } from "@/components/ProductCardSkeleton";
 
 function useRecommendations(quizId: string | null) {
   return useQuery({
     queryKey: ["recommend", quizId],
     queryFn: async (): Promise<RecommendResult> => {
       const url = quizId ? `/recommend?quiz_id=${quizId}` : "/recommend";
-      const { data } = await api.post<Envelope<RecommendResult>>(url);
-      return data.data;
+      return post<RecommendResult>(url);
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -30,13 +29,21 @@ export default function RecommendationsPage() {
 
   const pickedIds = useMemo(() => new Set(picked.map((p) => p.id)), [picked]);
 
+  // Perf: ProductCard is React.memo'd, but an inline arrow recreated on every
+  // render gives it a new `onAdd` identity each time and defeats the memo —
+  // every card re-rendered whenever any card was added. useCallback keeps the
+  // reference stable so only the changed card re-renders.
+  const addToBoard = useCallback((p: RecommendedProduct) => add(p), [add]);
+
   if (isLoading) {
     return (
       <div>
         <Skeleton className="h-8 w-64" />
+        {/* Layout-matched shimmer (Stripe/Linear pattern): the skeleton mirrors
+            the real card so nothing shifts when data lands. */}
         <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
-            <Skeleton key={i} className="h-80" />
+            <ProductCardSkeleton key={i} />
           ))}
         </div>
       </div>
@@ -51,10 +58,6 @@ export default function RecommendationsPage() {
         action={<Link to="/quiz" className="rounded-xl bg-clay px-4 py-2 text-sm font-semibold text-white">Retake quiz</Link>}
       />
     );
-  }
-
-  function addToBoard(p: RecommendedProduct) {
-    add(p);
   }
 
   return (

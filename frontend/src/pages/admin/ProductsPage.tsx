@@ -1,10 +1,10 @@
 import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, get, patch, post } from "@/lib/api";
-import type { Envelope } from "@/lib/api";
+import { get, patch, post } from "@/lib/api";
 import type { AdminProduct } from "@/lib/types";
 import { CATEGORY_LABELS, formatToman } from "@/lib/constants";
 import { Badge, Button, Card, Spinner } from "@/components/ui";
+import { OptimizedImage } from "@/components/OptimizedImage";
 
 interface ProductList {
   items: AdminProduct[];
@@ -57,10 +57,8 @@ export default function AdminProductsPage() {
     mutationFn: async (file: File) => {
       const form = new FormData();
       form.append("file", file);
-      const { data: resp } = await api.post<Envelope<{ extraction: { confidence: number } }>>(
-        "/products/upload", form, { headers: { "Content-Type": "multipart/form-data" } },
-      );
-      return resp.data;
+      // No explicit Content-Type: the browser sets the multipart boundary.
+      return post<{ extraction: { confidence: number } }>("/products/upload", form);
     },
     onSuccess: (result) => {
       setUploadResult(
@@ -129,8 +127,9 @@ export default function AdminProductsPage() {
                 <tr key={p.id} className="border-b border-[#f5f0e8] align-top last:border-0">
                   <td className="max-w-[240px] px-4 py-3">
                     <div className="flex items-center gap-3">
-                      <img src={p.image_url} alt="" width={48} height={48} loading="lazy"
-                           className="h-12 w-12 shrink-0 rounded-lg object-cover" />
+                      <OptimizedImage src={p.image_url} alt="" width={48} height={48}
+                                      sizes="48px" widths={[48, 96, 144]}
+                                      wrapperClassName="h-12 w-12 shrink-0 rounded-lg" />
                       <div className="min-w-0">
                         <p className="truncate font-medium">{p.title}</p>
                         <p className="text-xs text-stone">{CATEGORY_LABELS[p.category] ?? p.category}</p>

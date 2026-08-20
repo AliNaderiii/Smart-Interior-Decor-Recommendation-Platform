@@ -7,16 +7,20 @@ Stage B — Semantic candidate retrieval: pgvector cosine distance
 Stage C — Weighted scoring with full explainability:
           final = 0.30*style + 0.30*color + 0.20*budget + 0.15*material + 0.05*pattern
 
-Results are cached in Redis under ``rec:{sha256(quiz-payload)}`` TTL 3600s.
+Results are cached in Redis under
+``rec:{user_id}:{sha256(quiz-payload)}`` TTL 3600s — see ``quiz_cache_key``
+for why the user id is part of the key.
 """
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
+import threading
+import time
 from typing import Any
 
-from sqlalchemy import select
+import orjson
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from ai.embedding_service import cosine_similarity, get_embedding, quiz_to_text
@@ -93,10 +97,29 @@ def jaccard(a: list[str], b: list[str]) -> float:
 # ---------------------------------------------------------------------------
 # Engine
 # ---------------------------------------------------------------------------
-def quiz_cache_key(quiz: dict[str, Any]) -> str:
-    """Stable Redis key for a quiz payload."""
-    canonical = json.dumps(quiz, sort_keys=True, default=str)
-    return "rec:" + hashlib.sha256(canonical.encode()).hexdigest()
+def quiz_cache_key(quiz: dict[str, Any], user_id: str | None = None) -> str:
+    """Stable Redis key for a quiz payload, scoped to the requesting user.
+
+    V2 Phase 2 — the v1 key was ``rec:{sha256(quiz)}`` with no user component.
+    That is too coarse in two ways:
+
+    1. **Correctness/tenancy.** Two users who answer the quiz identically (very
+       likely — the quiz is a small set of enumerated choices) shared one cache
+       entry. Anything user-specific layered on top of the result (the Pro
+       paywall masking in ``/recommend``, and per-user re-ranking planned for
+       v2.1) would then leak across accounts. Scoping by user id makes the
+       entry private by construction rather than relying on every caller to
+       re-apply its own masking.
+    2. **Invalidation.** A per-user prefix lets us drop one account's cached
+       recommendations (e.g. after they upgrade to Pro) without flushing the
+       whole ``rec:*`` namespace.
+
+    ``user_id`` stays optional so internal/anonymous callers and the existing
+    unit tests keep working with a shared key.
+    """
+    canonical = orjson.dumps(quiz, option=orjson.OPT_SORT_KEYS, default=str)
+    digest = hashlib.sha256(canonical).hexdigest()
+    return f"rec:{user_id}:{digest}" if user_id else f"rec:{digest}"
 
 
 def _stage_a_hard_filter(
@@ -138,7 +161,18 @@ def _stage_b_semantic(
 def _stage_ab_postgres(
     db: Session, category: str, lo: int, hi: int, user_emb: list[float]
 ) -> list[tuple[Product, float]]:
-    """Stages A+B fused in one pgvector query (production path)."""
+    """Stages A+B fused in one pgvector query (production path).
+
+    Recall note (V2 Phase 2): this is a post-filtered ANN search — the HNSW
+    index orders by cosine distance while the WHERE clause discards anything
+    outside the category/budget/verified window. With pgvector's default
+    ``hnsw.ef_search = 40`` the index only visits ~40 nodes, so on a catalog
+    of any real size most of them are filtered away and we silently return far
+    fewer than ``CANDIDATE_LIMIT`` candidates to score (measured: 14/100 at
+    20.7k rows). Raising ef_search for the duration of the transaction
+    restores full recall while keeping the index scan cheaper than a seq scan.
+    """
+    db.execute(text(f"SET LOCAL hnsw.ef_search = {int(settings.HNSW_EF_SEARCH)}"))
     dist = Product.style_embedding.cosine_distance(user_emb)
     stmt = (
         select(Product, dist.label("dist"))
@@ -221,11 +255,66 @@ def _product_payload(p: Product) -> dict[str, Any]:
     }
 
 
+# ---------------------------------------------------------------------------
+# Cache stampede protection (V2 Phase 2)
+# ---------------------------------------------------------------------------
+# Measured on the 20.7k-row catalog: a single cold /recommend costs ~139 ms
+# (five sequential pgvector searches), but 100 concurrent requests for the SAME
+# quiz all missed the cache simultaneously and all recomputed -> p95 3226 ms.
+# That is a thundering herd, not a slow query: the work is duplicated 100x.
+#
+# Fix: one in-flight computation per cache key. The first caller computes; the
+# others wait on the same lock and then re-read the cache, so they pay a Redis
+# GET instead of five vector scans. `_INFLIGHT` is per-process, which is the
+# right granularity here — with N workers the herd collapses from
+# (concurrency) to (workers), and Redis absorbs the rest.
+_INFLIGHT_GUARD = threading.Lock()
+_INFLIGHT: dict[str, threading.Lock] = {}
+
+# Wait budget for a follower blocked behind the leader's computation. Beyond
+# this we recompute rather than queue indefinitely — a stuck leader must never
+# turn into an availability outage for everyone else.
+_SINGLEFLIGHT_TIMEOUT_S = 10.0
+
+
+def _inflight_lock(key: str) -> threading.Lock:
+    with _INFLIGHT_GUARD:
+        lock = _INFLIGHT.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _INFLIGHT[key] = lock
+        return lock
+
+
+def _release_inflight(key: str, lock: threading.Lock) -> None:
+    lock.release()
+    with _INFLIGHT_GUARD:
+        # Only drop the entry if nobody else is queued behind it, otherwise a
+        # waiter would end up holding a lock no longer in the registry and a
+        # later caller would create a second lock for the same key.
+        if not lock.locked() and _INFLIGHT.get(key) is lock:
+            del _INFLIGHT[key]
+
+
+def _read_cache(redis, cache_key: str) -> dict[str, Any] | None:
+    try:
+        cached = redis.get(cache_key)
+    except Exception as exc:  # cache must never break the request
+        logger.warning("redis read failed: %s", exc)
+        return None
+    if not cached:
+        return None
+    result = orjson.loads(cached)
+    result["cached"] = True
+    return result
+
+
 def recommend(
     db: Session,
     quiz: dict[str, Any],
     categories: list[str] | None = None,
     use_cache: bool = True,
+    user_id: str | None = None,
 ) -> dict[str, Any]:
     """Run the full 3-stage pipeline and return ranked products per category.
 
@@ -235,19 +324,47 @@ def recommend(
          budget_min_toman, budget_max_toman, materials: [..], patterns: [..]}
     """
     categories = categories or CATEGORIES
-    cache_key = quiz_cache_key({**quiz, "_categories": categories})
+    cache_key = quiz_cache_key({**quiz, "_categories": categories}, user_id)
     redis = get_redis()
 
-    if use_cache:
-        try:
-            cached = redis.get(cache_key)
-            if cached:
-                result = json.loads(cached)
-                result["cached"] = True
-                return result
-        except Exception as exc:  # cache must never break the request
-            logger.warning("redis read failed: %s", exc)
+    if not use_cache:
+        return _compute(db, quiz, categories)
 
+    hit = _read_cache(redis, cache_key)
+    if hit is not None:
+        return hit
+
+    # Cache miss. Serialise concurrent misses for this key (see _INFLIGHT).
+    lock = _inflight_lock(cache_key)
+    acquired = lock.acquire(timeout=_SINGLEFLIGHT_TIMEOUT_S)
+    if not acquired:
+        logger.warning("single-flight wait timed out for %s; computing anyway", cache_key)
+        return _compute(db, quiz, categories)
+    try:
+        # Re-check: the leader we queued behind has just populated the cache.
+        hit = _read_cache(redis, cache_key)
+        if hit is not None:
+            return hit
+
+        started = time.perf_counter()
+        result = _compute(db, quiz, categories)
+        try:
+            redis.setex(cache_key, settings.RECOMMEND_CACHE_TTL, orjson.dumps(result))
+        except Exception as exc:
+            logger.warning("redis write failed: %s", exc)
+        logger.info(
+            "recommend cold compute key=%s took=%.0fms",
+            cache_key, (time.perf_counter() - started) * 1000,
+        )
+        return result
+    finally:
+        _release_inflight(cache_key, lock)
+
+
+def _compute(
+    db: Session, quiz: dict[str, Any], categories: list[str]
+) -> dict[str, Any]:
+    """Run the actual 3-stage pipeline (uncached)."""
     user_emb = quiz.get("quiz_embedding") or get_embedding(
         quiz_to_text(
             quiz.get("styles", []),
@@ -275,10 +392,4 @@ def recommend(
         if ranked:
             result_categories[category] = ranked[:MAX_RESULTS]
 
-    result = {"categories": result_categories, "cached": False}
-    if use_cache:
-        try:
-            redis.setex(cache_key, settings.RECOMMEND_CACHE_TTL, json.dumps(result))
-        except Exception as exc:
-            logger.warning("redis write failed: %s", exc)
-    return result
+    return {"categories": result_categories, "cached": False}

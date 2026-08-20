@@ -11,6 +11,13 @@
   --color-ink: #2b2622;
   --color-stone: #8a8178;
   --font-sans: "Inter Variable", "Vazirmatn", ui-sans-serif, system-ui, sans-serif;
+
+  /* Shimmer sweep used by <Skeleton> (Tailwind v4 generates .animate-shimmer) */
+  --animate-shimmer: shimmer 1.6s infinite;
+}
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
 }
 
 html {

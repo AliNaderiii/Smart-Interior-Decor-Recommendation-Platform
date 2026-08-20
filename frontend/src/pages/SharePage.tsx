@@ -4,6 +4,7 @@ import { get } from "@/lib/api";
 import type { RecommendedProduct } from "@/lib/types";
 import { CATEGORY_LABELS, formatToman } from "@/lib/constants";
 import { Badge, Card, ErrorState, Spinner } from "@/components/ui";
+import { OptimizedImage } from "@/components/OptimizedImage";
 
 interface ShareData {
   client_name: string;
@@ -50,8 +51,9 @@ export default function SharePage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {items.map((p, i) => (
               <Card key={p.id} className="overflow-hidden">
-                <img src={p.image_url} alt={p.title} width={400} height={260} loading={i === 0 ? "eager" : "lazy"}
-                     className="h-40 w-full object-cover" />
+                <OptimizedImage src={p.image_url} alt={p.title} width={400} height={260}
+                                priority={i === 0} sizes="(max-width: 768px) 100vw, 33vw"
+                                wrapperClassName="h-40 w-full" />
                 <div className="space-y-2 p-4">
                   <h3 className="line-clamp-2 text-sm font-semibold">{p.title}</h3>
                   <p className="font-bold text-clay-dark">{formatToman(p.price_toman)}</p>

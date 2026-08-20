@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useAuthStore } from "@/stores/authStore";
 import { STYLES } from "@/lib/constants";
 import { Card } from "@/components/ui";
+import { OptimizedImage } from "@/components/OptimizedImage";
 
 export default function HomePage() {
   const user = useAuthStore((s) => s.user);
@@ -35,12 +36,14 @@ export default function HomePage() {
             )}
           </div>
         </div>
-        <img
+        <OptimizedImage
           src="https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=960&q=70&fm=webp"
           alt="Warm modern living room with a beige sofa and walnut coffee table"
-          width={960} height={640}
-          fetchPriority="high"
-          className="h-72 w-full rounded-3xl object-cover shadow-lg lg:h-96"
+          width={960}
+          height={640}
+          priority
+          sizes="(max-width: 1024px) 100vw, 50vw"
+          wrapperClassName="h-72 w-full rounded-3xl shadow-lg lg:h-96"
         />
       </section>
 
@@ -49,7 +52,8 @@ export default function HomePage() {
         <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
           {STYLES.map((s) => (
             <Card key={s.id} className="overflow-hidden">
-              <img src={s.image} alt={`${s.label} style`} width={320} height={200} loading="lazy" className="h-24 w-full object-cover" />
+              <OptimizedImage src={s.image} alt={`${s.label} style`} width={320} height={200}
+                              sizes="(max-width: 640px) 50vw, 200px" wrapperClassName="h-24 w-full" />
               <p className="px-3 py-2 text-sm font-semibold">{s.label}</p>
             </Card>
           ))}

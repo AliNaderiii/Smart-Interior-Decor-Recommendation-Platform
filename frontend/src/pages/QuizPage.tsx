@@ -13,6 +13,7 @@ import {
 } from "@/lib/constants";
 import { Button, Card, Input } from "@/components/ui";
 import clsx from "clsx";
+import { OptimizedImage } from "@/components/OptimizedImage";
 
 const STEP_TITLES = ["Style", "Color Palette", "Room Dimensions", "Budget", "Materials"];
 
@@ -103,13 +104,13 @@ export default function QuizPage() {
                       active ? "border-clay shadow-md" : "border-transparent hover:border-[#e5ded3]",
                     )}
                   >
-                    <img
+                    <OptimizedImage
                       src={s.image}
                       alt={`${s.label} style living room`}
                       width={320}
                       height={200}
-                      loading="lazy"
-                      className="h-28 w-full object-cover"
+                      sizes="(max-width: 640px) 50vw, 240px"
+                      wrapperClassName="h-28 w-full"
                     />
                     <div className="flex items-center justify-between bg-white px-3 py-2">
                       <span className="text-sm font-semibold">{s.label}</span>

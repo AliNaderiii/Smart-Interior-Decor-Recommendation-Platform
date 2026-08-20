@@ -5,6 +5,7 @@ import { get } from "@/lib/api";
 import type { Moodboard } from "@/lib/types";
 import { CATEGORY_LABELS, formatToman } from "@/lib/constants";
 import { Card, EmptyState, Spinner } from "@/components/ui";
+import { OptimizedImage } from "@/components/OptimizedImage";
 
 export default function ShoppingListPage() {
   const [copied, setCopied] = useState<string | null>(null);
@@ -69,8 +70,9 @@ export default function ShoppingListPage() {
               <tr key={p.id} className="border-b border-[#f5f0e8] last:border-0">
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-3">
-                    <img src={p.image_url} alt="" width={48} height={48} loading="lazy"
-                         className="h-12 w-12 rounded-lg object-cover" />
+                    <OptimizedImage src={p.image_url} alt="" width={48} height={48}
+                                    sizes="48px" widths={[48, 96, 144]}
+                                    wrapperClassName="h-12 w-12 rounded-lg" />
                     <span className="max-w-[260px] truncate font-medium">{p.title}</span>
                   </div>
                 </td>

@@ -20,6 +20,7 @@ from app.api.routes import (
     users,
 )
 from app.core.config import settings
+from app.core.json_response import ORJSONResponse
 from app.core.security_headers import SecurityHeadersMiddleware
 
 logging.basicConfig(level=logging.INFO)
@@ -32,6 +33,11 @@ app = FastAPI(
     title=settings.APP_NAME,
     version="1.0.0",
     description="Smart Interior Decor Recommendation Platform — living room MVP.",
+    # Perf (V2 Phase 2): orjson serialises the recommendation envelope — a
+    # deeply nested dict of ~40 products with float score breakdowns — several
+    # times faster than the stdlib encoder, and it emits floats without the
+    # repr round-trip. /recommend is the heaviest JSON payload in the API.
+    default_response_class=ORJSONResponse,
 )
 
 # Order matters: middleware added last runs first on the response path, so

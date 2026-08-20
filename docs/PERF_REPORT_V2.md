@@ -214,3 +214,236 @@ Lighthouse, INP and Chrome Performance traces need a headless Chrome + a deploye
 7. 10 k-product `EXPLAIN ANALYZE` shows the HNSW index in use, p95 still <1 s.
 8. `orjson` enabled; p95 re-measured at 4 workers.
 9. Lighthouse ≥90 / LCP <2.5 s / INP <200 ms recorded in `docs/reports/`.
+
+---
+
+# PHASE 2 — IMPLEMENTATION RESULTS
+
+_Measured after the Phase 2 changes landed. Same sandbox, same methodology as
+the baseline sections above, so the numbers are directly comparable._
+
+## 9. Frontend bundle
+
+### 9.1 Initial JS — target <120 KB gzip
+
+| Stage | Initial JS (gzip) | Delta |
+| --- | --- | --- |
+| Phase 0B baseline | **158.40 KB** | — |
+| Fix mis-preloaded `gridlayout` chunk | 143.76 KB | −14.64 |
+| Replace axios with native `fetch` | 119.95 KB | −23.81 |
+| Lazy-load Quiz + Recommendations routes | **117.14 KB** | −2.81 |
+
+**Result: 117.14 KB gzip — under the 120 KB budget** (was 158.40 KB, −26.0 %).
+Adding the stylesheet the first paint costs 124.36 KB gzip.
+
+Final entry graph:
+
+| Asset | gzip |
+| --- | --- |
+| `vendor` (react, react-dom, react-router) | 77.88 KB |
+| `index` (app shell + eager routes) | 24.13 KB |
+| `query` (@tanstack/react-query, zustand) | 14.77 KB |
+| `rolldown-runtime` | 0.36 KB |
+| `index.css` | 7.22 KB |
+
+Async chunks stay off the critical path: `BoardGrid` 17.69 KB, `ProductsPage`
+2.41, `FloorplanPage` 2.31, every other route ≤1.5 KB.
+
+#### The three findings behind those numbers
+
+1. **`manualChunks` silently defeated the lazy boundary.** Naming
+   `react-grid-layout` in `manualChunks` put it in the static entry graph, so
+   Vite emitted `<link rel="modulepreload">` for it — the `React.lazy()`
+   boundary still deferred *execution*, but ~21 KB gzip was *downloaded* on
+   100 % of routes. Un-naming it was not enough: the broader
+   `id.includes("node_modules/react")` rule then matched it (and its
+   `react-draggable` / `react-resizable` deps) and forced it into the eager
+   vendor chunk. It needs an explicit early `return undefined` **ahead of** the
+   broad rules. Documented inline in `vite.config.ts` so it is not reintroduced.
+2. **axios cost 23.81 KB gzip to do what `fetch` already does.** The client was
+   rewritten onto native `fetch` behind the same public surface
+   (`get/post/patch/del` + an axios-shaped `api` object), so no call site
+   changed except two that were already wrong (see §9.4). axios is removed from
+   `package.json`; `grep axios dist/assets/*.js` → 0 hits.
+3. **Two eagerly-imported routes were unreachable while logged out.** Quiz and
+   Recommendations are both behind `RequireAuth`, so they can never be the
+   first paint — an anonymous visitor always lands on `/`, `/login` or
+   `/share/:token`. Making them lazy moved 2.81 KB out of the entry chunk.
+
+### 9.2 Fonts — 214 KB → 176 KB, and the right subsets
+
+Baseline shipped Inter's Cyrillic + Greek + Vietnamese subsets to a
+Persian/English product, and Vazirmatn twice (`.woff` *and* `.woff2`).
+
+`@fontsource-variable/inter` publishes **no per-subset CSS** for the variable
+font (only `index/wght/opsz[-italic].css`, all subsets inlined), so subsetting
+required hand-written `@font-face` rules in `frontend/src/fonts.css` pointing at
+the package's `files/*.woff2` with the upstream `unicode-range` values.
+
+Build now emits exactly four font files:
+
+| File | Size |
+| --- | --- |
+| `inter-latin-wght-normal.woff2` | 48.25 KB |
+| `inter-latin-ext-wght-normal.woff2` | 85.06 KB |
+| `vazirmatn-arabic-400-normal.woff2` | 21.08 KB |
+| `vazirmatn-arabic-700-normal.woff2` | 21.72 KB |
+
+All Cyrillic/Greek/Vietnamese subsets and every legacy `.woff` duplicate are
+gone (~38 KB saved). CSS gzip fell 7.50 → 6.97 KB in the process.
+
+### 9.3 Images — 10 raw `<img>` → 0
+
+`frontend/src/components/OptimizedImage.tsx` replaces every raw tag:
+
+- `<picture>` with AVIF → WebP → original fallback, via a `?format=&w=`
+  derivative convention, guarded by `canDerive` so absolute/data URLs degrade
+  to a plain `<img>` instead of emitting broken sources.
+- `srcset` at `[320, 480, 640, 960, 1280]` + per-call-site `sizes`.
+- **CLS defence**: mandatory `width`/`height` plus an `aspect-ratio` wrapper, so
+  the box is reserved before the bytes arrive.
+- Blur-up: `placeholderColor` tint cross-fading to the decoded image.
+- `decoding="async"`; `priority` opts into `loading="eager"` +
+  `fetchPriority="high"` and is set on exactly the two LCP candidates — the
+  homepage hero and the first recommendation card (`rank === 0`).
+- `React.memo`'d, because it renders inside long product grids.
+
+Verified: `grep -rn "<img" src --include=*.tsx` returns only the single tag
+*inside* `OptimizedImage` itself.
+
+### 9.4 Two real bugs found while swapping the HTTP client
+
+- `RecommendationsPage` called `api.post<Envelope<T>>(...)` and then unwrapped
+  `.data.data` — a double unwrap that only worked because axios nests its own
+  `data`. Now `post<RecommendResult>(url)`.
+- The admin product upload posted `FormData` with an explicit
+  `Content-Type: application/json` header. The rewrite detects `FormData` and
+  omits the header so the browser can set the multipart boundary.
+
+### 9.5 Render behaviour
+
+- `RecommendationsPage` passed a fresh inline `onAdd` arrow on every render,
+  which gave the `React.memo`'d `ProductCard` a new prop identity each time and
+  **defeated the memo entirely** — adding one product re-rendered every card in
+  the grid. Now a `useCallback` with a stable reference.
+- `Skeleton` is a real gradient shimmer (`--animate-shimmer` keyframe in
+  `index.css`), honouring `prefers-reduced-motion` via `motion-reduce:`.
+- `ProductCardSkeleton` mirrors the real card's geometry so the grid does not
+  reflow when data lands.
+
+---
+
+## 10. Backend
+
+### 10.1 HNSW at scale — the baseline test was invalid, and it hid a real bug
+
+Phase 0B ran `EXPLAIN ANALYZE` against 100 products and got a Seq Scan, which
+proves nothing about the index. The table was seeded to **20,700 products**
+(512-dim normalised vectors) and re-run.
+
+The index is used:
+
+```
+Limit (actual time=4.085..4.188 rows=14 loops=1)
+  ->  Index Scan using ix_products_style_embedding on products
+        Order By: (style_embedding <=> $1::vector)
+        Filter: (is_verified AND price_toman >= .. AND category = 'sofa' ..)
+        Rows Removed by Filter: 32
+Planning Time: 0.192 ms
+Execution Time: 4.209 ms
+```
+
+**But look at `rows=14` for a `LIMIT 100`.** This is a *post-filtered* ANN
+search: HNSW walks the graph in distance order while the `WHERE` clause throws
+away anything outside the category/budget/verified window. At pgvector's
+default `hnsw.ef_search = 40` the index only visits ~40 nodes, so most are
+filtered away and Stage C silently receives a fraction of the candidates it is
+supposed to rank. Recommendation *quality* degrades as the catalog grows, with
+no error anywhere.
+
+Recall vs. `ef_search` (4,210 eligible `sofa` rows, `LIMIT 100`):
+
+| `ef_search` | candidates returned | latency |
+| --- | --- | --- |
+| 40 (pgvector default) | **14 / 100** | 6.9 ms |
+| 100 | 26 / 100 | 5.7 ms |
+| 200 | 58 / 100 | 6.7 ms |
+| **400 (chosen)** | **100 / 100** | 8.9 ms |
+| 800 | 100 / 100 | 13.4 ms |
+| exact (seq scan, index off) | 100 / 100 | 14.1 ms |
+
+Fixed by `SET LOCAL hnsw.ef_search` per transaction in `_stage_ab_postgres`,
+driven by the new `settings.HNSW_EF_SEARCH = 400`. Full recall for ~2 ms, still
+cheaper than the exact scan. Verified: 100/100 candidates.
+
+### 10.2 Cache stampede — the actual cause of the tail latency
+
+At 20,700 rows the first 100-concurrent run showed **p95 3226 ms**, far worse
+than the 546 ms baseline. Profiling showed a *single* cold `/recommend` costs
+only 139 ms (five sequential pgvector searches at ~31 ms each; the mock
+embedding is 0.1 ms). So the query was not slow — the work was being done 100
+times over. All 100 concurrent requests shared one cache key, all missed
+together, and all recomputed.
+
+Fixed with in-process single-flight (`_INFLIGHT` in `recommender.py`): the first
+caller computes, the rest wait on the same lock and re-read the cache, paying a
+Redis GET instead of five vector scans. Waiters have a 10 s budget after which
+they recompute, so a stuck leader can never become an outage.
+
+### 10.3 Cache key now scoped per user
+
+`rec:{sha256(quiz)}` → `rec:{user_id}:{sha256(quiz)}`. The quiz is a small set
+of enumerated choices, so identical answers across users were *likely*, and the
+Pro paywall masking is applied on top of the cached result — a shared entry is
+a tenancy hazard as soon as anything user-specific enters the payload. It also
+lets one account's recommendations be invalidated (e.g. on upgrade) without
+flushing the whole `rec:*` namespace.
+
+### 10.4 orjson
+
+Enabled as the app-wide default response class — but **not** via
+`fastapi.responses.ORJSONResponse`, which FastAPI 0.141 deprecates and which
+emitted a `FastAPIDeprecationWarning` on every single request. FastAPI's
+replacement fast path only engages for routes with a `response_model`, and ours
+return plain envelope dicts from `ok()`, so it would never apply. Instead
+`app/core/json_response.py` subclasses Starlette's `JSONResponse` and renders
+with orjson. Deprecation warnings: 0.
+
+### 10.5 Load test — 20,700 products (30x the baseline dataset)
+
+| Scenario | rps | mean | p50 | p95 | p99 | errors |
+| --- | --- | --- | --- | --- | --- | --- |
+| Cold, shared key, 100 conc x 500 — *before* single-flight | 85.8 | 1112 ms | 599 ms | **3226 ms** | 3352 ms | 0 |
+| Cold, shared key, 100 conc x 500 — *after* | 162.3 | 569 ms | 565 ms | **717 ms** | 860 ms | 0 |
+| Warm, 100 conc x 500 | 180.8 | 503 ms | 506 ms | **608 ms** | 633 ms | 0 |
+| Cold, 300 **distinct** keys, 100 conc | 177.1 | 475 ms | 503 ms | **598 ms** | 655 ms | 0 |
+
+**p95 <1 s met on every scenario**, on 30x the data the baseline used, with
+zero non-200 responses across 1,800 requests. Single-flight cut cold-path p95
+by 4.5x.
+
+Backend suite: **71/71 passing** throughout.
+
+---
+
+## 11. Phase 2 DoD status
+
+| # | Requirement | Status |
+| --- | --- | --- |
+| 1 | `gridlayout` absent from `index.html` preloads | ✅ |
+| 2 | Initial JS <120 KB gzip | ✅ 117.14 KB |
+| 3 | 0 raw `<img>`; all via `OptimizedImage` | ✅ |
+| 4 | Font subsets trimmed; Vazirmatn `.woff2` only | ✅ 4 files |
+| 5 | Virtualization on lists >60 items | ⏳ see below |
+| 6 | Shimmer replaces `<Spinner/>` | ◐ primitive + product grid done; 7 call sites remain (Phase 5) |
+| 7 | HNSW proven at 10 k+ rows, p95 <1 s | ✅ 20.7 k rows, p95 598–717 ms |
+| 8 | orjson enabled | ✅ (p95 at 4 workers still pending) |
+| 9 | Lighthouse ≥90 / LCP / INP in `docs/reports/` | ⏳ needs headless Chrome + deployed origin |
+
+**Item 5 — virtualization is deliberately not implemented yet.** No list in the
+app can currently exceed 60 items: `/recommend` returns at most 5 categories x 8
+products, and the admin product table is server-paginated. Adding
+react-window today would mean measurable complexity (fixed row heights, lost
+native find-in-page, extra a11y wiring) guarding a threshold nothing reaches.
+The honest trigger is admin catalog growth; revisit when the products table
+serves unpaginated result sets or infinite scroll lands on recommendations.

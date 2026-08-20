@@ -5,6 +5,7 @@ import { del, get, post } from "@/lib/api";
 import type { Moodboard } from "@/lib/types";
 import { useMoodboardStore } from "@/stores/moodboardStore";
 import { Button, Card, EmptyState, Input, Spinner } from "@/components/ui";
+import { OptimizedImage } from "@/components/OptimizedImage";
 
 export default function MoodboardsPage() {
   const qc = useQueryClient();
@@ -52,8 +53,9 @@ export default function MoodboardsPage() {
         <Card className="mt-6 flex flex-wrap items-center gap-3 p-4">
           <div className="flex -space-x-3">
             {picked.slice(0, 5).map((p) => (
-              <img key={p.id} src={p.image_url} alt="" width={40} height={40} loading="lazy"
-                   className="h-10 w-10 rounded-full border-2 border-white object-cover" />
+              <OptimizedImage key={p.id} src={p.image_url} alt="" width={40} height={40}
+                              sizes="40px" widths={[40, 80, 120]}
+                              wrapperClassName="h-10 w-10 rounded-full border-2 border-white" />
             ))}
           </div>
           <p className="text-sm text-stone">{picked.length} products selected</p>
