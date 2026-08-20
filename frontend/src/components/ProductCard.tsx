@@ -210,6 +210,7 @@ function ProductCardInner({ product, rank, onAdd, added, feedback, onFeedback }:
           height={260}
           sizes="(max-width: 768px) 100vw, 33vw"
           wrapperClassName="h-40 w-full"
+          placeholderColor={product.colors?.[0]}
           className="blur-lg saturate-50"
         />
         <div className="absolute inset-0 grid place-items-center bg-[var(--color-surface)]/60 p-4 text-center backdrop-blur-[2px]">
@@ -254,6 +255,7 @@ function ProductCardInner({ product, rank, onAdd, added, feedback, onFeedback }:
           priority={rank === 0}
           sizes="(max-width: 768px) 100vw, 33vw"
           wrapperClassName="h-40 w-full"
+          placeholderColor={product.colors?.[0]}
         />
         <AnimatePresence>
           {hovered && !reduce && (
@@ -332,9 +334,9 @@ function ProductCardInner({ product, rank, onAdd, added, feedback, onFeedback }:
             href={product.seller_link}
             target="_blank"
             rel="noreferrer noopener"
-            className="text-center text-[11px] font-medium text-[var(--color-muted)] underline-offset-2 hover:text-[var(--color-ink)] hover:underline"
+            className="rounded-lg border border-[var(--color-line)] px-2 py-1.5 text-center text-[11px] font-semibold text-[var(--color-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-ink)]"
           >
-            View at retailer ↗
+            {product.seller_link.includes("digikala.com") ? "خرید از دیجی‌کالا" : product.seller_link.includes("torob.com") ? "مشاهده در ترب" : "مشاهده فروشنده"} ↗
           </a>
         )}
       </div>

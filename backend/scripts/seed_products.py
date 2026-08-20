@@ -94,6 +94,13 @@ CATEGORY_DEFS = {
     "curtain": {"price": (2_000_000, 18_000_000), "size": ((140, 300), (1, 2), (240, 280)), "fa": "پرده"},
 }
 
+CATEGORY_ALIASES = {
+    "armchair": "chair",
+    "tv_stand": "storage",
+    "bookshelf": "storage",
+    "curtain": "decor",
+}
+
 MATERIAL_WORDS = {
     "wood": "walnut wood", "metal": "black metal", "fabric": "linen fabric",
     "leather": "cognac leather", "glass": "tempered glass", "rattan": "natural rattan",
@@ -163,7 +170,7 @@ def build_products(real_from_json: bool = False) -> list[Product]:
         product = Product(
             title=title,
             title_fa=f"{CATEGORY_DEFS[category]['fa']} {style}",
-            category=category,
+            category=CATEGORY_ALIASES.get(category, category),
             room_type="living_room",
             price_toman=price,
             image_url=UNSPLASH.format(pid=PHOTO_IDS[i % len(PHOTO_IDS)]),
@@ -245,8 +252,23 @@ def seed(if_empty: bool = False, real_embeddings: bool = False, from_json: bool 
 
 
 if __name__ == "__main__":
-    seed(
-        if_empty="--if-empty" in sys.argv,
-        real_embeddings="--real-embeddings" in sys.argv,
-        from_json="--from-json" in sys.argv,
-    )
+    if "--realistic" in sys.argv:
+        # Backward-compatible entrypoint for deploy scripts that still call
+        # seed_products.py. The dedicated loader owns realistic data mapping.
+        from scripts.load_realistic_products import load
+
+        expand_to = 150
+        if "--expand-to" in sys.argv:
+            expand_to = int(sys.argv[sys.argv.index("--expand-to") + 1])
+        load(
+            if_empty="--if-empty" in sys.argv,
+            clear="--clear" in sys.argv,
+            expand_to=expand_to,
+            from_json="--from-json" in sys.argv,
+        )
+    else:
+        seed(
+            if_empty="--if-empty" in sys.argv,
+            real_embeddings="--real-embeddings" in sys.argv,
+            from_json="--from-json" in sys.argv,
+        )

@@ -25,6 +25,7 @@ import json
 import logging
 import re
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -33,8 +34,22 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_STYLES = ["modern", "scandinavian", "industrial", "boho", "minimal", "classic"]
-ALLOWED_MATERIALS = ["wood", "metal", "fabric", "leather", "glass", "rattan"]
+def _load_taxonomy() -> dict[str, Any]:
+    path = Path(__file__).resolve().parents[1] / "seed_data/style_taxonomy.json"
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        logger.warning("Style taxonomy unavailable at %s; using offline fallback", path)
+        return {}
+
+
+_TAXONOMY = _load_taxonomy()
+ALLOWED_STYLES = [row["id"] for row in _TAXONOMY.get("styles", [])] or [
+    "modern", "scandinavian", "industrial", "boho", "minimal", "classic"
+]
+ALLOWED_MATERIALS = list(_TAXONOMY.get("materials_taxonomy", {})) or [
+    "wood", "metal", "fabric", "leather", "glass", "rattan"
+]
 ALLOWED_PATTERNS = ["solid", "geometric", "floral", "striped", "abstract", "persian"]
 
 EXTRACTION_PROMPT = (

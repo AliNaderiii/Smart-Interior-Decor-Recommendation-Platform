@@ -151,7 +151,7 @@ export default function DesignerProjectPage() {
                     {q.client_name || "Unnamed"} — {q.styles.join(", ")}
                   </p>
                   <p className="text-xs text-[var(--color-faint)]">
-                    {new Date(q.created_at).toLocaleString()}
+                    {new Date(q.created_at).toLocaleString("fa-IR")}
                   </p>
                 </div>
                 <Link

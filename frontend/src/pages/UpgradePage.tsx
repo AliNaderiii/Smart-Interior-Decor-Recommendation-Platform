@@ -4,12 +4,38 @@ import { get, post } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
 import { formatToman } from "@/lib/constants";
 import { Button, Card } from "@/components/ui";
+import plansData from "@/assets/subscription_plans.json";
 
-interface SubInfo {
-  plan: string;
-  is_active: boolean;
-  expires_at: string | null;
-  pro_price_toman: number;
+interface SubInfo { plan: string; is_active: boolean; expires_at: string | null; pro_price_toman: number }
+type Plan = {
+  id: string; name_fa: string; name_en: string; price_monthly: number;
+  price_yearly?: number; yearly_discount?: string; features: string[];
+  cta_fa: string; popular?: boolean; badge?: string;
+};
+
+function PlanGrid({ title, plans, busy, active, onPayment }: {
+  title: string; plans: Plan[]; busy: boolean; active: boolean; onPayment: () => void;
+}) {
+  return (
+    <section className="mt-10" dir="rtl">
+      <h2 className="text-2xl font-semibold text-[var(--color-ink)]">{title}</h2>
+      <div className="mt-5 grid gap-5 lg:grid-cols-3">
+        {plans.map((plan) => (
+          <Card key={plan.id} className={`relative flex flex-col p-6 ${plan.popular ? "ring-2 ring-[var(--color-accent)]" : ""}`}>
+            {plan.badge && <span className="absolute -top-3 right-5 rounded-full bg-[var(--color-accent)] px-3 py-1 text-xs font-semibold text-white">{plan.badge}</span>}
+            <h3 className="text-xl font-semibold">{plan.name_fa}</h3>
+            <p className="text-xs text-[var(--color-muted)]">{plan.name_en}</p>
+            <p className="mt-5 text-2xl font-semibold tabular-nums">{formatToman(plan.price_monthly)} <span className="text-xs font-normal text-[var(--color-muted)]">/ ماه</span></p>
+            {plan.price_yearly !== undefined && plan.price_yearly > 0 && <p className="mt-1 text-xs text-[var(--color-muted)]">سالانه {formatToman(plan.price_yearly)} · {plan.yearly_discount}</p>}
+            <ul className="mt-5 flex-1 space-y-2 text-sm">{plan.features.map((feature) => <li key={feature}>✓ {feature}</li>)}</ul>
+            <Button className="mt-6 w-full" variant={plan.popular ? "accent" : "secondary"}
+                    disabled={busy || plan.price_monthly === 0 || active}
+                    onClick={onPayment}>{plan.price_monthly === 0 ? "پلن فعلی" : plan.cta_fa}</Button>
+          </Card>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 export default function UpgradePage() {
@@ -20,32 +46,20 @@ export default function UpgradePage() {
   const navigate = useNavigate();
   const { user, setUser } = useAuthStore();
 
-  useEffect(() => {
-    get<SubInfo>("/subscriptions/me").then(setSub).catch(() => {});
-  }, []);
-
-  // Zarinpal-style callback: ?Authority=...&Status=OK
+  useEffect(() => { get<SubInfo>("/subscriptions/me").then(setSub).catch(() => {}); }, []);
   useEffect(() => {
     const authority = params.get("Authority");
-    const status = params.get("Status");
     if (!authority) return;
-    (async () => {
+    void (async () => {
       setBusy(true);
       try {
-        const result = await post<{ status: string }>("/payment/verify", {
-          authority,
-          status: status ?? "NOK",
-        });
+        const result = await post<{ status: string }>("/payment/verify", { authority, status: params.get("Status") ?? "NOK" });
         if (result.status === "paid") {
-          setMessage("Payment confirmed — welcome to Pro! 🎉");
+          setMessage("پرداخت تأیید شد؛ به پلن حرفه‌ای خوش آمدید 🎉");
           if (user) setUser({ ...user, subscription_active: true, subscription_plan: "pro" });
           setTimeout(() => navigate("/recommendations"), 1200);
-        } else {
-          setMessage("Payment was not completed.");
-        }
-      } finally {
-        setBusy(false);
-      }
+        } else setMessage("پرداخت کامل نشد.");
+      } finally { setBusy(false); }
     })();
   }, [params]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -53,64 +67,26 @@ export default function UpgradePage() {
     setBusy(true);
     try {
       const res = await post<{ redirect_url?: string }>("/payment/request");
-      const redirect_url = res?.redirect_url;
-      // Defensive: a gateway outage can return 200 with no redirect_url, and
-      // blindly calling .startsWith() on it turned a recoverable payment
-      // failure into a white-screen crash.
-      if (!redirect_url) {
-        setMessage("Payment gateway did not return a checkout link. Please try again.");
-        return;
-      }
-      // Sandbox/mock returns our own callback URL; production redirects to Zarinpal.
-      if (redirect_url.startsWith("http") && !redirect_url.includes(window.location.host)) {
-        window.location.href = redirect_url;
-      } else {
-        const url = new URL(redirect_url, window.location.origin);
+      if (!res.redirect_url) { setMessage("درگاه پرداخت پاسخی نداد؛ دوباره تلاش کنید."); return; }
+      if (res.redirect_url.startsWith("http") && !res.redirect_url.includes(window.location.host)) window.location.href = res.redirect_url;
+      else {
+        const url = new URL(res.redirect_url, window.location.origin);
         navigate(`/upgrade?${url.searchParams.toString()}`);
       }
-    } catch {
-      setMessage("Could not start the payment. Please try again.");
-    } finally {
-      setBusy(false);
-    }
+    } catch { setMessage("شروع پرداخت ممکن نشد؛ دوباره تلاش کنید."); }
+    finally { setBusy(false); }
   }
 
   return (
-    <div className="mx-auto max-w-lg pt-8">
-      <Card className="p-8 text-center">
-        <span className="inline-block rounded-full bg-[var(--color-accent)]/8 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[var(--color-accent)]">
-          Smart Decor Pro
-        </span>
-        <h1 className="mt-4 text-3xl font-semibold tracking-tight text-[var(--color-ink)]">See every match</h1>
-        <p className="mt-2 text-sm text-[var(--color-muted)]">
-          Free accounts see the top pick per category. Pro unlocks all 3–5 ranked matches,
-          full explainability, moodboards and the shopping list.
-        </p>
-        <p className="mt-6 text-3xl font-semibold tabular-nums text-[var(--color-ink)]">
-          {sub ? formatToman(sub.pro_price_toman) : "—"}
-          <span className="text-sm font-medium text-[var(--color-muted)]"> / 30 days</span>
-        </p>
-        <ul className="mx-auto mt-6 max-w-xs space-y-2 text-left text-sm">
-          {["All ranked recommendations per category", "Why-recommended breakdowns", "Unlimited moodboards", "Validated seller links"].map((f) => (
-            <li key={f} className="flex items-start gap-2">
-              <span className="text-sage">✓</span> {f}
-            </li>
-          ))}
-        </ul>
-        {message && <p className="mt-4 rounded-xl border border-[var(--color-line)] bg-[var(--color-canvas)] px-3 py-2 text-sm font-medium text-[var(--color-ink)]">{message}</p>}
-        {sub?.is_active ? (
-          <p className="mt-6 rounded-xl bg-[#e7efe4] px-4 py-3 text-sm font-semibold text-sage">
-            You are on Pro until {sub.expires_at ? new Date(sub.expires_at).toLocaleDateString() : "—"}
-          </p>
-        ) : (
-          <Button className="mt-6 w-full" onClick={startPayment} disabled={busy}>
-            {busy ? "Redirecting to gateway…" : "Pay with Zarinpal"}
-          </Button>
-        )}
-        <p className="mt-3 text-xs text-[var(--color-muted)]">
-          Secure redirect to the payment gateway — we never see or store card details.
-        </p>
-      </Card>
+    <div className="mx-auto max-w-6xl pb-12 pt-6">
+      <div className="text-center" dir="rtl">
+        <h1 className="text-3xl font-semibold text-[var(--color-ink)]">پلن مناسب خودت را انتخاب کن</h1>
+        <p className="mt-2 text-sm text-[var(--color-muted)]">پرداخت امن زرین‌پال؛ اطلاعات کارت هرگز در این سامانه ذخیره نمی‌شود.</p>
+        {sub?.is_active && <p className="mt-4 text-sm text-[var(--color-ok)]">اشتراک فعال تا {sub.expires_at ? new Date(sub.expires_at).toLocaleDateString("fa-IR") : "—"}</p>}
+        {message && <p className="mx-auto mt-4 max-w-lg rounded-xl border border-[var(--color-line)] p-3 text-sm">{message}</p>}
+      </div>
+      <PlanGrid title="برای خانه" plans={plansData.homeowner_plans as Plan[]} busy={busy} active={Boolean(sub?.is_active)} onPayment={startPayment} />
+      <PlanGrid title="برای طراحان" plans={plansData.designer_plans as Plan[]} busy={busy} active={Boolean(sub?.is_active)} onPayment={startPayment} />
     </div>
   );
 }

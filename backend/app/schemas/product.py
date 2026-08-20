@@ -1,6 +1,28 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+import json
+from pathlib import Path
+
+from pydantic import BaseModel, Field, field_validator
+
+
+def _taxonomy_styles() -> set[str]:
+    path = Path(__file__).resolve().parents[2] / "seed_data/style_taxonomy.json"
+    try:
+        return {row["id"] for row in json.loads(path.read_text(encoding="utf-8"))["styles"]}
+    except (OSError, KeyError, ValueError):
+        # Offline/package fallback mirrors the committed taxonomy.
+        return {"modern", "scandinavian", "industrial", "boho", "minimal", "classic"}
+
+
+ALLOWED_STYLES = _taxonomy_styles()
+
+
+def validate_styles(value: list[str] | None) -> list[str] | None:
+    invalid = sorted(set(value or []) - ALLOWED_STYLES)
+    if invalid:
+        raise ValueError(f"Unknown styles: {', '.join(invalid)}")
+    return value
 
 
 class ProductIn(BaseModel):
@@ -19,6 +41,8 @@ class ProductIn(BaseModel):
     height_cm: int = 0
     description: str = ""
 
+    _styles_from_taxonomy = field_validator("styles")(validate_styles)
+
 
 class ProductUpdate(BaseModel):
     title: str | None = None
@@ -36,6 +60,8 @@ class ProductUpdate(BaseModel):
     height_cm: int | None = None
     description: str | None = None
     is_verified: bool | None = None
+
+    _styles_from_taxonomy = field_validator("styles")(validate_styles)
 
 
 class ProductOut(BaseModel):
