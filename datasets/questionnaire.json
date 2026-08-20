@@ -1,0 +1,193 @@
+{
+  "questionnaire_version": "2.0",
+  "inspired_by": ["Houzz Style Quiz", "Modsy Quiz", "Havenly Onboarding", "IKEA Home Planner"],
+  "total_steps": 5,
+  "estimated_time": "2 دقیقه",
+  "steps": [
+    {
+      "step": 1,
+      "id": "style",
+      "title_fa": "چه سبکی دوست داری؟",
+      "title_en": "What style do you love?",
+      "description_fa": "می‌توانی چند تا انتخاب کنی - ما ترکیب می‌کنیم",
+      "type": "multi_select_visual_cards",
+      "max_select": 2,
+      "options": [
+        {
+          "id": "modern",
+          "label_fa": "مدرن",
+          "label_en": "Modern",
+          "image": "https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=500&h=400&fit=crop",
+          "description_fa": "تمیز، شهری، مینیمال"
+        },
+        {
+          "id": "scandinavian",
+          "label_fa": "اسکاندیناوی",
+          "label_en": "Scandinavian",
+          "image": "https://images.unsplash.com/photo-1567016432779-094069958ea5?w=500&h=400&fit=crop",
+          "description_fa": "روشن، چوب بلوط، دنج"
+        },
+        {
+          "id": "industrial",
+          "label_fa": "صنعتی",
+          "label_en": "Industrial",
+          "image": "https://images.unsplash.com/photo-1550254478-ead40cc54513?w=500&h=400&fit=crop",
+          "description_fa": "فلز مشکی، گردو تیره، لافت"
+        },
+        {
+          "id": "boho",
+          "label_fa": "بوهو",
+          "label_en": "Boho",
+          "image": "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?w=500&h=400&fit=crop",
+          "description_fa": "حصیری، خاکی، سفری"
+        },
+        {
+          "id": "minimal",
+          "label_fa": "مینیمال",
+          "label_en": "Minimal",
+          "image": "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=500&h=400&fit=crop",
+          "description_fa": "سفید، خلوت، آرام"
+        },
+        {
+          "id": "classic",
+          "label_fa": "کلاسیک",
+          "label_en": "Classic",
+          "image": "https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?w=500&h=400&fit=crop",
+          "description_fa": "چستر، مخمل، جاودانه"
+        }
+      ]
+    },
+    {
+      "step": 2,
+      "id": "color_palette",
+      "title_fa": "چه پالت رنگی؟",
+      "title_en": "What color palette?",
+      "description_fa": "رنگ‌هایی که حس خوبی بهت میدن",
+      "type": "color_dots_multi",
+      "inspired_by": "West Elm color dots + Wayfair color filter",
+      "options": [
+        {
+          "id": "warm_neutrals",
+          "label_fa": "خنثی گرم",
+          "label_en": "Warm Neutrals",
+          "colors": ["#F2E8D5", "#D9CBB3", "#FFFFFF"],
+          "mood": "دنج و روشن"
+        },
+        {
+          "id": "earthy_boho",
+          "label_fa": "خاکی بوهو",
+          "label_en": "Earthy Boho",
+          "colors": ["#D9A05B", "#C1633F", "#4C6444"],
+          "mood": "گرم و سفری"
+        },
+        {
+          "id": "modern_mono",
+          "label_fa": "مونوکروم مدرن",
+          "label_en": "Modern Mono",
+          "colors": ["#2E2E2E", "#8A8A8A", "#FFFFFF"],
+          "mood": "مینیمال و شهری"
+        },
+        {
+          "id": "deep_industrial",
+          "label_fa": "تیره صنعتی",
+          "label_en": "Deep Industrial",
+          "colors": ["#1A1A1A", "#8B4513", "#5B5B5B"],
+          "mood": "جسور و لافت"
+        },
+        {
+          "id": "soft_sage",
+          "label_fa": "سبز مریم گلی",
+          "label_en": "Soft Sage",
+          "colors": ["#4C6444", "#E8D5B7", "#F2E8D5"],
+          "mood": "طبیعی و آرام"
+        }
+      ]
+    },
+    {
+      "step": 3,
+      "id": "room_dimensions",
+      "title_fa": "اتاقت چقدر بزرگه؟",
+      "title_en": "How big is your room?",
+      "description_fa": "برای اینکه مبلمان جا بشن و راه عبور بمونه",
+      "type": "dimensions_input",
+      "inspired_by": "Modsy floorplanner - 76cm walkway clearance check",
+      "fields": [
+        {
+          "id": "width",
+          "label_fa": "عرض اتاق (سانتی‌متر)",
+          "label_en": "Room Width (cm)",
+          "type": "number",
+          "min": 200,
+          "max": 800,
+          "default": 400,
+          "placeholder": "400"
+        },
+        {
+          "id": "length",
+          "label_fa": "طول اتاق (سانتی‌متر)",
+          "label_en": "Room Length (cm)",
+          "type": "number",
+          "min": 200,
+          "max": 1000,
+          "default": 500,
+          "placeholder": "500"
+        },
+        {
+          "id": "has_window",
+          "label_fa": "پنجره داری؟",
+          "type": "boolean",
+          "default": true
+        },
+        {
+          "id": "has_door",
+          "label_fa": "در کجاست؟",
+          "type": "select",
+          "options": ["left_wall", "right_wall", "center", "no_door"]
+        }
+      ],
+      "help_text_fa": "برای راه عبور حداقل 76 سانتی‌متر نیاز داریم (قانون طلایی Modsy)"
+    },
+    {
+      "step": 4,
+      "id": "budget",
+      "title_fa": "بودجه‌ات چقدره؟",
+      "title_en": "What's your budget?",
+      "description_fa": "برای هر دسته جداگانه پیشنهاد می‌دیم",
+      "type": "budget_histogram_slider",
+      "inspired_by": "Wayfair price histogram + Digikala price filter",
+      "currency": "تومان",
+      "display_format": "fa-IR",
+      "ranges": [
+        {"id": "low", "label_fa": "اقتصادی", "min": 10000000, "max": 30000000, "label_en": "Budget", "color": "#4C6444"},
+        {"id": "medium", "label_fa": "متوسط", "min": 30000000, "max": 70000000, "label_en": "Mid-range", "color": "#C8A165"},
+        {"id": "high", "label_fa": "حرفه‌ای", "min": 70000000, "max": 150000000, "label_en": "Premium", "color": "#1A1A1A"},
+        {"id": "luxury", "label_fa": "لوکس", "min": 150000000, "max": 300000000, "label_en": "Luxury", "color": "#7B1E26"}
+      ],
+      "per_category": true,
+      "categories": ["sofa", "coffee_table", "rug", "lighting", "chair", "storage"],
+      "help_text_fa": "بودجه کل نشیمن را بگو، ما بین دسته‌ها تقسیم می‌کنیم"
+    },
+    {
+      "step": 5,
+      "id": "material",
+      "title_fa": "چه متریالی دوست داری؟",
+      "title_en": "What materials?",
+      "description_fa": "می‌توانی چند تا انتخاب کنی",
+      "type": "material_multi_select",
+      "options": [
+        {"id": "wood", "label_fa": "چوب", "label_en": "Wood", "icon": "🪵", "subtypes": ["بلوط روشن", "گردو تیره", "کاج"]},
+        {"id": "metal", "label_fa": "فلز", "label_en": "Metal", "icon": "🔩", "subtypes": ["مشکی مات", "برنجی"]},
+        {"id": "fabric", "label_fa": "پارچه", "label_en": "Fabric", "icon": "🧵", "subtypes": ["کتان", "بوکله", "مخمل"]},
+        {"id": "leather", "label_fa": "چرم", "label_en": "Leather", "icon": "🟫", "subtypes": ["طبیعی", "مصنوعی"]},
+        {"id": "rattan", "label_fa": "حصیر", "label_en": "Rattan", "icon": "🧺", "subtypes": ["حصیر طبیعی", "جوت"]},
+        {"id": "glass", "label_fa": "شیشه", "label_en": "Glass", "icon": "🔍", "subtypes": ["شفاف", "دودی"]}
+      ]
+    }
+  ],
+  "post_quiz": {
+    "confetti": true,
+    "message_fa": "عالیه! داریم بهترین‌ها رو برات پیدا می‌کنیم...",
+    "estimated_time": "2 ثانیه",
+    "p95_target": "<2s"
+  }
+}
