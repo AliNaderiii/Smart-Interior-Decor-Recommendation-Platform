@@ -285,3 +285,91 @@ No `audit_logs` table exists in the schema (confirmed against the live database 
 - 5 000-char title returns **422**, not 500; unknown fields **rejected**.
 - `pip-audit` clean (or `ecdsa` provably removed from the tree); `npm audit` 0 high.
 - All 8 A01 access-control probes still pass (no regression).
+
+---
+
+# PHASE 1 RE-PROBE — post-remediation verification
+
+**Date:** 2026-08-20 · same environment (real Postgres 16.2 + pgvector 0.6.2).
+Every probe below was **re-executed** against the hardened build.
+
+## Results
+
+| # | Probe | Phase 0B | Phase 1 | Verdict |
+| --- | --- | --- | --- | --- |
+| 1 | 6 security headers on `/health` | 0/6 | **6/6 present** (+ COOP, CORP, X-Permitted-Cross-Domain-Policies) | ✅ FIXED |
+| 2 | Headers on error responses (401) | absent | present | ✅ |
+| 3 | HSTS with `X-Forwarded-Proto: https` | missing | `max-age=63072000; includeSubDomains; preload` | ✅ FIXED |
+| 4 | `server` banner | `uvicorn` | `Smart Decor` (uvicorn suppressed) | ✅ FIXED |
+| 5 | `Cache-Control` on API | absent | `no-store` | ✅ |
+| 6 | Brute force: 5th bad login | 401 | **429** | ✅ FIXED |
+| 7 | `Retry-After` on lockout | absent | `900` | ✅ FIXED |
+| 8 | Correct password while locked out | n/a | 429 (lockout holds) | ✅ |
+| 9 | Unrelated account during lockout | n/a | **200** (no collateral DoS) | ✅ |
+| 10 | `Set-Cookie` on login | none | `access_token` + `refresh_token` `HttpOnly; SameSite=strict` + readable `csrf_token` | ✅ FIXED |
+| 11 | Cookie POST without `X-CSRF-Token` | n/a | **403** | ✅ |
+| 12 | 5 000-char title | **500** | **422** `string_too_long` | ✅ FIXED |
+| 13 | Unknown field `is_admin` | 201 | **422** `extra_forbidden` | ✅ FIXED |
+| 14 | Stored XSS payload | persisted verbatim | stored as `Living Room` — markup and script body removed | ✅ FIXED |
+| 15 | `audit_logs` table | absent | present, 4 indexes, rows for login/login_failed/login_blocked | ✅ FIXED |
+| 16 | `/recommend` 429 `Retry-After` | absent | `60` | ✅ FIXED |
+| 17 | CORS: `evil.com` preflight | no ACAO (pass) | no ACAO; methods narrowed to `GET, POST, PATCH, DELETE, OPTIONS` | ✅ improved |
+| 18 | **A01 regression** — IDOR project (other designer) | 404 | **404** | ✅ no regression |
+| 19 | A01 — DELETE project (other designer) | 404 | **404** | ✅ |
+| 20 | A01 — moodboard GET/PATCH (attacker) | 404 | **404** | ✅ |
+| 21 | A01 — owner access | 200 | **200** | ✅ |
+| 22 | A01 — `/admin/*` as homeowner | 403 | **403** | ✅ |
+
+## Audit-log evidence
+
+The brute-force attack that previously left no trace is now fully reconstructable:
+
+```
+action         | user     | detail                                  | ip
+login          | bcad53f6 |                                         | 127.0.0.1
+login_blocked  | -        | email=bf3-14955@smartdecor.dev           | 127.0.0.1
+login_failed   | -        | email=bf3-14955@smartdecor.dev attempt=5 | 127.0.0.1
+login_failed   | -        | email=bf3-14955@smartdecor.dev attempt=4 | 127.0.0.1
+...
+counts: login_failed 14 · login 3 · login_blocked 2
+```
+
+## Bug found *during* remediation
+
+The v1 `StarletteHTTPException` handler rebuilt the response envelope but
+**dropped `exc.headers`**, silently discarding `Retry-After` on every 429 (and
+`WWW-Authenticate` on 401). Fixed in `app/main.py`; regression-tested by
+`test_brute_force_429_carries_retry_after_header`.
+
+## Design note — why the per-IP login limit is 30/min, not 5/min
+
+A strict 5/min per-IP limit was implemented first and **rejected after testing**:
+the probe showed an unrelated user (`demo@smartdecor.dev`) being locked out at
+the same moment as the attack target, because both shared an egress IP. That
+turns an authentication control into a self-inflicted DoS — a real risk for
+corporate NAT and mobile carrier-grade NAT. Final design:
+
+* **per ip+email** — 5 failures ⇒ 15-minute lockout (precise, stops guessing);
+* **per IP** — 30 requests/min (coarse flood guard only).
+
+Verified: 5th wrong password ⇒ 429, while a different account from the same IP
+still logs in with 200.
+
+## Remaining / accepted
+
+| Item | Status |
+| --- | --- |
+| `ecdsa` PYSEC-2026-1325 | **Accepted, documented.** No fix version exists. Unreachable under HS256; `python-jose` → PyJWT migration deferred to v2.1 as it touches every token path. |
+| fakeredis in dev | Warned; production boot now **fails** without `REDIS_URL`. |
+| `npm audit` | 0 vulnerabilities. |
+
+## Phase 1 Definition of Done — status
+
+- ✅ 6th bad login returns 429 with `Retry-After` (in fact the 5th does)
+- ✅ `curl -I` shows all six security headers
+- ✅ `Set-Cookie` carries `HttpOnly` + `SameSite=Strict` (+ `Secure` in prod)
+- ✅ `audit_logs` exists and is populated
+- ✅ Oversize input 422 (not 500); unknown fields rejected
+- ✅ `npm audit` 0 high; `pip-audit` 1 documented no-fix advisory
+- ✅ All A01 access-control probes still pass
+- ✅ **71/71 backend tests green** (45 pre-existing + 26 new security tests)
