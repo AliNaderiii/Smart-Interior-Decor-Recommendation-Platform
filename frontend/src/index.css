@@ -157,3 +157,66 @@ html.dark img { filter: none; }
   border-right: 2px solid rgba(0,0,0,0.35);
   border-bottom: 2px solid rgba(0,0,0,0.35);
 }
+
+/* Dual-handle range inputs (BudgetHistogram). The tracks are drawn by the
+   component, so the native track is transparent and only the thumb shows.
+   pointer-events are re-enabled on the thumb alone, otherwise the upper input
+   would swallow every click meant for the lower one. */
+.range-thumb { pointer-events: none; }
+.range-thumb::-webkit-slider-thumb {
+  pointer-events: auto;
+  -webkit-appearance: none;
+  height: 20px; width: 20px;
+  border-radius: 9999px;
+  background: var(--color-surface);
+  border: 2px solid var(--color-accent);
+  box-shadow: 0 1px 4px rgb(17 24 39 / 0.2);
+  cursor: grab;
+}
+.range-thumb::-webkit-slider-thumb:active { cursor: grabbing; }
+.range-thumb::-moz-range-thumb {
+  pointer-events: auto;
+  height: 20px; width: 20px;
+  border-radius: 9999px;
+  background: var(--color-surface);
+  border: 2px solid var(--color-accent);
+  box-shadow: 0 1px 4px rgb(17 24 39 / 0.2);
+  cursor: grab;
+}
+.range-thumb:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--color-accent); outline-offset: 2px; }
+
+/* ---------------------------------------------------------------- moodboard */
+
+/* Dot grid: a 24px lattice that reads as "canvas" rather than "page", the
+   Figma/Linear cue that this surface is manipulable. Pure background-image,
+   so it costs nothing at runtime and scales with the zoom wrapper. */
+.board-dots {
+  background-image: radial-gradient(circle, var(--color-line) 1px, transparent 1px);
+  background-size: 24px 24px;
+  background-position: -1px -1px;
+}
+
+/* Cards tilt while dragging. react-grid-layout adds .react-draggable-dragging
+   to the item being moved, so no JS state is needed. */
+.board-card {
+  transition: transform 160ms cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 160ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.react-draggable-dragging > .board-card,
+.board-card:has(.react-draggable-dragging) {
+  transform: rotate(1.5deg) scale(1.02);
+  box-shadow: 0 12px 32px rgb(17 24 39 / 0.18);
+  cursor: grabbing;
+}
+.react-grid-item.react-draggable-dragging {
+  z-index: 20;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .board-card,
+  .react-draggable-dragging > .board-card,
+  .board-card:has(.react-draggable-dragging) {
+    transition: none;
+    transform: none;
+  }
+}

@@ -44,8 +44,8 @@ export default function LoginPage() {
   return (
     <div className="mx-auto max-w-md pt-10">
       <Card className="p-8">
-        <h1 className="text-2xl font-bold text-walnut">Welcome back</h1>
-        <p className="mt-1 text-sm text-stone">Sign in to continue designing your living room.</p>
+        <h1 className="h1 text-[var(--color-ink)]">Welcome back</h1>
+        <p className="mt-1 text-sm text-[var(--color-muted)]">Sign in to continue designing your living room.</p>
         <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4" noValidate>
           <div>
             <label htmlFor="email" className="mb-1 block text-sm font-medium">Email</label>
@@ -62,11 +62,11 @@ export default function LoginPage() {
             {busy ? "Signing in…" : "Sign in"}
           </Button>
         </form>
-        <p className="mt-4 text-center text-sm text-stone">
-          No account? <Link to="/register" className="font-semibold text-clay">Create one</Link>
+        <p className="mt-4 text-center text-sm text-[var(--color-muted)]">
+          No account? <Link to="/register" className="font-semibold text-[var(--color-ink)] underline underline-offset-2">Create one</Link>
         </p>
-        <div className="mt-6 rounded-xl bg-sand p-3 text-xs text-stone">
-          <p className="font-semibold text-walnut">Demo accounts</p>
+        <div className="mt-6 rounded-xl border border-[var(--color-line)] bg-[var(--color-canvas)] p-3 text-xs text-[var(--color-muted)]">
+          <p className="font-semibold text-[var(--color-ink)]">Demo accounts</p>
           <p>demo@smartdecor.dev / Demo1234! · designer@smartdecor.dev / Design123! · admin@smartdecor.dev / Admin123!</p>
         </div>
       </Card>

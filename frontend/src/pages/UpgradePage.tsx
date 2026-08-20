@@ -68,17 +68,17 @@ export default function UpgradePage() {
   return (
     <div className="mx-auto max-w-lg pt-8">
       <Card className="p-8 text-center">
-        <span className="inline-block rounded-full bg-[#f7e3d9] px-3 py-1 text-xs font-bold uppercase tracking-wide text-clay-dark">
+        <span className="inline-block rounded-full bg-[var(--color-accent)]/8 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-[var(--color-accent)]">
           Smart Decor Pro
         </span>
-        <h1 className="mt-4 text-3xl font-bold text-walnut">See every match</h1>
-        <p className="mt-2 text-sm text-stone">
+        <h1 className="mt-4 text-3xl font-semibold tracking-tight text-[var(--color-ink)]">See every match</h1>
+        <p className="mt-2 text-sm text-[var(--color-muted)]">
           Free accounts see the top pick per category. Pro unlocks all 3–5 ranked matches,
           full explainability, moodboards and the shopping list.
         </p>
-        <p className="mt-6 text-3xl font-extrabold text-clay-dark">
+        <p className="mt-6 text-3xl font-semibold tabular-nums text-[var(--color-ink)]">
           {sub ? formatToman(sub.pro_price_toman) : "—"}
-          <span className="text-sm font-medium text-stone"> / 30 days</span>
+          <span className="text-sm font-medium text-[var(--color-muted)]"> / 30 days</span>
         </p>
         <ul className="mx-auto mt-6 max-w-xs space-y-2 text-left text-sm">
           {["All ranked recommendations per category", "Why-recommended breakdowns", "Unlimited moodboards", "Validated seller links"].map((f) => (
@@ -87,7 +87,7 @@ export default function UpgradePage() {
             </li>
           ))}
         </ul>
-        {message && <p className="mt-4 rounded-lg bg-sand px-3 py-2 text-sm font-medium">{message}</p>}
+        {message && <p className="mt-4 rounded-xl border border-[var(--color-line)] bg-[var(--color-canvas)] px-3 py-2 text-sm font-medium text-[var(--color-ink)]">{message}</p>}
         {sub?.is_active ? (
           <p className="mt-6 rounded-xl bg-[#e7efe4] px-4 py-3 text-sm font-semibold text-sage">
             You are on Pro until {sub.expires_at ? new Date(sub.expires_at).toLocaleDateString() : "—"}
@@ -97,7 +97,7 @@ export default function UpgradePage() {
             {busy ? "Redirecting to gateway…" : "Pay with Zarinpal"}
           </Button>
         )}
-        <p className="mt-3 text-xs text-stone">
+        <p className="mt-3 text-xs text-[var(--color-muted)]">
           Secure redirect to the payment gateway — we never see or store card details.
         </p>
       </Card>

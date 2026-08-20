@@ -8,12 +8,16 @@ import { ToastProvider } from "@/components/Toast";
 import { CommandPaletteProvider } from "@/components/CommandPalette";
 import HomePage from "@/pages/HomePage";
 import LoginPage from "@/pages/LoginPage";
-import RegisterPage from "@/pages/RegisterPage";
 
 // Perf (V2 Phase 2): every route below is auth-gated, so none of it can be
 // the first paint — an anonymous visitor always lands on /, /login or a
 // /share link. Keeping Quiz + Recommendations eager cost ~4 KB gzip in the
 // entry chunk for code no logged-out user can reach.
+
+// Register is lazy too: an anonymous visitor's first paint is always "/" or
+// "/login" (or a "/share/:token" link). Reaching /register requires a click,
+// by which time the chunk has already been fetched in the background.
+const RegisterPage = lazy(() => import("@/pages/RegisterPage"));
 
 // Route-level code splitting keeps the recommendation page bundle lean (LCP).
 const QuizPage = lazy(() => import("@/pages/QuizPage"));

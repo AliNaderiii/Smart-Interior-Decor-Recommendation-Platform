@@ -28,6 +28,11 @@ interface Props {
  *  in the a11y tree. Aesop's rule — secondary detail hides behind interaction
  *  rather than cluttering the card face. */
 function MatchBreakdown({ product }: { product: RecommendedProduct }) {
+  // Controlled rather than hover-only. Radix opens the card on pointer hover,
+  // but a touch user has no hover — without an explicit tap handler the
+  // explainability panel (the whole point of the feature) is unreachable on
+  // mobile. Clicking toggles it; hover still works on pointer devices.
+  const [open, setOpen] = useState(false);
   const exp = product.explanation;
   const rows = [
     { label: "Style", value: exp.style_match, detail: product.styles.join(" / ") || "—" },
@@ -41,11 +46,13 @@ function MatchBreakdown({ product }: { product: RecommendedProduct }) {
   ];
 
   return (
-    <HoverCard.Root openDelay={120} closeDelay={80}>
+    <HoverCard.Root open={open} onOpenChange={setOpen} openDelay={120} closeDelay={80}>
       <HoverCard.Trigger asChild>
         <button
           type="button"
           className="w-full rounded-lg text-left text-xs font-semibold text-[var(--color-muted)] underline decoration-dotted underline-offset-2 hover:text-[var(--color-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
           aria-label={`Why we matched ${product.title}: ${Math.round(product.final_score * 100)} percent overall`}
         >
           {Math.round(product.final_score * 100)}% match — why?

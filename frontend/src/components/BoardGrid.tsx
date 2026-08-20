@@ -16,14 +16,16 @@ interface Props {
   layout: LayoutItem[];
   products: Record<string, RecommendedProduct>;
   onLayoutChange: (next: readonly LayoutItem[]) => void;
+  /** Canvas width in px — driven by the editor's zoom control. */
+  width?: number;
 }
 
-export default function BoardGrid({ layout, products, onLayoutChange }: Props) {
+export default function BoardGrid({ layout, products, onLayoutChange, width = 1080 }: Props) {
   return (
     <GridLayout
       className="layout"
       layout={layout as Layout}
-      width={1080}
+      width={width}
       gridConfig={{ cols: 12, rowHeight: 40 }}
       compactor={noCompactor}
       onLayoutChange={(next: Layout) =>
@@ -33,7 +35,10 @@ export default function BoardGrid({ layout, products, onLayoutChange }: Props) {
       {layout.map((l) => {
         const p = products[l.i];
         return (
-          <div key={l.i} className="border border-[#eee7db] bg-white">
+          // `.board-card` tilts the card 1.5deg while react-grid-layout has it
+          // in flight — the physical "picking up a photo" cue from a real
+          // pinboard, which pure translation never conveys.
+          <div key={l.i} className="board-card overflow-hidden rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] shadow-[var(--shadow-card)]">
             {p ? (
               <div className="flex h-full flex-col">
                 <OptimizedImage
@@ -45,10 +50,10 @@ export default function BoardGrid({ layout, products, onLayoutChange }: Props) {
                   wrapperClassName="min-h-0 w-full flex-1"
                   className="select-none"
                 />
-                <div className="truncate px-2 py-1 text-[11px] font-medium">{p.title}</div>
+                <div className="truncate px-2 py-1.5 text-[11px] font-medium text-[var(--color-ink)]">{p.title}</div>
               </div>
             ) : (
-              <div className="grid h-full place-items-center text-xs text-stone">?</div>
+              <div className="grid h-full place-items-center text-xs text-[var(--color-faint)]">Unavailable</div>
             )}
           </div>
         );

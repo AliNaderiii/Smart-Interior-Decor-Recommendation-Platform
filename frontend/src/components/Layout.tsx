@@ -107,7 +107,7 @@ export default function Layout() {
       <header className="sticky top-0 z-40 border-b border-[var(--color-line)] bg-[var(--color-canvas)]/85 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
           <Link to="/" className="flex items-center gap-2 font-semibold tracking-[-0.02em] text-[var(--color-ink)]">
-            <span aria-hidden className="grid h-7 w-7 place-items-center rounded-lg bg-clay text-sm text-white">SD</span>
+            <span aria-hidden className="grid h-7 w-7 place-items-center rounded-lg bg-[var(--color-accent)] text-sm text-[var(--color-canvas)]">SD</span>
             Smart Decor
           </Link>
           <nav className="hidden gap-1 md:flex" aria-label="Main">
@@ -134,7 +134,7 @@ export default function Layout() {
             {user ? (
               <>
                 {user.subscription_active && (
-                  <span className="rounded-full bg-[#f7e3d9] px-2.5 py-0.5 text-xs font-semibold text-clay-dark">PRO</span>
+                  <span className="rounded-full bg-[var(--color-accent)]/8 px-2.5 py-0.5 text-xs font-semibold text-[var(--color-accent)]">PRO</span>
                 )}
                 <span className="hidden text-sm text-[var(--color-muted)] lg:inline">{user.email}</span>
                 <button
