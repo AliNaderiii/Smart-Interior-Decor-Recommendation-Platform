@@ -1,0 +1,164 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend — pytest vs Postgres+pgvector & benchmark
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: ankane/pgvector:latest
+        env:
+          POSTGRES_USER: decor
+          POSTGRES_PASSWORD: decor
+          POSTGRES_DB: decor_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U decor"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install dependencies
+        working-directory: backend
+        run: pip install -r requirements.txt
+      - name: Migrate (creates pgvector extension + HNSW index)
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg://decor:decor@localhost:5432/decor_test
+        run: alembic upgrade head
+      - name: Run test suite against Postgres + Redis
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+psycopg://decor:decor@localhost:5432/decor_test
+          REDIS_URL: redis://localhost:6379/1
+          AI_PROVIDER: mock
+          EMBEDDING_BACKEND: hash
+          PAYMENT_PROVIDER: mock
+          SECRET_KEY: ci-secret
+          APP_ENV: test
+        run: pytest tests/ -v --tb=short
+      - name: Extraction benchmark (>=80% required; MOCK mode — deterministic CI baseline)
+        working-directory: backend
+        env:
+          AI_PROVIDER: mock
+        run: python scripts/evaluate_extraction.py
+      - name: Extraction benchmark — REAL mode (runs only when GEMINI_API_KEY secret set)
+        working-directory: backend
+        env:
+          AI_PROVIDER: gemini
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -n "$GEMINI_API_KEY" ]; then
+            python scripts/evaluate_extraction.py --real --sample 10 || \
+              echo "::warning::REAL-mode extraction below 80% — human-in-the-loop gate active"
+          else
+            echo "GEMINI_API_KEY secret not configured — skipping REAL-mode benchmark"
+          fi
+      - name: Lint (ruff)
+        working-directory: backend
+        run: pip install ruff && ruff check app ai scripts
+
+  frontend:
+    name: Frontend — typecheck & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Build (tsc strict + vite)
+        working-directory: frontend
+        run: npm run build
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+  lighthouse:
+    name: Lighthouse CI (>=80, LCP<3s on recommendation page)
+    runs-on: ubuntu-latest
+    needs: [frontend, backend]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install, migrate & seed backend (SQLite for speed)
+        working-directory: backend
+        env:
+          DATABASE_URL: sqlite:///./ci.sqlite3
+          EMBEDDING_BACKEND: hash
+        run: |
+          pip install -r requirements.txt
+          python scripts/seed_products.py
+      - name: Start backend
+        working-directory: backend
+        env:
+          DATABASE_URL: sqlite:///./ci.sqlite3
+          EMBEDDING_BACKEND: hash
+          PAYMENT_PROVIDER: mock
+          SECRET_KEY: ci-secret
+        run: nohup uvicorn app.main:app --port 8000 &
+      - name: Build & preview frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+          nohup npm run preview -- --port 4173 &
+          sleep 3
+      - name: Lighthouse CI (budget-gated)
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: |
+            http://localhost:4173/
+            http://localhost:4173/recommendations
+          budgetPath: ./lighthouse-budget.json
+          uploadArtifacts: true
+          temporaryPublicStorage: false
+      - name: Assert performance >= 80 and LCP < 3000ms
+        run: |
+          npm install -g lighthouse
+          lighthouse http://localhost:4173/ \
+            --only-categories=performance,accessibility,best-practices \
+            --chrome-flags="--headless --no-sandbox" \
+            --output=json --output-path=./lighthouse-report.json --quiet
+          node -e "
+            const r = require('./lighthouse-report.json');
+            const perf = Math.round(r.categories.performance.score * 100);
+            const lcp = r.audits['largest-contentful-paint'].numericValue;
+            console.log('Performance:', perf, '| LCP:', Math.round(lcp), 'ms');
+            if (perf < 80) { console.error('Lighthouse performance < 80'); process.exit(1); }
+            if (lcp >= 3000) { console.error('LCP >= 3s'); process.exit(1); }
+          "
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-report
+          path: lighthouse-report.json

@@ -1,0 +1,49 @@
+# Caddy reverse proxy — automatic HTTPS with TLS 1.3 enforced.
+# For production replace :443 with your domain (e.g. decor.example.com)
+# and Caddy will provision Let's Encrypt certificates automatically.
+
+{
+	email admin@smartdecor.local
+}
+
+:443 {
+	tls internal {
+		protocols tls1.3 tls1.3
+	}
+
+	encode zstd gzip
+
+	# V2 (OWASP A05): full header set, mirrored by the FastAPI
+	# SecurityHeadersMiddleware so protection survives proxy drift.
+	header {
+		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
+		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://*.s3.ir-thr1.arvanstorage.ir https://images.unsplash.com; connect-src 'self' https://generativelanguage.googleapis.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+		Cross-Origin-Opener-Policy "same-origin"
+		X-Permitted-Cross-Domain-Policies "none"
+		-Server
+	}
+
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
+
+	handle /docs* {
+		reverse_proxy backend:8000
+	}
+
+	handle /openapi.json {
+		reverse_proxy backend:8000
+	}
+
+	handle {
+		reverse_proxy frontend:80
+	}
+}
+
+:80 {
+	redir https://{host}{uri} permanent
+}

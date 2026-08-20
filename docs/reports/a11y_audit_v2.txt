@@ -1,0 +1,36 @@
+
+=== CONTRAST (WCAG 1.4.3, AA needs 4.5:1 body / 3:1 large) ===
+
+light  ink     on canvas   16.73:1  need 4.5  PASS
+light  muted   on canvas   4.56:1  need 4.5  PASS
+light  faint   on canvas   3.47:1  need 3  PASS
+light  ok      on canvas   5.17:1  need 4.5  PASS
+light  warn    on canvas   4.74:1  need 4.5  PASS
+light  danger  on canvas   6.10:1  need 4.5  PASS
+light  ink     on surface  17.74:1  need 4.5  PASS
+light  muted   on surface  4.83:1  need 4.5  PASS
+light  faint   on surface  3.68:1  need 3  PASS
+light  ok      on surface  5.48:1  need 4.5  PASS
+light  warn    on surface  5.02:1  need 4.5  PASS
+light  danger  on surface  6.47:1  need 4.5  PASS
+light  canvas  on accent   16.84:1  need 4.5  PASS
+dark   ink     on canvas   16.30:1  need 4.5  PASS
+dark   muted   on canvas   6.96:1  need 4.5  PASS
+dark   faint   on canvas   3.75:1  need 3  PASS
+dark   ok      on canvas   9.29:1  need 4.5  PASS
+dark   warn    on canvas   10.69:1  need 4.5  PASS
+dark   danger  on canvas   6.45:1  need 4.5  PASS
+dark   ink     on surface  13.35:1  need 4.5  PASS
+dark   muted   on surface  5.71:1  need 4.5  PASS
+dark   faint   on surface  3.07:1  need 3  PASS
+dark   ok      on surface  7.61:1  need 4.5  PASS
+dark   warn    on surface  8.76:1  need 4.5  PASS
+dark   danger  on surface  5.29:1  need 4.5  PASS
+dark   canvas  on accent   16.30:1  need 4.5  PASS
+
+=== DOM A11Y (49 elements checked across 16 pages) ===
+
+(no issues)
+
+TOTAL: 0 issue(s)
+RESULT: PASS
