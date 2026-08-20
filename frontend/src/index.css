@@ -17,7 +17,11 @@
   --color-surface: #FFFFFF;
   --color-ink:     #111827;
   --color-muted:   #6B7280;
-  --color-faint:   #9CA3AF;
+  /* WCAG 1.4.3: #9CA3AF measured only 2.40:1 on the canvas — below even the
+     3:1 large-text floor, so timestamps and metadata were failing AA.
+     #7C8697 is 3.47:1 on canvas / 3.68:1 on white and still reads as
+     recessive against --color-muted. */
+  --color-faint:   #7C8697;
   --color-line:    #F3F4F6;
   --color-accent:  #0F172A;   /* the single accent */
   --color-ok:      #047857;
@@ -101,6 +105,11 @@ html.dark {
   --color-line:    #334155;
   --color-accent:  #F1F5F9;
   --color-sand:    #334155;
+  /* Status colours must be re-lightened for a dark canvas: #047857 on
+     #0F172A is 1.9:1, effectively invisible. These clear AA at >=5:1. */
+  --color-ok:      #34D399;
+  --color-warn:    #FBBF24;
+  --color-danger:  #F87171;
   /* Shadows are invisible on dark; elevation comes from a lighter surface.
      Keep a faint ring so cards still have an edge. */
   --shadow-card:  0 0 0 1px rgb(148 163 184 / 0.10);

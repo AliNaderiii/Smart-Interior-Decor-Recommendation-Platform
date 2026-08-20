@@ -463,3 +463,96 @@ react-window today would mean measurable complexity (fixed row heights, lost
 native find-in-page, extra a11y wiring) guarding a threshold nothing reaches.
 The honest trigger is admin catalog growth; revisit when the products table
 serves unpaginated result sets or infinite scroll lands on recommendations.
+
+---
+
+# Phase 5 — final measurements (2026-08-20)
+
+## Bundle
+
+Measured from a real `npm run build`, gzip -9 over every asset referenced by
+`dist/index.html`. CSS excluded from the JS budget.
+
+| Chunk | gzip |
+|---|---|
+| vendor (react, react-dom, react-router, scheduler) | 68.25 KB |
+| index (app shell, eager pages) | 36.62 KB |
+| query (@tanstack/react-query + zustand) | 14.66 KB |
+| rolldown-runtime | 0.36 KB |
+| **Initial JS total** | **119.89 KB** (budget < 120) |
+| index.css | 10.54 KB (excluded) |
+
+29 chunks emitted; 25 are lazy. Verified absent from every eager chunk:
+`framer-motion`, `motion-dom`, `cmdk`, `@radix-ui/*`, `html2canvas`,
+`canvas-confetti`, `react-grid-layout`. `dist/index.html` emits no
+`modulepreload` for any of them.
+
+### How the last 4 KB were reclaimed
+
+1. **`manualChunks` vendor rule was over-matching.** `id.includes("node_modules/react")`
+   also matches `@radix-ui/react-hover-card`, `react-remove-scroll`,
+   `use-callback-ref` and friends, dragging lazy-only dependencies into the
+   eager vendor chunk. Tightened to exact paths (`node_modules/react/`,
+   `node_modules/react-dom/`, `node_modules/react-router`,
+   `node_modules/scheduler`): vendor 84.77 → 68.25 KB.
+2. **`EmptyState` / `ErrorState` split out of `ui.tsx`** into `states.tsx`.
+   `ui.tsx` is eager because Home and Login need `Card`/`Button`, so its inline
+   illustration SVGs were shipping to every first-time visitor for components
+   only reachable behind auth.
+3. **`RegisterPage` made lazy.** No anonymous first paint can land there.
+
+### Motion policy (the reason Framer is not in the entry graph)
+
+`LazyMotion` was evaluated and rejected: framer's core is ~35 KB gzip in the
+entry graph the moment any eagerly-rendered component imports `m`. The shell
+(page transition, toasts, card lift) is therefore pure CSS —
+`.page-enter`, `.toast-in`, `.card-lift`, all reduced-motion guarded. Framer is
+reserved for lazy route chunks where it pays for itself: `layoutId` shared
+elements, drag, `AnimatePresence` exits, image crossfades.
+
+## Recommend endpoint latency — 20,700 products
+
+| Scenario | conc | reqs | p50 | **p95** | p99 | rps | errors |
+|---|---|---|---|---|---|---|---|
+| Warm cache, shared key | 20 | 600 | 114.6 ms | **202.4 ms** | 232.7 ms | 165.4 | 0 |
+| Cold, 300 distinct keys | 100 | 300 | 606.1 ms | **721.3 ms** | 773.3 ms | 154.8 | 0 |
+
+Target was p95 < 1 s at 20k rows. Met with 28% headroom on the cold path.
+
+## Accessibility — WCAG 2.1 AA
+
+`frontend/scripts/a11yAudit.mts`, full output in `docs/reports/a11y_audit_v2.txt`.
+
+- **Contrast: 26/26 pairs pass**, light and dark. Tokens are parsed out of
+  `index.css` at audit time rather than duplicated in the script, so the check
+  cannot silently go stale when a colour is tuned.
+- **DOM: 0 issues** across 16 pages / 49 elements — img alt, control names,
+  input labels, link purpose, heading order.
+
+Two real defects were fixed to reach this:
+
+- `--color-faint` was `#9CA3AF` = **2.40:1** on the canvas, below even the 3:1
+  large-text floor. Every timestamp and metadata line was failing AA. Now
+  `#7C8697` (3.47:1 canvas / 3.68:1 surface).
+- Dark mode had **no** `--color-ok/warn/danger` overrides, so it inherited the
+  light values: `#047857` on `#0F172A` is 1.9:1, effectively invisible. Dark
+  now has its own status ramp at ≥5:1.
+
+## Still blocked: Lighthouse
+
+`npx lighthouse` installs (13.4.1) but cannot launch a browser — no Chromium
+exists in the sandbox and `npx playwright install chromium` fails with
+ECONNRESET against the Chrome for Testing CDN. Retried in Phase 5; still
+blocked.
+
+Consequently **LCP, INP, CLS and the Lighthouse performance score are not
+reported**. No score is estimated or fabricated. What is measured instead:
+real bundle bytes, real server-side p95 under concurrency, a real click audit,
+and a real contrast audit.
+
+To produce `lighthouse.json` on any machine with a browser:
+
+```bash
+npx lighthouse http://localhost:5173 --output=json --output-path=lighthouse.json \
+  --chrome-flags="--headless --no-sandbox"
+```

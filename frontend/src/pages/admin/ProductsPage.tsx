@@ -166,7 +166,10 @@ export default function AdminProductsPage() {
               {f}
             </Button>
           ))}
+          {/* Visually hidden but still labelled — a screen reader that lands
+              on the input must know what it is for (WCAG 1.3.1). */}
           <input ref={fileRef} type="file" accept="image/*" className="hidden"
+                 aria-label="Choose a product image to upload"
                  onChange={(e) => e.target.files?.[0] && upload.mutate(e.target.files[0])} />
           <Button variant="accent" onClick={() => fileRef.current?.click()} disabled={upload.isPending}>
             {upload.isPending ? "Extracting features…" : "Upload product image"}

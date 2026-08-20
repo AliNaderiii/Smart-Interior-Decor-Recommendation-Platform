@@ -19,6 +19,7 @@ import { useNavigate } from "react-router-dom";
 import { useThemeStore } from "@/stores/themeStore";
 
 const PaletteOverlay = lazy(() => import("@/components/CommandPaletteOverlay"));
+const ShortcutsDialog = lazy(() => import("@/components/ShortcutsDialog"));
 
 export interface CommandItem {
   id: string;
@@ -54,6 +55,7 @@ export function useCommands(items: CommandItem[], deps: unknown[] = []) {
 
 export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [help, setHelp] = useState(false);
   const [dynamic, setDynamic] = useState<CommandItem[]>([]);
   const navigate = useNavigate();
   const toggleTheme = useThemeStore((s) => s.toggle);
@@ -70,6 +72,15 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
       if (e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault(); // else Chrome opens its search bar
         setOpen((v) => !v);
+        return;
+      }
+      // "?" opens help — but never while the user is typing into a field,
+      // otherwise it hijacks a legitimate question mark.
+      if (e.key === "?" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const t = e.target as HTMLElement | null;
+        if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
+        e.preventDefault();
+        setHelp((v) => !v);
       }
     }
     document.addEventListener("keydown", onKey);
@@ -85,6 +96,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
       { id: "nav.floorplan", label: "Go to Floorplan", group: "Navigate", keywords: "layout room plan", run: () => navigate("/floorplan") },
       { id: "nav.shopping", label: "Go to Shopping list", group: "Navigate", keywords: "cart basket buy", run: () => navigate("/shopping-list") },
       { id: "nav.upgrade", label: "Upgrade to Pro", group: "Navigate", keywords: "billing subscription pay", run: () => navigate("/upgrade") },
+      { id: "help.shortcuts", label: "Keyboard shortcuts", group: "Appearance", keywords: "keys hotkeys help ?", shortcut: "?", run: () => setHelp(true) },
       {
         id: "theme.toggle",
         label: mode === "dark" ? "Switch to light mode" : "Switch to dark mode",
@@ -120,6 +132,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
           only while open, which also means the dialog cannot trap focus or
           intercept keys when it is closed. */}
       <Suspense fallback={null}>{open && <PaletteOverlay groups={groups} onClose={() => setOpen(false)} />}</Suspense>
+      <Suspense fallback={null}>{help && <ShortcutsDialog onClose={() => setHelp(false)} />}</Suspense>
     </PaletteContext.Provider>
   );
 }
