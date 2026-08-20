@@ -1,12 +1,16 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from app.schemas.sanitize import SafeText
 
 ALLOWED_STYLES = {"modern", "scandinavian", "industrial", "boho", "minimal", "classic"}
 ALLOWED_MATERIALS = {"wood", "metal", "fabric", "leather", "glass", "rattan"}
 
 
 class QuizIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     styles: list[str] = Field(min_length=1, max_length=3)
     color_palette: list[str] = Field(default_factory=list, max_length=5)
     room_width_cm: int = Field(ge=100, le=3000)
@@ -16,7 +20,7 @@ class QuizIn(BaseModel):
     materials: list[str] = Field(default_factory=list, max_length=6)
     patterns: list[str] = Field(default_factory=list, max_length=3)
     project_id: str | None = None
-    client_name: str = ""
+    client_name: SafeText(max_length=200) = ""
 
     @field_validator("styles")
     @classmethod

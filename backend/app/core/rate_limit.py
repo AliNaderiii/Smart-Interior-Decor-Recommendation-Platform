@@ -39,10 +39,12 @@ def enforce_rate_limit(key: str, limit: int | None = None,
         if current == 1:
             redis.expire(bucket, window_seconds)
         if current > limit:
-            ttl = redis.ttl(bucket)
+            ttl = max(int(redis.ttl(bucket) or window_seconds), 1)
             raise HTTPException(
                 status.HTTP_429_TOO_MANY_REQUESTS,
-                f"Rate limit exceeded ({limit}/min). Retry in {max(ttl, 1)}s.",
+                f"Rate limit exceeded ({limit}/min). Retry in {ttl}s.",
+                # V2: machine-readable backoff, not just prose in the body.
+                headers={"Retry-After": str(ttl)},
             )
     except HTTPException:
         raise

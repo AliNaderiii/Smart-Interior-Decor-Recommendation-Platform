@@ -44,8 +44,8 @@ export default function RegisterPage() {
   return (
     <div className="mx-auto max-w-md pt-10">
       <Card className="p-8">
-        <h1 className="text-2xl font-bold text-walnut">Create your account</h1>
-        <p className="mt-1 text-sm text-stone">Answer a 2-minute quiz, get a full room plan.</p>
+        <h1 className="h1 text-[var(--color-ink)]">Create your account</h1>
+        <p className="mt-1 text-sm text-[var(--color-muted)]">Answer a 2-minute quiz, get a full room plan.</p>
         <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4" noValidate>
           <div>
             <label htmlFor="full_name" className="mb-1 block text-sm font-medium">Full name</label>
@@ -65,11 +65,11 @@ export default function RegisterPage() {
           <fieldset>
             <legend className="mb-1 text-sm font-medium">I am a…</legend>
             <div className="grid grid-cols-2 gap-2">
-              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-[#e5ded3] px-3 py-2.5 text-sm has-checked:border-clay has-checked:bg-[#fdf3ee]">
+              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-[var(--color-line)] px-3 py-2.5 text-sm has-checked:border-[var(--color-accent)] has-checked:bg-[var(--color-accent)]/5">
                 <input type="radio" value="homeowner" {...register("role")} className="accent-clay" />
                 Homeowner
               </label>
-              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-[#e5ded3] px-3 py-2.5 text-sm has-checked:border-clay has-checked:bg-[#fdf3ee]">
+              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-[var(--color-line)] px-3 py-2.5 text-sm has-checked:border-[var(--color-accent)] has-checked:bg-[var(--color-accent)]/5">
                 <input type="radio" value="designer" {...register("role")} className="accent-clay" />
                 Interior Designer
               </label>
@@ -80,8 +80,8 @@ export default function RegisterPage() {
             {busy ? "Creating…" : "Create account"}
           </Button>
         </form>
-        <p className="mt-4 text-center text-sm text-stone">
-          Already registered? <Link to="/login" className="font-semibold text-clay">Sign in</Link>
+        <p className="mt-4 text-center text-sm text-[var(--color-muted)]">
+          Already registered? <Link to="/login" className="font-semibold text-[var(--color-ink)] underline underline-offset-2">Sign in</Link>
         </p>
       </Card>
     </div>

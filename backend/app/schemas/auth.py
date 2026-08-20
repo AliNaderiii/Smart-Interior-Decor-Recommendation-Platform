@@ -1,18 +1,27 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+from app.schemas.sanitize import SafeText
+
+#: V2 (A04): reject unknown fields on every auth payload.
+STRICT = ConfigDict(extra="forbid")
 
 
 class RegisterIn(BaseModel):
+    model_config = STRICT
+
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-    full_name: str = ""
+    full_name: SafeText(max_length=200) = ""
     role: str = Field(default="homeowner", pattern="^(homeowner|designer)$")
 
 
 class LoginIn(BaseModel):
+    model_config = STRICT
+
     email: EmailStr
-    password: str
+    password: str = Field(max_length=128)
 
 
 class TokenPair(BaseModel):
@@ -22,7 +31,9 @@ class TokenPair(BaseModel):
 
 
 class RefreshIn(BaseModel):
-    refresh_token: str
+    model_config = STRICT
+
+    refresh_token: str = Field(default="", max_length=2048)
 
 
 class UserOut(BaseModel):

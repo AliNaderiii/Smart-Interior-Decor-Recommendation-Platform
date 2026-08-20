@@ -5,7 +5,9 @@ import secrets
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+from app.schemas.sanitize import SafeText
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -23,16 +25,22 @@ router = APIRouter(tags=["projects"])
 
 
 class ProjectIn(BaseModel):
-    name: str
-    client_name: str = ""
-    client_email: str = ""
-    notes: str = ""
+    # V2 (A04): extra="forbid" — this model is splatted into Project(**dump),
+    # so unknown keys must be rejected, not silently dropped.
+    model_config = ConfigDict(extra="forbid")
+
+    name: SafeText(max_length=200, min_length=1)
+    client_name: SafeText(max_length=200) = ""
+    client_email: SafeText(max_length=255) = ""
+    notes: SafeText(max_length=2000) = ""
 
 
 class ShareIn(BaseModel):
-    quiz_id: str
+    model_config = ConfigDict(extra="forbid")
+
+    quiz_id: str = Field(max_length=32)
     send_to_email: EmailStr | None = None
-    expires_days: int = 30
+    expires_days: int = Field(default=30, ge=1, le=365)
 
 
 def _project_out(p: Project, quiz_count: int = 0) -> dict:

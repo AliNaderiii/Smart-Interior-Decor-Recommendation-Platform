@@ -7,7 +7,7 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={clsx(
-        "rounded-2xl bg-white shadow-[0_1px_3px_rgba(43,38,34,0.08),0_8px_24px_rgba(43,38,34,0.06)]",
+        "rounded-2xl bg-[var(--color-surface)] shadow-[var(--shadow-card)]",
         className,
       )}
       {...props}
@@ -15,13 +15,45 @@ export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   );
 }
 
-type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+/** Card that lifts on hover (DESIGN_SYSTEM_V2 §4: y:-2 + shadow).
+ *
+ *  CSS-driven (`.card-lift`), not Framer Motion — this renders in the eager
+ *  shell and appears dozens of times per grid, so it must cost nothing on the
+ *  critical path. `prefers-reduced-motion` is handled in the stylesheet. */
+export function MotionCard({
+  className,
+  children,
+  onClick,
+  interactive = true,
+}: {
+  className?: string;
+  children: ReactNode;
+  onClick?: () => void;
+  interactive?: boolean;
+}) {
+  return (
+    <div
+      onClick={onClick}
+      className={clsx(
+        "rounded-2xl bg-[var(--color-surface)] shadow-[var(--shadow-card)]",
+        interactive && "card-lift",
+        className,
+      )}
+    >
+      {children}
+    </div>
+  );
+}
+
+type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "accent";
 
 const buttonStyles: Record<ButtonVariant, string> = {
   primary: "bg-clay text-white hover:bg-clay-dark focus-visible:ring-clay",
   secondary: "bg-sand text-ink hover:bg-[#e8e0d4] focus-visible:ring-stone",
   ghost: "bg-transparent text-ink hover:bg-sand focus-visible:ring-stone",
   danger: "bg-red-700 text-white hover:bg-red-800 focus-visible:ring-red-700",
+  /* The V2 single accent — near-black. Used for primary CTAs on rebuilt pages. */
+  accent: "bg-[var(--color-accent)] text-[var(--color-canvas)] hover:opacity-90 focus-visible:ring-[var(--color-accent)]",
 };
 
 export function Button({
@@ -32,9 +64,10 @@ export function Button({
   return (
     <button
       className={clsx(
-        "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold",
+        "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold",
         "transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
-        "disabled:opacity-50 disabled:cursor-not-allowed",
+        "active:scale-[0.98] motion-reduce:active:scale-100",
+        "disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100",
         buttonStyles[variant],
         className,
       )}
@@ -84,30 +117,20 @@ export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   );
 }
 
+/** Shimmer placeholder (V2): a moving gradient sweep, not a pulsing grey box.
+ *  Honours prefers-reduced-motion by falling back to a static tint. */
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={clsx("animate-pulse rounded-xl bg-sand", className)} />;
-}
-
-export function EmptyState({ title, hint, action }: { title: string; hint?: string; action?: ReactNode }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-[#ddd4c7] py-16 text-center">
-      <p className="text-lg font-semibold text-walnut">{title}</p>
-      {hint && <p className="max-w-sm text-sm text-stone">{hint}</p>}
-      {action}
-    </div>
-  );
-}
-
-export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
-  return (
-    <div className="flex flex-col items-center gap-3 rounded-2xl bg-red-50 py-12 text-center">
-      <p className="font-medium text-red-800">{message}</p>
-      {onRetry && (
-        <Button variant="secondary" onClick={onRetry}>
-          Try again
-        </Button>
+    <div
+      aria-hidden="true"
+      className={clsx(
+        "relative overflow-hidden rounded-xl bg-sand",
+        "before:absolute before:inset-0 before:-translate-x-full before:animate-shimmer",
+        "before:bg-gradient-to-r before:from-transparent before:via-white/60 before:to-transparent",
+        "motion-reduce:before:hidden",
+        className,
       )}
-    </div>
+    />
   );
 }
 

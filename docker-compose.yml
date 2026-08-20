@@ -45,7 +45,7 @@ services:
     command: >
       sh -c "alembic upgrade head &&
              python scripts/seed_products.py --if-empty --from-json &&
-             uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2"
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --no-server-header --proxy-headers"
 
   frontend:
     build:

@@ -7,7 +7,7 @@ environment / ``.env`` file.  No secrets are ever hardcoded — see
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Literal
+from typing import ClassVar, Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -30,12 +30,38 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     FERNET_KEY: str = ""
 
+    # ---- Cookie auth (V2 — OWASP A02) ----
+    #: When true, /auth/* also sets HttpOnly access+refresh cookies and the
+    #: API accepts them. Body tokens are retained for Bearer/CLI clients.
+    USE_COOKIE_AUTH: bool = True
+    COOKIE_SECURE: bool = True
+    COOKIE_SAMESITE: Literal["strict", "lax", "none"] = "strict"
+
+    # ---- Auth rate limits (V2 — OWASP A07) ----
+    #: Coarse per-IP flood guard. Deliberately generous: many legitimate users
+    #: share one NAT egress IP, and a strict 5/min here would let one attacker
+    #: lock out every colleague behind the same address (turning the control
+    #: into a DoS). Targeted guessing is stopped precisely by
+    #: `app.core.brute_force` (5 failures per ip+email -> 15 min lockout).
+    LOGIN_RATE_LIMIT_PER_MINUTE: int = 30
+    REGISTER_RATE_LIMIT_PER_MINUTE: int = 3
+    RECOMMEND_IP_RATE_LIMIT_PER_MINUTE: int = 100
+
     # ---- Database ----
     DATABASE_URL: str = "sqlite:///./decor.sqlite3"
 
     # ---- Redis ----
     REDIS_URL: str = ""  # empty -> fakeredis (dev/test only)
     RECOMMEND_CACHE_TTL: int = 3600
+
+    # pgvector HNSW search breadth (V2 Phase 2). The pgvector default of 40 is
+    # tuned for unfiltered nearest-neighbour search. Our Stage A/B query is a
+    # *post-filtered* ANN search (category + budget + is_verified applied on
+    # top of the index scan), so the index must walk far more than 40 nodes to
+    # still yield CANDIDATE_LIMIT survivors. Measured on a 20.7k-row catalog:
+    # ef_search=40 returned 14/100 candidates, 200 -> 58/100, 400 -> 100/100.
+    # 400 costs ~9 ms vs ~7 ms and remains faster than the 14 ms exact scan.
+    HNSW_EF_SEARCH: int = 400
     RECOMMEND_RATE_LIMIT_PER_MINUTE: int = 20  # 0 disables (load tests)
 
     # ---- AI ----
@@ -72,6 +98,32 @@ class Settings(BaseSettings):
     @property
     def is_postgres(self) -> bool:
         return self.DATABASE_URL.startswith(("postgresql", "postgres"))
+
+    #: V2 (OWASP A02): refuse to boot production with a weak/default signing key.
+    DEFAULT_SECRET: ClassVar[str] = "dev-only-secret-change-me"
+
+    def validate_runtime(self) -> None:
+        """Fail fast on insecure production configuration."""
+        if self.APP_ENV != "production":
+            return
+        problems: list[str] = []
+        if self.SECRET_KEY == self.DEFAULT_SECRET:
+            problems.append("SECRET_KEY is still the default value")
+        if len(self.SECRET_KEY) < 32:
+            problems.append(
+                f"SECRET_KEY must be >=32 chars (got {len(self.SECRET_KEY)})"
+            )
+        if not self.REDIS_URL:
+            problems.append(
+                "REDIS_URL is empty — fakeredis is per-process, so rate limits "
+                "and brute-force lockouts would not be shared across workers"
+            )
+        if self.USE_COOKIE_AUTH and not self.COOKIE_SECURE:
+            problems.append("COOKIE_SECURE must be true in production")
+        if problems:
+            raise RuntimeError(
+                "Insecure production configuration:\n  - " + "\n  - ".join(problems)
+            )
 
 
 @lru_cache
