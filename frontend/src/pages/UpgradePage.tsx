@@ -52,7 +52,15 @@ export default function UpgradePage() {
   async function startPayment() {
     setBusy(true);
     try {
-      const { redirect_url } = await post<{ redirect_url: string }>("/payment/request");
+      const res = await post<{ redirect_url?: string }>("/payment/request");
+      const redirect_url = res?.redirect_url;
+      // Defensive: a gateway outage can return 200 with no redirect_url, and
+      // blindly calling .startsWith() on it turned a recoverable payment
+      // failure into a white-screen crash.
+      if (!redirect_url) {
+        setMessage("Payment gateway did not return a checkout link. Please try again.");
+        return;
+      }
       // Sandbox/mock returns our own callback URL; production redirects to Zarinpal.
       if (redirect_url.startsWith("http") && !redirect_url.includes(window.location.host)) {
         window.location.href = redirect_url;
@@ -60,6 +68,8 @@ export default function UpgradePage() {
         const url = new URL(redirect_url, window.location.origin);
         navigate(`/upgrade?${url.searchParams.toString()}`);
       }
+    } catch {
+      setMessage("Could not start the payment. Please try again.");
     } finally {
       setBusy(false);
     }

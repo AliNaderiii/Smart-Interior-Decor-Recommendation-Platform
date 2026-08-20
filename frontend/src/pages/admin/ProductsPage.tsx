@@ -161,6 +161,7 @@ export default function AdminProductsPage() {
         <div className="flex items-center gap-2">
           {(["all", "pending", "verified"] as const).map((f) => (
             <Button key={f} variant={filter === f ? "accent" : "ghost"} className="py-1.5 text-xs capitalize"
+                    aria-pressed={filter === f}
                     onClick={() => { setFilter(f); setPage(1); }}>
               {f}
             </Button>
