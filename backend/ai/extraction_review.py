@@ -40,6 +40,10 @@ FALLBACK_CONFIDENCE_CAP = 0.30
 _REASONS = {
     "low_confidence": "confidence below AUTO_ACCEPT_THRESHOLD (0.80)",
     "provider_error": "vision provider failed; values are fallback/empty, not model output",
+    "fallback_provider": (
+        "values came from the labelled mock fallback, not the selected vision "
+        "provider (misconfigured provider/key)"
+    ),
     "unknown_taxonomy_values": "model returned values outside the taxonomy; they were discarded",
     "missing_style": "no style recognised — recommendations would be blind on the dominant signal",
     "missing_material": "no material recognised",
@@ -59,6 +63,8 @@ def review_decision(extraction: dict[str, Any]) -> dict[str, Any]:
         reasons.append("low_confidence")
     if extraction.get("provider_error"):
         reasons.append("provider_error")
+    if extraction.get("provider") == "mock-fallback":
+        reasons.append("fallback_provider")
     if extraction.get("unknown_taxonomy_values"):
         reasons.append("unknown_taxonomy_values")
     if not extraction.get("style"):
