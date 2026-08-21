@@ -132,7 +132,7 @@ Legend — **Status**: `FIXED` (this stage) · `OK` (pre-existing, re-verified) 
 | ID | STRIDE | Threat | Control | Status | Evidence |
 |---|---|---|---|---|---|
 | T-22 | Tampering | SQL injection | SQLAlchemy Core/ORM parameter binding throughout; no string-built SQL in request paths | OK | code review + `test_input_validation.py` |
-| T-23 | Denial of service | Oversized field reaches the driver and returns `500` (`StringDataRightTruncation`) | Bounded `SafeText`/`Field(max_length=…)` on **every** writable string, verified against real PostgreSQL | **FIXED** | `07-postgres-*.log`, probe `V-02` |
+| T-23 | Denial of service | Oversized field reaches the driver and returns `500` (`StringDataRightTruncation`) | Bounded `SafeText`/`Field(max_length=…)` on **every** writable string, verified against real PostgreSQL | **FIXED** | `06-AFTER-api-security-probe.txt` (run against real PostgreSQL 16.2), probe `V-02` |
 | T-24 | Information disclosure | Stack trace / driver error echoed to the client | Generic envelopes; the `422` handler no longer reflects the submitted value | **FIXED** | probe `H-02`, `H-03` |
 
 ### TB8 — Redis
@@ -160,7 +160,7 @@ Legend — **Status**: `FIXED` (this stage) · `OK` (pre-existing, re-verified) 
 | ID | STRIDE | Threat | Control | Status | Evidence |
 |---|---|---|---|---|---|
 | T-35 | Information disclosure | SSRF — `seller_link` / `image_url` pointed at `169.254.169.254`, `127.0.0.1`, `10.0.0.0/8`, `file://`, `gopher://` and fetched by the link checker or the AI provider | `app.core.url_safety`: scheme allowlist (`http`/`https`), DNS resolution, IP-literal and private/loopback/link-local/reserved range rejection at **validation** time and again before the outbound request | **FIXED** | `test_url_safety.py` |
-| T-36 | Elevation (XSS) | `javascript:` / `data:text/html` in `seller_link`, rendered straight into `<a href>` in three SPA views | Same URL validator server-side; `safeExternalUrl()` guard client-side | **FIXED** | probe `X-01` |
+| T-36 | Elevation (XSS) | `javascript:` / `data:text/html` in `seller_link`, rendered straight into `<a href>` in three SPA views | Same URL validator server-side; `safeUrl()` guard client-side (`frontend/src/lib/safeUrl.ts`) | **FIXED** | probe `X-01` |
 | T-37 | Tampering | **Prompt injection**: an image containing text that makes the vision model return markup, which is then stored as the product title/description and rendered | AI output HTML-stripped and length-bounded at the persistence boundary | **FIXED** | probe `X-03` |
 | T-38 | Information disclosure | API keys leaked into logs / error envelopes | Redacting log filter (JWTs, bearer tokens, `key=`/`api_key=`/`authority=` query values, cookies, emails) | **FIXED** | probe `P-01` |
 
@@ -170,12 +170,12 @@ Legend — **Status**: `FIXED` (this stage) · `OK` (pre-existing, re-verified) 
 |---|---|---|---|---|---|
 | T-39 | Tampering | **Unhandled `500` bypassed the header middleware entirely** — zero security headers on the one response class an attacker most wants to reach | Headers applied inside the middleware's own exception path; generic envelope | **FIXED** | probe `H-01` |
 | T-40 | Elevation | **Production CORS allowlist contained `http://localhost:5173/4173` with `allow_credentials=true`** — any local process could drive an authenticated session | Origins built per environment; production = `FRONTEND_ORIGIN` only, and it must be `https://` | **FIXED** | probe `C-02` |
-| T-41 | Elevation | `script-src 'unsafe-inline'` neutralises CSP as an XSS backstop | Removed — the Vite bundle has no inline script; `img-src` derives from `S3_PUBLIC_BASE_URL` (closes IR-005); `upgrade-insecure-requests` in production | **FIXED** | `06-security-headers.txt` |
-| T-42 | Information disclosure | Authenticated payloads cached by a shared proxy | `Cache-Control: no-store` + `Vary: Cookie, Authorization` on API responses | **FIXED** (extended) | `06-security-headers.txt` |
+| T-41 | Elevation | `script-src 'unsafe-inline'` neutralises CSP as an XSS backstop | Removed — the Vite bundle has no inline script; `img-src` derives from `S3_PUBLIC_BASE_URL` (closes IR-005); `upgrade-insecure-requests` in production | **FIXED** | `07-AFTER-production-failsafe-probe.txt`, `test_security_headers.py` |
+| T-42 | Information disclosure | Authenticated payloads cached by a shared proxy | `Cache-Control: no-store` + `Vary: Cookie, Authorization` on API responses | **FIXED** (extended) | `07-AFTER-production-failsafe-probe.txt`, `test_security_headers.py` |
 | T-43 | Repudiation / privacy | GDPR erasure left `product_feedback` and `audit_logs` bound to the deleted user id, and was not itself audited | Erasure deletes feedback, **pseudonymises** audit rows (keeping the security trail, dropping the link to a person), writes one `user_delete` row with the pseudonym | **FIXED** | probe `G-01`…`G-03` |
 | T-44 | Privacy | No self-service data export (GDPR Art. 15/20) | `GET /users/me/export` returning the full personal-data inventory, audited, rate limited | **FIXED** | `test_gdpr.py` |
 | T-45 | Information disclosure | `FERNET_KEY` unset in production → a fresh key per process → ciphertext undecryptable and key material not managed | `validate_runtime()` requires a valid Fernet key in production | **FIXED** | `test_config_fail_safe.py` |
-| T-46 | Supply chain | `ecdsa 0.19.2` / `PYSEC-2026-1325` with no fixed release, pulled in by `python-jose` | Not exploitable here (HS256 only) and now unreachable by construction (algorithm allowlist). Dependency swap to `pyjwt` raised as **IR-SEC-002** because `requirements.txt` is shared | **ACCEPTED + DEFERRED** | `09-pip-audit.log`, IR-SEC-002 |
+| T-46 | Supply chain | `ecdsa 0.19.2` / `PYSEC-2026-1325` with no fixed release, pulled in by `python-jose` | Not exploitable here (HS256 only) and now unreachable by construction (algorithm allowlist). Dependency swap to `pyjwt` raised as **IR-SEC-002** because `requirements.txt` is shared | **ACCEPTED + DEFERRED** | `10-pip-audit.log`, IR-SEC-002 |
 
 ## 5. Attack trees for the two highest-value goals
 

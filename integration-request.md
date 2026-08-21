@@ -397,3 +397,276 @@ be executed as written.
 | IR-009 | Medium | 07 | Python dependencies not locked |
 | IR-010 | Low | 10 | Inconsistent version metadata, no SemVer tag on the baseline, no CHANGELOG |
 | IR-011 | Medium | 07 | Rollback not executable (floating images, no backups, untested downgrade) |
+
+---
+---
+
+# Integration Requests — from Stage 03 (Security, Privacy & Trust Hardening)
+
+**Raised by:** Master Prompt 03 agent squad
+**Branch:** `agent/security-hardening-2026-08-21`
+**Date:** 2026-08-21
+**Report:** `docs/agent-reports/security-hardening-report.md`
+**Risk register:** `docs/security/RISK_REGISTER.md` §3
+
+Every item below is a security defect this stage **found and verified**, but whose
+fix lands in a file outside the `Allowed scope` clause of
+`agent-master-prompts/03-security-privacy.md` (`backend/app/core/**`, the four
+named route modules, their schemas, security tests, `frontend/src/stores/authStore.ts`,
+`frontend/src/lib/api.ts`, security-related UI, and `docs/security/**`).
+
+None of the files listed under "Files to change" was modified by this stage.
+Verify with `git diff --stat origin/v2-strict-mode...agent/security-hardening-2026-08-21`.
+
+---
+
+## IR-SEC-001 · MEDIUM · `docker-compose.yml` runs the seed loader on every backend start
+
+**Owner:** Master Prompt 07 — Infrastructure / DevOps
+**Related:** IR-001, threat `T-01`, risk `D-01`
+
+### Evidence
+
+`docker-compose.yml:44-47`
+
+```yaml
+command: >
+  sh -c "alembic upgrade head &&
+         python scripts/load_realistic_products.py --realistic --if-empty &&
+         uvicorn app.main:app --host 0.0.0.0 --port 8000"
+```
+
+Before this stage, that command created `admin@smartdecor.dev / Admin123!` on
+every container start, in every environment
+(`docs/agent-reports/security-hardening-evidence/03-BEFORE-demo-seeding-probe.txt`).
+
+### What this stage did
+
+The account-creation path is now gated centrally and **cannot** run under
+`APP_ENV=production` — verified by
+`05-AFTER-demo-seeding-probe.txt` (0 of 3 production runs create a user) and
+`07-AFTER-production-failsafe-probe.txt` (F-01, F-03, F-04). The compose command
+itself is therefore no longer dangerous.
+
+### What is still requested
+
+1. The compose file hard-codes development-shaped values
+   (`APP_ENV`, `SECRET_KEY`, `COOKIE_SECURE=false`, `STORAGE_BACKEND=local`).
+   That is correct for local development; make it *obviously* development-only
+   — rename to `docker-compose.dev.yml` or add an explicit
+   `# DEVELOPMENT ONLY — production must not use this file` banner and a
+   separate production compose/manifest.
+2. Add `SEED_DEMO_ACCOUNTS=true` to the dev compose environment so the demo
+   logins keep appearing for local users after this change. Without it, a
+   developer running `docker compose up` gets a catalog but no accounts, which
+   will read as a regression.
+3. Consider moving seeding out of the container `command` into a one-shot
+   `make seed` / init container, so a production image never runs a seeder.
+
+**Files to change:** `docker-compose.yml`, `Makefile`, `docs/DEPLOYMENT.md`.
+
+---
+
+## IR-SEC-002 · MEDIUM · Replace `python-jose` with `pyjwt` to drop the unfixable `ecdsa` advisory
+
+**Owner:** Master Prompt 07 — Infrastructure (dependency manifests)
+**Related:** IR-008, threat `T-46`, accepted risk `A-04`
+
+### Evidence
+
+`docs/agent-reports/security-hardening-evidence/10-pip-audit.log`
+
+```
+Found 1 known vulnerability in 1 package
+Name  Version ID              Fix Versions
+----- ------- --------------- ------------
+ecdsa 0.19.2  PYSEC-2026-1325
+```
+
+`ecdsa` has **no fixed release**. It is pulled in transitively by
+`python-jose[cryptography]`.
+
+### Why this stage accepted rather than fixed it
+
+The advisory affects ECDSA signing/verification. The platform signs and verifies
+with HS256 only, and Stage 03 added a boot-time algorithm allowlist
+(`Settings.ALLOWED_JWT_ALGORITHMS`, enforced in **every** environment) that makes
+the ECDSA code path unreachable by construction. The residual risk is low.
+
+### What is requested
+
+Swap `python-jose[cryptography]` for `pyjwt[crypto]`, which does not depend on
+`ecdsa`. The call sites are small and confined to
+`backend/app/core/security.py` (`jwt.encode` / `jwt.decode`) plus the `JWTError`
+import in `backend/app/api/routes/auth.py` and `backend/app/api/deps.py`; the
+Stage 03 tests in `tests/test_auth_hardening.py` (alg-none, tampered signature,
+garbage header) will validate the swap.
+
+**Files to change:** `backend/requirements.txt` (package manifest — explicitly
+out of scope for Stage 03).
+
+---
+
+## IR-SEC-003 · LOW · `ai/feature_extractor.py` fetches a remote URL without the SSRF validator
+
+**Owner:** Master Prompt 05 — AI / Recommendation Engine
+**Related:** threat `T-35`, risk `D-03`
+
+### Evidence
+
+`backend/ai/feature_extractor.py` fetches the image URL it is handed in order to
+run extraction. It is the third server-side fetch of an operator-supplied URL;
+the other two (`app/services/link_checker.py` and the schema boundary in
+`app/schemas/product.py`) were hardened in this stage with
+`app.core.url_safety.validate_public_url(..., resolve=True)`.
+
+### Current exposure
+
+Low. Every URL that reaches the extractor has already passed schema validation
+(scheme allowlist + private-range rejection), and the upload path passes a
+storage URL the application generated itself. The gap is **defence in depth**:
+if a future caller reaches the extractor with an unvalidated URL, there is no
+second lock.
+
+### What is requested
+
+```python
+from app.core.url_safety import UnsafeUrl, validate_public_url
+
+try:
+    url = validate_public_url(source, resolve=True, field="image_url")
+except UnsafeUrl:
+    return _fallback_extraction()
+```
+
+`backend/ai/**` is owned by the AI stage, so this stage did not edit it.
+
+**Files to change:** `backend/ai/feature_extractor.py`.
+
+---
+
+## IR-SEC-004 · MEDIUM · No frontend unit-test runner, so security tests cannot run in CI
+
+**Owner:** Master Prompt 08 — QA / Testing
+**Related:** IR-007, risk `D-04`
+
+### Evidence
+
+`frontend/package.json` has `dev`, `build`, `lint`, `preview` and a Playwright
+config, but no unit-test runner. This stage added
+`frontend/src/lib/safeUrl.ts` — the client-side guard that stops
+`javascript:` URLs reaching `<a href>` on the **unauthenticated** share page —
+and its tests must run somewhere.
+
+### Workaround used
+
+`frontend/tests/unit/safeUrl.test.ts` uses `node:test` and runs standalone:
+
+```bash
+cd frontend
+node --experimental-strip-types --test tests/unit/safeUrl.test.ts
+# 9 pass, 0 fail
+```
+
+Evidence: `docs/agent-reports/security-hardening-evidence/11-AFTER-frontend-verification.txt`.
+
+### What is requested
+
+Add `vitest` + `@vitest/coverage-v8`, a `"test": "vitest run"` script, and wire
+it into CI so this file stops depending on an experimental Node flag.
+
+**Files to change:** `frontend/package.json`, `frontend/vite.config.ts`,
+`.github/workflows/**` — all package-manifest / CI files, outside Stage 03 scope.
+
+---
+
+## IR-SEC-005 · LOW · Registration accepts known-breached passwords
+
+**Owner:** Master Prompt 03 (future) / product decision
+**Related:** accepted risk `A-06`
+
+`app/schemas/auth.py` enforces a 12-character minimum, the bcrypt 72-byte bound,
+rejection of repetitive and sequential strings, and a hard-coded list of **15**
+common passwords. NIST SP 800-63B §5.1.1.2 asks verifiers to check candidates
+against a breach corpus; 15 entries is not that.
+
+**Requested:** a k-anonymity lookup against the HIBP range API (`GET
+https://api.pwnedpasswords.com/range/{first5}`), with a cache, a timeout and a
+fail-open policy — a password checker that is down must not stop registration.
+This needs a product decision on adding an outbound network dependency to the
+signup path, and an entry in the privacy notice.
+
+**Files to change:** `backend/app/schemas/auth.py` (in scope) plus a new
+outbound-HTTP client and its configuration (needs the decision above first).
+
+---
+
+## IR-SEC-006 · HIGH · Security scans and probes do not run automatically
+
+**Owner:** Master Prompt 07 — Infrastructure / CI
+**Related:** IR-006, risk `D-06`
+
+Master Prompt 03 permits security CI changes "only by integration request", so
+this stage did not touch `.github/workflows/**`.
+
+**Requested:** a `security` CI job running, on every PR:
+
+```yaml
+- run: cd backend && pip-audit -r requirements.txt
+- run: cd frontend && npm audit --omit=dev
+- run: cd backend && ruff check app ai scripts tests
+- run: cd backend && pytest -p no:warnings
+- run: cd backend && python ../docs/security/probes/probe_demo_seeding.py
+- run: cd backend && python ../docs/security/probes/probe_production_failsafe.py
+```
+
+The two probes exit `0` and print a machine-greppable summary line
+(`production runs that created demo accounts = 0`, `8 checks, 8 secure, 0
+INSECURE`); a `grep -q` on those lines is enough to gate the build. Note that
+`ruff check` currently fails on a **pre-existing** `I001` in
+`backend/tests/test_perf_v2.py`, owned by the performance stage (IR-002).
+
+**Files to change:** `.github/workflows/**`.
+
+---
+
+## IR-SEC-007 · MEDIUM · Audit-log retention is promised but not enforced
+
+**Owner:** Master Prompt 07 — Infrastructure (scheduling) with Master Prompt 03 review
+**Related:** threat `T-43`, risk `D-07`
+
+`GET /users/me/export` returns this retention notice to data subjects:
+
+> Security events are retained for 180 days under GDPR Art. 6(1)(f) …
+
+Nothing enforces it. `audit_logs` grows without bound, which is both a storage
+issue and — because rows carry IP addresses and user agents — a data-minimisation
+problem under Art. 5(1)(e). Pseudonymised rows from an erasure are equally
+affected.
+
+**Requested:** a scheduled job (cron container, Celery beat, or a `pg_cron`
+entry) running
+
+```sql
+DELETE FROM audit_logs WHERE created_at < now() - interval '180 days';
+```
+
+plus a metric for rows purged. The retention window itself should be confirmed
+with whoever owns the privacy notice.
+
+**Files to change:** deployment scheduling (`docker-compose.yml` / infra
+manifests) and a small management command.
+
+---
+
+## Stage 03 summary
+
+| ID | Severity | Owner | Title |
+|---|---|---|---|
+| IR-SEC-001 | Medium | 07 | `docker-compose.yml` seeding command and dev-shaped env |
+| IR-SEC-002 | Medium | 07 | Swap `python-jose` → `pyjwt` to drop the unfixable `ecdsa` advisory |
+| IR-SEC-003 | Low | 05 | SSRF validator missing in `ai/feature_extractor.py` (defence in depth) |
+| IR-SEC-004 | Medium | 08 | No frontend unit-test runner for the `safeUrl` security tests |
+| IR-SEC-005 | Low | 03 / product | No breached-password check at registration |
+| IR-SEC-006 | High | 07 | Security scans and probes are not in CI |
+| IR-SEC-007 | Medium | 07 / 03 | Audit-log retention promised to users but not enforced |
