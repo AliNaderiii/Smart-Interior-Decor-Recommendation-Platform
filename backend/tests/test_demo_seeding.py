@@ -74,6 +74,10 @@ def _prod(**overrides) -> Settings:
         FRONTEND_ORIGIN="https://app.example.com",
         FERNET_KEY="2xLmTPRPYxxLW8mM3jXfKcXo5G3iVYkYfQ2vYbFsC8Y=",
         STORAGE_BACKEND="s3", SEED_DEMO_ACCOUNTS=False,
+        # Stage 04 remediation: AI_PROVIDER=mock is production-invalid now
+        # (keyword-derived features must never serve production). Placeholder
+        # key value — not a real credential.
+        AI_PROVIDER="gemini", GEMINI_API_KEY="test-gemini-key-placeholder",
     )
     base.update(overrides)
     return Settings(**base)
@@ -112,11 +116,12 @@ def test_boot_guard_is_a_no_op_outside_production(reset_settings, db):
 def _run_seeder(tmp_path: Path, env_overrides: dict[str, str], argv: list[str]):
     # Stage 04 note: production no longer permits seeding a catalog with hash
     # embeddings (ai.embedding_service raises EmbeddingBackendError — see
-    # docs/ai/model-versions.md). The documented deploy flow is "seed once at
-    # deployment time (development profile or --from-json with committed real
-    # vectors), serve in production", so this fixture pre-seeds the database in
-    # development mode first. The production-mode invocation under test then
-    # exercises the `--if-empty` steady state exactly as compose runs it.
+    # docs/ai/model-versions.md), and — as of the Stage 04 remediation — the
+    # production compose startup path no longer seeds at all (the catalog is
+    # loaded by the explicit `catalog-bootstrap` job). This fixture pre-seeds
+    # the database in development mode first; the production-mode invocation
+    # under test then exercises the `--if-empty` steady state exactly as the
+    # bootstrap job runs it.
     # The dev pre-seed never carries --seed-demo-accounts: the production
     # invocation must still be the one that refuses the flag.
     dev_argv = [a for a in argv if a != "--seed-demo-accounts"]
