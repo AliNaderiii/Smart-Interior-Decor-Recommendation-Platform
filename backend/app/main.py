@@ -80,8 +80,22 @@ async def lifespan(_: FastAPI):
     restored staging dump. Refusing to serve is the safe direction: a process
     that will not start is a five-minute incident, an internet-facing platform
     with a published admin password is not.
+
+    Stage 04 remediation (IR-AI-001): production startup must also prove the
+    embedding runtime *before serving the first recommendation* — a wrong
+    backend (hash) or an unusable CLIP model raising here fails startup with
+    an actionable message instead of silently ranking on development vectors.
+    No-op outside production, and imported lazily so collection of ordinary
+    SQLite tests never triggers model loading.
     """
     if settings.is_production:
+        from ai.embedding_service import validate_embedding_runtime
+
+        info = validate_embedding_runtime()
+        logger.info(
+            "startup embedding validation passed: backend=%s model=%s dim=%s",
+            info.get("backend"), info.get("model"), info.get("dim"),
+        )
         from app.core.demo_seed import assert_no_demo_accounts_in_production
         from app.db.session import SessionLocal
 
