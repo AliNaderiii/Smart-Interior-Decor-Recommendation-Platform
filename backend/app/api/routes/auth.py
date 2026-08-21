@@ -6,9 +6,18 @@ V2 hardening (see docs/SECURITY_AUDIT_V2.md):
   * A07 — per-IP rate limits on /login (5/min) and /register (3/min)
   * A02 — httpOnly/Secure/SameSite=Strict cookies + double-submit CSRF token
   * A09 — audit_logs written for login/failed login/blocked/logout/register/refresh
+
+Stage 03 hardening (see docs/security/THREAT_MODEL.md):
+  * T-03 — constant-work login: a miss now performs a dummy bcrypt verify, so
+    response time no longer discloses whether an address is registered
+  * T-09 — /refresh and /logout enforce the double-submit CSRF token for
+    cookie sessions instead of relying on SameSite alone
+  * T-10 — registration passwords are bounded at bcrypt's real 72-byte input
+  * T-38 — audit `detail` stores a keyed pseudonym, not the raw address
 """
 from __future__ import annotations
 
+import secrets
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
@@ -21,8 +30,10 @@ from app.core.config import settings
 from app.core.cookies import (
     REFRESH_COOKIE,
     clear_auth_cookies,
+    require_csrf_for_cookie_session,
     set_auth_cookies,
 )
+from app.core.log_redaction import pseudonymise_email
 from app.core.rate_limit import enforce_rate_limit
 from app.core.redis_client import get_redis
 from app.core.security import (
@@ -73,11 +84,42 @@ def _issue(response: Response, user_id: str) -> dict:
     return pair
 
 
-def _refresh_token_from(body: RefreshIn | None, request: Request) -> str | None:
-    """Accept the refresh token from the body (v1) or the cookie (v2)."""
+#: A bcrypt hash of a value nobody knows, used only to burn the same CPU on a
+#: login miss as on a hit (T-03). Computed lazily and once: hashing at import
+#: time would add ~250 ms to every process start, including the test suite.
+_DUMMY_HASH: str | None = None
+
+
+def _equalise_login_work(password: str) -> None:
+    """Spend the same time on a missing account as on an existing one.
+
+    Baseline measurement (probe T-01): an existing account took 268 ms (bcrypt)
+    and a non-existent one 9 ms, because `verify_password` was skipped
+    entirely. A 30x gap is a reliable, remotely observable oracle for "is this
+    address registered?" — which turns a credential-stuffing list into a
+    validated target list, and leaks membership of a service users may not want
+    to be known to use.
+    """
+    global _DUMMY_HASH
+    if _DUMMY_HASH is None:
+        _DUMMY_HASH = hash_password(secrets.token_urlsafe(24))
+    verify_password(password, _DUMMY_HASH)
+
+
+def _refresh_token_from(
+    body: RefreshIn | None, request: Request
+) -> tuple[str | None, bool]:
+    """Accept the refresh token from the body (v1) or the cookie (v2).
+
+    Returns ``(token, came_from_cookie)``. The flag matters: a token supplied in
+    the request body is *not* ambient authority — a cross-site attacker cannot
+    read it, so replaying it is not CSRF. Only the cookie path needs the
+    double-submit check, and requiring it for Bearer/CLI callers would break
+    them for no security gain.
+    """
     if body is not None and body.refresh_token:
-        return body.refresh_token
-    return request.cookies.get(REFRESH_COOKIE)
+        return body.refresh_token, False
+    return request.cookies.get(REFRESH_COOKIE), True
 
 
 @router.post("/register", status_code=status.HTTP_201_CREATED)
@@ -126,17 +168,25 @@ def login(
         brute_force.check_not_blocked(ip, email)
     except HTTPException:
         audit.record(
-            db, actions.ACTION_LOGIN_BLOCKED, detail=f"email={email}", request=request
+            db, actions.ACTION_LOGIN_BLOCKED,
+            detail=f"account={pseudonymise_email(email)}", request=request,
         )
         raise
 
     user = db.scalar(select(User).where(User.email == email))
-    if not user or not verify_password(body.password, user.hashed_password):
+    if user is None:
+        # T-03: burn the bcrypt cost the hit path would have spent.
+        _equalise_login_work(body.password)
+        password_ok = False
+    else:
+        password_ok = verify_password(body.password, user.hashed_password)
+    if not password_ok:
         count = brute_force.register_failure(ip, email)
         audit.record(
             db, actions.ACTION_LOGIN_FAILED,
             user_id=user.id if user else None,
-            detail=f"email={email} attempt={count}", request=request,
+            detail=f"account={pseudonymise_email(email)} attempt={count}",
+            request=request,
         )
         # Re-check so the *5th* failure itself is answered with the lockout.
         brute_force.check_not_blocked(ip, email)
@@ -161,7 +211,12 @@ def refresh(
     body: RefreshIn | None = None,
     db: Session = Depends(get_db),
 ):
-    token = _refresh_token_from(body, request)
+    token, from_cookie = _refresh_token_from(body, request)
+    if from_cookie:
+        # T-09: /refresh mints a fresh credential pair, so it is the
+        # highest-value CSRF target in the API and must not rely on SameSite
+        # alone when the credential travels as an ambient cookie.
+        require_csrf_for_cookie_session(request)
     if not token:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Missing refresh token")
     try:
@@ -192,7 +247,9 @@ def logout(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    token = _refresh_token_from(body, request)
+    token, from_cookie = _refresh_token_from(body, request)
+    if from_cookie:
+        require_csrf_for_cookie_session(request)
     if token:
         try:
             payload = decode_token(token, expected_type="refresh")
