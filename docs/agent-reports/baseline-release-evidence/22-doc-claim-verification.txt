@@ -1,0 +1,68 @@
+Documentation-claim verification — measured values vs documented values
+Captured: 2026-08-21T13:33:24Z (UTC)  HEAD=f97bfad
+
+### 1. Backend test count
+$ backend/.venv/bin/python -m pytest tests/ --collect-only -q  (measured)
+======================== 97 passed, 1 warning in 15.44s ========================
+measured per-file 'def test_' counts:
+  backend/tests/test_auth.py             13
+  backend/tests/test_feedback_v2.py      16
+  backend/tests/test_perf_v2.py          10
+  backend/tests/test_rate_limit.py       2
+  backend/tests/test_recommender.py      30
+  backend/tests/test_security_v2.py      22
+
+documented claims found in tracked docs:
+  ./CONTINUATION_PROMPT_V2.md:13:    - Monorepo: /backend (FastAPI + Postgres+pgvector + 45 tests green on both SQLite & Postgres), /frontend (React 19 + TS 0 errors, 3 portals), docker-compose.yml, Caddy TLS 1.3, docs/
+  ./README.md:71:pytest tests/ -v                          # 43 tests: 30/30 recommender (incl. p95<2s) + auth/API
+  ./ci/README.md:13:Jobs: backend pytest (43 tests) + extraction benchmark + ruff · frontend
+  ./docs/reports/ACCEPTANCE_REPORT.md:9:| 1 | Recommender tests | ≥28/30 | ✅ **30/30** (45/45 total incl. rate-limit tests) — passes on BOTH SQLite and Postgres+pgvector | `docs/reports/postgres_parity.md` |
+  ./docs/reports/ACCEPTANCE_REPORT.md:11:| 3 | pgvector production path | works | ✅ migration creates `vector` ext + HNSW index; fused `<=>` query verified with EXPLAIN; 45/45 tests green on Postgres | `docs/reports/postgres_parity.md` |
+  ./docs/reports/ACCEPTANCE_REPORT.md:29:| P0-3 Postgres parity | ✅ **proven in-sandbox** | Real Postgres 16 + pgvector 0.6.2 run: migration (extension + HNSW) ✓, fused `<=>` EXPLAIN ✓, 45/45 tests ✓, p95 1.63 s @100 concurrent ✓. Pool set to 20+30/30s per PM. `docker-compose.test.yml` added for Docker reproduction. |
+  ./docs/reports/ACCEPTANCE_REPORT.md:54:45 passed  (30 recommender + 13 auth/API/payment/GDPR + 2 rate-limit)
+  ./docs/reports/postgres_parity.md:52:45 passed, 1 warning in 9.04s
+  ./docs/RESEARCH_V2.md:5:**Base:** MVP v1.1 (`v2-strict-mode` @ 61d13e9) — 45/45 tests green on real Postgres 16 + pgvector 0.6.2, p95 1.63 s @100 concurrent, 3 portals (client / designer / admin).
+  ./docs/WALKTHROUGH.md:67:- 43 automated tests green, incl. **30/30 recommender** + p95 latency test.
+  ./MASTER_PROMPT_V3_DATASETS_INTEGRATION.md:11:- 97 tests green, 119.89KB JS, p95 721ms @20k rows, 0 dead keys, WCAG AA 26/26
+  ./MASTER_PROMPT_V3_DATASETS_INTEGRATION.md:282:- [ ] Tests still green: 97 tests (or 81) pass
+  ./agent-master-prompts/04-ai-recommender-data.md:28:At least 28/30 agreed recommender scenarios pass; real extraction meets the contracted 80% criterion or is transparently blocked behind human review; p95 target is measured on a declared environment; no silent fallback or fabricated explanation.
+  ./agent-master-prompts/10-integration-release-manager.md:19:- 28/30 recommender scenarios; real 50-image benchmark ≥80% or explicit conditional acceptance.
+
+### 2. Seed catalog size
+$ backend/scripts/seed_products.py (measured, SQLite)
+  seeded 100 products
+  default accounts ready (see scripts/seed_products.py docstring)
+$ python3 -c 'len(json.load(datasets/products_realistic_150.json))'
+  datasets/products_realistic_150.json rows: 150
+  datasets/products_realistic.json rows      : 20
+  backend/seed_data/products_realistic_150.json rows: 150
+
+### 3. Dead-keys audit (re-run at HEAD)
+  === DEAD KEYS AUDIT ===
+  scanned 31 files, 92 interactive elements
+  
+  (no findings)
+  
+  TOTAL: 0 DEAD, 0 PARTIAL, 0 OK-DISABLED
+  RESULT: PASS — 0 DEAD
+  docs/AUDIT_V2.md claims: 21 files, 55 interactive elements, 2 PARTIAL (recorded at commit 61d13e9)
+
+### 4. Live API surface
+  openapi.json paths: 29
+  see 19-api-endpoint-inventory.log
+
+### 5. .env.example vs backend Settings parity
+  .env.example variables: 50
+  backend Settings fields: 42
+  in .env.example, NOT a Settings field: POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, STORAGE_PROVIDER, CDN_URL, CORS_ORIGINS, VITE_API_URL, ZARINPAL_SANDBOX, ZARINPAL_CALLBACK_URL, RESEND_FROM_EMAIL, RESEND_FROM_NAME
+  Settings field, NOT in .env.example  : JWT_ALGORITHM, HNSW_EF_SEARCH, DEFAULT_SECRET
+
+### 6. Unused env variables (grepped across backend+frontend source)
+  STORAGE_PROVIDER         referenced in 0 source file(s)
+  CDN_URL                  referenced in 0 source file(s)
+  CORS_ORIGINS             referenced in 0 source file(s)
+  VITE_API_URL             referenced in 0 source file(s)
+  ZARINPAL_SANDBOX         referenced in 0 source file(s)
+  ZARINPAL_CALLBACK_URL    referenced in 0 source file(s)
+  RESEND_FROM_EMAIL        referenced in 0 source file(s)
+  RESEND_FROM_NAME         referenced in 0 source file(s)
