@@ -1,0 +1,8 @@
+COMMAND: /tmp/infra-venv/bin/pip check
+No broken requirements found.
+COMMAND: pip show ecdsa python-jose
+WARNING: Package(s) not found: ecdsa, python-jose
+COMMAND: python import PyJWT
+PyJWT 2.13.0
+COMMAND: locked package count
+64

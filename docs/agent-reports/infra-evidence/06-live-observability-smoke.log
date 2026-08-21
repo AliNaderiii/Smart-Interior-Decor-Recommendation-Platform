@@ -1,0 +1,20 @@
+=== LOCAL live observability smoke ===
+Command: 2-worker uvicorn app.main:app --host 0.0.0.0 --port 8200 --no-server-header --proxy-headers
+Environment: APP_ENV=test, LOG_FORMAT=json, PostgreSQL 16.2+pgvector 0.6.2, Redis 6.2.14 on 127.0.0.1:6399
+
+GET /api/v1/health -> 200
+{"success":true,"data":{"status":"ok","env":"test"},"error":null}
+GET /api/v1/health/ready -> 200
+{"success":true,"data":{"status":"ready","checks":{"database":"ok","redis":"ok","env":"test"}},"error":null}
+GET /api/v1/health with X-Request-ID: smoke-test-42 -> 200; response X-Request-ID: smoke-test-42
+GET /api/v1/health without header -> 200; generated response X-Request-ID: f3d088ffd7334be59c8d2afe135045a0
+GET /metrics -> 200; app_info present; http_requests_total and latency histogram present; redis_up 1
+POST /api/v1/auth/register -> 201
+POST /api/v1/auth/login -> 200
+
+Structured-log excerpt from the two worker processes (fixture email/token values omitted):
+{"logger":"app.access","message":"http_request","request_id":"smoke-test-42","event":"http_request","path":"/api/v1/health","method":"GET","status":200}
+{"logger":"app.access","message":"http_request","request_id":"f3d088ffd7334be59c8d2afe135045a0","event":"http_request","path":"/api/v1/health","method":"GET","status":200}
+{"logger":"app.access","message":"http_request","request_id":"cf66823cdd704afbb6721558f2fe02a2","event":"http_request","path":"/api/v1/auth/login","method":"POST","status":200}
+
+RESULT: PASS
