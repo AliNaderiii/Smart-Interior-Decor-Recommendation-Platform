@@ -211,7 +211,7 @@ def test_forged_role_claim_is_ignored(client, make_user):
     import json
     import time
 
-    from jose import jwt
+    import jwt
 
     from app.core.config import settings
 
