@@ -13,7 +13,11 @@ pgvector>=0.2.5
 psycopg[binary]>=3.1; platform_system != "Windows"
 
 # Auth & crypto
-python-jose[cryptography]>=3.3
+# Stage 07 (IR-SEC-002): PyJWT replaces python-jose. python-jose's transitive
+# `ecdsa` dependency has the unfixed PYSEC-2026-1325 advisory; PyJWT uses
+# `cryptography` directly and has no such code path. HS256/384/512 only
+# (config.py pins ALLOWED_JWT_ALGORITHMS to the HMAC family).
+pyjwt[crypto]>=2.9
 passlib[bcrypt]>=1.7
 bcrypt<4.1
 cryptography>=42
