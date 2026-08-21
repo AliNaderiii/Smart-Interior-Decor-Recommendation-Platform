@@ -1,0 +1,234 @@
+==============================================================================
+PROBE — predictable demo / default-admin account creation
+==============================================================================
+
+--- load_realistic_products.py in PRODUCTION (docker-compose boot command)
+    argv                 : scripts/load_realistic_products.py --realistic --expand-to 150 --if-empty --from-json
+    APP_ENV              : production
+    SEED_DEMO_ACCOUNTS   : <unset>
+    exit code            : 0
+    users rows created   : 3
+    DEMO ACCOUNTS CREATED: [('admin@smartdecor.dev', 'admin'), ('demo@smartdecor.dev', 'homeowner'), ('designer@smartdecor.dev', 'designer')]
+    stderr| INFO Reading 150 realistic products from /home/user/Smart-Interior-Decor-Recommendation-Platform/datasets/products_realistic_150.json
+    stderr| WARNING seed_data/embeddings_real.json is absent; using configured embedding backend. Generate it on a networked machine with seed_products.py --real-embeddings
+    stderr| INFO Loaded 150 realistic products with 150 retailer links, avg price 22.6M Toman, categories: {'sofa': 30, 'coffee_table': 20, 'rug': 20, 'lighting': 20, 'chair': 20, 'storage': 20, 'decor': 20}, embedding=hash; table count=150
+
+--- seed_products.py in PRODUCTION
+    argv                 : scripts/seed_products.py --if-empty
+    APP_ENV              : production
+    SEED_DEMO_ACCOUNTS   : <unset>
+    exit code            : 0
+    users rows created   : 3
+    DEMO ACCOUNTS CREATED: [('admin@smartdecor.dev', 'admin'), ('demo@smartdecor.dev', 'homeowner'), ('designer@smartdecor.dev', 'designer')]
+    stdout| seeded 100 products
+    stdout| default accounts ready (see scripts/seed_products.py docstring)
+
+--- load_realistic_products.py in PRODUCTION with SEED_DEMO_ACCOUNTS=true (explicit opt-in must still be refused)
+    argv                 : scripts/load_realistic_products.py --realistic --if-empty
+    APP_ENV              : production
+    SEED_DEMO_ACCOUNTS   : true
+    exit code            : 0
+    users rows created   : 3
+    DEMO ACCOUNTS CREATED: [('admin@smartdecor.dev', 'admin'), ('demo@smartdecor.dev', 'homeowner'), ('designer@smartdecor.dev', 'designer')]
+    stderr| INFO Reading 20 realistic products from /home/user/Smart-Interior-Decor-Recommendation-Platform/datasets/products_realistic.json
+    stderr| INFO Loaded 20 realistic products with 20 retailer links, avg price 26.1M Toman, categories: {'sofa': 5, 'coffee_table': 3, 'rug': 3, 'lighting': 3, 'chair': 2, 'storage': 3, 'decor': 1}, embedding=hash; table count=20
+
+--- load_realistic_products.py in DEVELOPMENT, no opt-in
+    argv                 : scripts/load_realistic_products.py --realistic --if-empty
+    APP_ENV              : development
+    SEED_DEMO_ACCOUNTS   : <unset>
+    exit code            : 0
+    users rows created   : 3
+    DEMO ACCOUNTS CREATED: [('admin@smartdecor.dev', 'admin'), ('demo@smartdecor.dev', 'homeowner'), ('designer@smartdecor.dev', 'designer')]
+    stderr| INFO Reading 20 realistic products from /home/user/Smart-Interior-Decor-Recommendation-Platform/datasets/products_realistic.json
+    stderr| INFO Loaded 20 realistic products with 20 retailer links, avg price 26.1M Toman, categories: {'sofa': 5, 'coffee_table': 3, 'rug': 3, 'lighting': 3, 'chair': 2, 'storage': 3, 'decor': 1}, embedding=hash; table count=20
+
+--- load_realistic_products.py in DEVELOPMENT with SEED_DEMO_ACCOUNTS=true
+    argv                 : scripts/load_realistic_products.py --realistic --if-empty
+    APP_ENV              : development
+    SEED_DEMO_ACCOUNTS   : true
+    exit code            : 0
+    users rows created   : 3
+    DEMO ACCOUNTS CREATED: [('admin@smartdecor.dev', 'admin'), ('demo@smartdecor.dev', 'homeowner'), ('designer@smartdecor.dev', 'designer')]
+    stderr| INFO Reading 20 realistic products from /home/user/Smart-Interior-Decor-Recommendation-Platform/datasets/products_realistic.json
+    stderr| INFO Loaded 20 realistic products with 20 retailer links, avg price 26.1M Toman, categories: {'sofa': 5, 'coffee_table': 3, 'rug': 3, 'lighting': 3, 'chair': 2, 'storage': 3, 'decor': 1}, embedding=hash; table count=20
+
+--- seed_products.py in DEVELOPMENT with SEED_DEMO_ACCOUNTS=true
+    argv                 : scripts/seed_products.py --if-empty
+    APP_ENV              : development
+    SEED_DEMO_ACCOUNTS   : true
+    exit code            : 0
+    users rows created   : 3
+    DEMO ACCOUNTS CREATED: [('admin@smartdecor.dev', 'admin'), ('demo@smartdecor.dev', 'homeowner'), ('designer@smartdecor.dev', 'designer')]
+    stdout| seeded 100 products
+    stdout| default accounts ready (see scripts/seed_products.py docstring)
+
+==============================================================================
+VERDICT: production runs that created demo accounts = 3
+         (requirement: 0)
+==============================================================================
+[
+  {
+    "case": "load_realistic_products.py in PRODUCTION (docker-compose boot command)",
+    "argv": "scripts/load_realistic_products.py --realistic --expand-to 150 --if-empty --from-json",
+    "APP_ENV": "production",
+    "SEED_DEMO_ACCOUNTS": "<unset>",
+    "exit_code": 0,
+    "users_created": 3,
+    "demo_accounts_created": [
+      [
+        "admin@smartdecor.dev",
+        "admin"
+      ],
+      [
+        "demo@smartdecor.dev",
+        "homeowner"
+      ],
+      [
+        "designer@smartdecor.dev",
+        "designer"
+      ]
+    ],
+    "stdout_tail": [],
+    "stderr_tail": [
+      "INFO Reading 150 realistic products from /home/user/Smart-Interior-Decor-Recommendation-Platform/datasets/products_realistic_150.json",
+      "WARNING seed_data/embeddings_real.json is absent; using configured embedding backend. Generate it on a networked machine with seed_products.py --real-embeddings",
+      "INFO Loaded 150 realistic products with 150 retailer links, avg price 22.6M Toman, categories: {'sofa': 30, 'coffee_table': 20, 'rug': 20, 'lighting': 20, 'chair': 20, 'storage': 20, 'decor': 20}, embedding=hash; table count=150"
+    ]
+  },
+  {
+    "case": "seed_products.py in PRODUCTION",
+    "argv": "scripts/seed_products.py --if-empty",
+    "APP_ENV": "production",
+    "SEED_DEMO_ACCOUNTS": "<unset>",
+    "exit_code": 0,
+    "users_created": 3,
+    "demo_accounts_created": [
+      [
+        "admin@smartdecor.dev",
+        "admin"
+      ],
+      [
+        "demo@smartdecor.dev",
+        "homeowner"
+      ],
+      [
+        "designer@smartdecor.dev",
+        "designer"
+      ]
+    ],
+    "stdout_tail": [
+      "seeded 100 products",
+      "default accounts ready (see scripts/seed_products.py docstring)"
+    ],
+    "stderr_tail": []
+  },
+  {
+    "case": "load_realistic_products.py in PRODUCTION with SEED_DEMO_ACCOUNTS=true (explicit opt-in must still be refused)",
+    "argv": "scripts/load_realistic_products.py --realistic --if-empty",
+    "APP_ENV": "production",
+    "SEED_DEMO_ACCOUNTS": "true",
+    "exit_code": 0,
+    "users_created": 3,
+    "demo_accounts_created": [
+      [
+        "admin@smartdecor.dev",
+        "admin"
+      ],
+      [
+        "demo@smartdecor.dev",
+        "homeowner"
+      ],
+      [
+        "designer@smartdecor.dev",
+        "designer"
+      ]
+    ],
+    "stdout_tail": [],
+    "stderr_tail": [
+      "INFO Reading 20 realistic products from /home/user/Smart-Interior-Decor-Recommendation-Platform/datasets/products_realistic.json",
+      "INFO Loaded 20 realistic products with 20 retailer links, avg price 26.1M Toman, categories: {'sofa': 5, 'coffee_table': 3, 'rug': 3, 'lighting': 3, 'chair': 2, 'storage': 3, 'decor': 1}, embedding=hash; table count=20"
+    ]
+  },
+  {
+    "case": "load_realistic_products.py in DEVELOPMENT, no opt-in",
+    "argv": "scripts/load_realistic_products.py --realistic --if-empty",
+    "APP_ENV": "development",
+    "SEED_DEMO_ACCOUNTS": "<unset>",
+    "exit_code": 0,
+    "users_created": 3,
+    "demo_accounts_created": [
+      [
+        "admin@smartdecor.dev",
+        "admin"
+      ],
+      [
+        "demo@smartdecor.dev",
+        "homeowner"
+      ],
+      [
+        "designer@smartdecor.dev",
+        "designer"
+      ]
+    ],
+    "stdout_tail": [],
+    "stderr_tail": [
+      "INFO Reading 20 realistic products from /home/user/Smart-Interior-Decor-Recommendation-Platform/datasets/products_realistic.json",
+      "INFO Loaded 20 realistic products with 20 retailer links, avg price 26.1M Toman, categories: {'sofa': 5, 'coffee_table': 3, 'rug': 3, 'lighting': 3, 'chair': 2, 'storage': 3, 'decor': 1}, embedding=hash; table count=20"
+    ]
+  },
+  {
+    "case": "load_realistic_products.py in DEVELOPMENT with SEED_DEMO_ACCOUNTS=true",
+    "argv": "scripts/load_realistic_products.py --realistic --if-empty",
+    "APP_ENV": "development",
+    "SEED_DEMO_ACCOUNTS": "true",
+    "exit_code": 0,
+    "users_created": 3,
+    "demo_accounts_created": [
+      [
+        "admin@smartdecor.dev",
+        "admin"
+      ],
+      [
+        "demo@smartdecor.dev",
+        "homeowner"
+      ],
+      [
+        "designer@smartdecor.dev",
+        "designer"
+      ]
+    ],
+    "stdout_tail": [],
+    "stderr_tail": [
+      "INFO Reading 20 realistic products from /home/user/Smart-Interior-Decor-Recommendation-Platform/datasets/products_realistic.json",
+      "INFO Loaded 20 realistic products with 20 retailer links, avg price 26.1M Toman, categories: {'sofa': 5, 'coffee_table': 3, 'rug': 3, 'lighting': 3, 'chair': 2, 'storage': 3, 'decor': 1}, embedding=hash; table count=20"
+    ]
+  },
+  {
+    "case": "seed_products.py in DEVELOPMENT with SEED_DEMO_ACCOUNTS=true",
+    "argv": "scripts/seed_products.py --if-empty",
+    "APP_ENV": "development",
+    "SEED_DEMO_ACCOUNTS": "true",
+    "exit_code": 0,
+    "users_created": 3,
+    "demo_accounts_created": [
+      [
+        "admin@smartdecor.dev",
+        "admin"
+      ],
+      [
+        "demo@smartdecor.dev",
+        "homeowner"
+      ],
+      [
+        "designer@smartdecor.dev",
+        "designer"
+      ]
+    ],
+    "stdout_tail": [
+      "seeded 100 products",
+      "default accounts ready (see scripts/seed_products.py docstring)"
+    ],
+    "stderr_tail": []
+  }
+]

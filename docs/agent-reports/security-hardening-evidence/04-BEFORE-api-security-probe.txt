@@ -1,0 +1,312 @@
+/home/user/Smart-Interior-Decor-Recommendation-Platform/backend/.venv/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/__probe/boom "HTTP/1.1 500 Internal Server Error"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 422 Unprocessable Entity"
+INFO:httpx:HTTP Request: OPTIONS http://testserver/api/v1/auth/login "HTTP/1.1 400 Bad Request"
+WARNING:app.services.link_checker:link check failed for javascript:alert(document.cookie): Request URL is missing an 'http://' or 'https://' protocol.
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products "HTTP/1.1 422 Unprocessable Entity"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: GET http://testserver/media/6805ef1c426a419a820cd5cb7d350a45.html "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/projects "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/quiz "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/projects/acaeec08a12e45afa699e2b17216f3b3/share "HTTP/1.1 201 Created"
+INFO:app.services.recommender:recommend cold compute key=rec:ee9622a8bcb336073c6b24f019253f35d745516bc81cae15b6f567edfaffbe72 took=5ms
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/-zSCdwz0kSL4ojRLI07aJpz6a11vVWB4VN5aInV0lnA "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz "HTTP/1.1 404 Not Found"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 429 Too Many Requests"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 429 Too Many Requests"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 429 Too Many Requests"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+WARNING:app.core.brute_force:brute-force lockout engaged for email=lock-a042a0@probe.example.com ip=testclient after 5 attempts
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 429 Too Many Requests"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 429 Too Many Requests"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 429 Too Many Requests"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/moodboards "HTTP/1.1 403 Forbidden"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/moodboards "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/logout "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/refresh "HTTP/1.1 401 Unauthorized"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/moodboards "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/moodboards/c3a2c6f5adfe4fe49d947f69b0c1fce1 "HTTP/1.1 404 Not Found"
+INFO:httpx:HTTP Request: DELETE http://testserver/api/v1/moodboards/c3a2c6f5adfe4fe49d947f69b0c1fce1 "HTTP/1.1 404 Not Found"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/admin/users "HTTP/1.1 403 Forbidden"
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/projects "HTTP/1.1 403 Forbidden"
+INFO:httpx:HTTP Request: PATCH http://testserver/api/v1/admin/users/805a55476bd745318342329e20ebe32a "HTTP/1.1 403 Forbidden"
+INFO:httpx:HTTP Request: PATCH http://testserver/api/v1/admin/users/df2aab19ec814b34aca3056da6c3df24 "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: PATCH http://testserver/api/v1/admin/users/805a55476bd745318342329e20ebe32a "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: PATCH http://testserver/api/v1/admin/users/4c31cdb9245e4637be08e948dd611f3d "HTTP/1.1 200 OK"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/feedback "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/moodboards "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: DELETE http://testserver/api/v1/users/me "HTTP/1.1 200 OK"
+DEBUG:asyncio:Using selector: EpollSelector
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+DEBUG:asyncio:Using selector: EpollSelector
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+DEBUG:asyncio:Using selector: EpollSelector
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+DEBUG:asyncio:Using selector: EpollSelector
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+DEBUG:asyncio:Using selector: EpollSelector
+WARNING:app.core.brute_force:brute-force lockout engaged for email=log-probe-f2eb2e@probe.example.com ip=testclient after 5 attempts
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 429 Too Many Requests"
+DEBUG:asyncio:Using selector: EpollSelector
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 429 Too Many Requests"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 201 Created"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+WARNING:app.core.rate_limit:rate limiter unavailable (probe: redis is down); failing open
+WARNING:app.core.brute_force:brute-force check unavailable (probe: redis is down); failing open
+WARNING:app.core.brute_force:brute-force counter unavailable (probe: redis is down)
+WARNING:app.core.brute_force:brute-force check unavailable (probe: redis is down); failing open
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+WARNING:app.core.rate_limit:rate limiter unavailable (probe: redis is down); failing open
+WARNING:app.core.brute_force:brute-force check unavailable (probe: redis is down); failing open
+WARNING:app.core.brute_force:brute-force counter unavailable (probe: redis is down)
+WARNING:app.core.brute_force:brute-force check unavailable (probe: redis is down); failing open
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+WARNING:app.core.rate_limit:rate limiter unavailable (probe: redis is down); failing open
+WARNING:app.core.brute_force:brute-force check unavailable (probe: redis is down); failing open
+WARNING:app.core.brute_force:brute-force counter unavailable (probe: redis is down)
+WARNING:app.core.brute_force:brute-force check unavailable (probe: redis is down); failing open
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+WARNING:app.core.rate_limit:rate limiter unavailable (probe: redis is down); failing open
+WARNING:app.core.brute_force:brute-force check unavailable (probe: redis is down); failing open
+WARNING:app.core.brute_force:brute-force counter unavailable (probe: redis is down)
+WARNING:app.core.brute_force:brute-force check unavailable (probe: redis is down); failing open
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+WARNING:app.core.rate_limit:rate limiter unavailable (probe: redis is down); failing open
+WARNING:app.core.brute_force:brute-force check unavailable (probe: redis is down); failing open
+WARNING:app.core.brute_force:brute-force counter unavailable (probe: redis is down)
+WARNING:app.core.brute_force:brute-force check unavailable (probe: redis is down); failing open
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+WARNING:app.core.rate_limit:rate limiter unavailable (probe: redis is down); failing open
+WARNING:app.core.brute_force:brute-force check unavailable (probe: redis is down); failing open
+WARNING:app.core.brute_force:brute-force counter unavailable (probe: redis is down)
+WARNING:app.core.brute_force:brute-force check unavailable (probe: redis is down); failing open
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+WARNING:app.core.rate_limit:rate limiter unavailable (probe: redis is down); failing open
+WARNING:app.core.brute_force:brute-force check unavailable (probe: redis is down); failing open
+WARNING:app.core.brute_force:brute-force counter unavailable (probe: redis is down)
+WARNING:app.core.brute_force:brute-force check unavailable (probe: redis is down); failing open
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+WARNING:app.core.rate_limit:rate limiter unavailable (probe: redis is down); failing open
+WARNING:app.core.brute_force:brute-force check unavailable (probe: redis is down); failing open
+WARNING:app.core.brute_force:brute-force counter unavailable (probe: redis is down)
+WARNING:app.core.brute_force:brute-force check unavailable (probe: redis is down); failing open
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+==============================================================================
+STAGE 03 API SECURITY PROBE — BEFORE
+redis: redis://127.0.0.1:6399/2
+db   : sqlite:////tmp/apiprobe-39v9ymmj/probe.sqlite3
+==============================================================================
+[INSECURE] H-01 Security headers on an unhandled 500
+           expected: all 5 core headers present on the 500 response
+           observed: status=500 missing=['content-security-policy', 'permissions-policy', 'referrer-policy', 'x-content-type-options', 'x-frame-options']
+[SECURE  ] H-02 500 response body must not leak a stack trace / exception type
+           expected: generic JSON envelope, no traceback, no exception class name
+           observed: body[:160]='Internal Server Error'
+[INSECURE] H-03 422 validation envelope must not reflect submitted values
+           expected: field name + message only
+           observed: status=422 reflects_input=True body[:200]='{"success":false,"data":null,"error":"[{\'type\': \'value_error\', \'loc\': (\'body\', \'email\'), \'msg\': \'value is not a valid email address: An email address must have an @-sign.\', \'input\': \'not-an-email\', \'c'
+[SECURE  ] C-01 CORS must reject an unknown origin
+           expected: no access-control-allow-origin for https://evil.example
+           observed: acao=None
+[INSECURE] C-02 Production CORS allowlist must not contain localhost origins
+           expected: ['https://app.example.com']
+           observed: ['https://app.example.com', 'http://localhost:5173', 'http://localhost:4173']
+[INSECURE] X-01 javascript: URL in seller_link must be rejected
+           expected: 422
+           observed: status=201 stored_verbatim=True
+[INSECURE] X-02 Admin-supplied product free text must be HTML-stripped
+           expected: no markup persisted
+           observed: status=201 markup_persisted=True title='<script>alert(1)</script>Sofa'
+[INSECURE] V-01 Unknown fields on ProductIn must be rejected (mass assignment)
+           expected: 422 extra_forbidden
+           observed: status=201
+[SECURE  ] V-02 Oversized product title must be a 422, never a 500
+           expected: 422
+           observed: status=422
+[INSECURE] V-03 Product category must be validated against the taxonomy
+           expected: 422
+           observed: status=201
+[INSECURE] U-01 Non-image upload (text/html) must be rejected
+           expected: 415 or 422
+           observed: status=201 served_content_type='text/html; charset=utf-8'
+[INSECURE] U-02 SVG upload (scriptable image) must be rejected
+           expected: 415 or 422
+           observed: status=201
+[INSECURE] U-03 Content-type spoofing must be caught by magic-byte sniffing
+           expected: 415 or 422
+           observed: status=201
+[INSECURE] U-04 Path-traversal filename must not escape the storage root
+           expected: rejected, or stored under a generated name inside the storage dir
+           observed: status=201 escaped=False
+[INSECURE] U-05 Upload endpoint must be rate limited
+           expected: at least one 429 within 12 rapid uploads
+           observed: status_codes=[201, 201, 201, 201, 201, 201, 201, 201, 201, 201, 201, 201]
+[INSECURE] X-03 AI-generated text must be HTML-stripped before persistence
+           expected: no markup in the stored title/description
+           observed: markup_persisted=True title="<img src=x onerror=alert('ai')>a modern sofa"
+[INSECURE] R-01 Public share endpoint must be rate limited
+           expected: at least one 429 within 40 rapid reads
+           observed: distinct_status=[200]
+[SECURE  ] R-02 Unknown share token must not leak whether it ever existed
+           expected: 404 with a generic message
+           observed: status=404 body='{"success":false,"data":null,"error":"Share link not found"}'
+[SECURE  ] R-03 Registration flooding must be throttled with Retry-After
+           expected: 429 + Retry-After header
+           observed: status_codes=[201, 201, 201, 429, 429, 429] retry_after='59'
+[SECURE  ] R-04 Wrong-password lockout must engage and carry Retry-After
+           expected: 401 x4 then 429 + Retry-After
+           observed: status_codes=[401, 401, 401, 401, 429, 429, 429] retry_after='900'
+[SECURE  ] K-01 Auth cookies must be HttpOnly + SameSite
+           expected: HttpOnly and SameSite on the access cookie
+           observed: set-cookie='access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwN2E3MmU4ZDVkZmU0NzRmOTEzYWM4NWViNzhlYmFlZiIsInR5cGUiOiJhY2'
+[SECURE  ] K-02 Cookie-authenticated state change requires the CSRF header
+           expected: 403 without X-CSRF-Token, 201 with it
+           observed: without=403 with=201
+[SECURE  ] K-03 Refresh token must be revoked after logout (replay blocked)
+           expected: 401 on refresh after logout
+           observed: logout=200 refresh_replay=401
+[SECURE  ] A-01 Cross-tenant moodboard read must 404
+           expected: 404
+           observed: status=404
+[SECURE  ] A-02 Cross-tenant moodboard delete must 404
+           expected: 404
+           observed: status=404
+[SECURE  ] A-03 Homeowner must not reach admin endpoints
+           expected: 403
+           observed: status=403
+[SECURE  ] A-04 Homeowner must not reach designer endpoints
+           expected: 403
+           observed: status=403
+[SECURE  ] A-05 Self privilege escalation via admin route must fail
+           expected: 403
+           observed: status=403
+[INSECURE] A-06 Admin must not be able to demote itself (lockout / audit gap)
+           expected: 409 or 422
+           observed: status=200
+[INSECURE] V-04 Unknown fields on the admin user patch must be rejected
+           expected: 422
+           observed: status=200
+[INSECURE] L-01 Admin role change must be written to the audit log
+           expected: role_change present
+           observed: new_actions=none
+[SECURE  ] G-01 GDPR delete must remove per-user feedback rows
+           expected: 0 rows left
+           observed: status=200 product_feedback_rows_left=0
+[INSECURE] G-02 GDPR delete must pseudonymise/clear the user's audit rows
+           expected: 0 rows still bound to the deleted user id
+           observed: audit_rows_still_bound=1
+[INSECURE] G-03 GDPR delete must itself be audited
+           expected: >=1 user_delete audit row
+           observed: user_delete_rows=0
+[INSECURE] P-01 Logs must not contain raw account identifiers (personal data)
+           expected: email addresses masked or hashed
+           observed: raw_email_in_logs=True
+[INSECURE] T-01 Login timing must not disclose whether an account exists
+           expected: ratio between 0.5x and 2x
+           observed: known=264.4ms unknown=4.9ms ratio=54.4x
+[SECURE  ] D-01 Brute-force control behaviour when Redis is unavailable
+           expected: production: fail closed (503). dev/test: documented fail-open
+           observed: APP_ENV=test status_codes=[401, 401, 401, 401, 401, 401, 401, 401]
+
+==============================================================================
+SUMMARY BEFORE: 37 checks, 16 secure, 21 INSECURE
+  INSECURE  H-01  Security headers on an unhandled 500
+  INSECURE  H-03  422 validation envelope must not reflect submitted values
+  INSECURE  C-02  Production CORS allowlist must not contain localhost origins
+  INSECURE  X-01  javascript: URL in seller_link must be rejected
+  INSECURE  X-02  Admin-supplied product free text must be HTML-stripped
+  INSECURE  V-01  Unknown fields on ProductIn must be rejected (mass assignment)
+  INSECURE  V-03  Product category must be validated against the taxonomy
+  INSECURE  U-01  Non-image upload (text/html) must be rejected
+  INSECURE  U-02  SVG upload (scriptable image) must be rejected
+  INSECURE  U-03  Content-type spoofing must be caught by magic-byte sniffing
+  INSECURE  U-04  Path-traversal filename must not escape the storage root
+  INSECURE  U-05  Upload endpoint must be rate limited
+  INSECURE  X-03  AI-generated text must be HTML-stripped before persistence
+  INSECURE  R-01  Public share endpoint must be rate limited
+  INSECURE  A-06  Admin must not be able to demote itself (lockout / audit gap)
+  INSECURE  V-04  Unknown fields on the admin user patch must be rejected
+  INSECURE  L-01  Admin role change must be written to the audit log
+  INSECURE  G-02  GDPR delete must pseudonymise/clear the user's audit rows
+  INSECURE  G-03  GDPR delete must itself be audited
+  INSECURE  P-01  Logs must not contain raw account identifiers (personal data)
+  INSECURE  T-01  Login timing must not disclose whether an account exists
+==============================================================================
