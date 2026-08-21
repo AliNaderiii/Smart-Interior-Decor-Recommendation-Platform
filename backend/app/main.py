@@ -20,9 +20,17 @@ from app.api.routes import (
     subscriptions,
     users,
 )
+from app.api.routes import (
+    health as health_routes,
+)
 from app.core.config import Settings, settings
 from app.core.json_response import ORJSONResponse
 from app.core.log_redaction import install_log_redaction
+from app.core.observability import (
+    MetricsMiddleware,
+    RequestIDMiddleware,
+    setup_structured_logging,
+)
 from app.core.security_headers import SecurityHeadersMiddleware, apply_security_headers
 
 logging.basicConfig(level=logging.INFO)
@@ -30,6 +38,9 @@ logging.basicConfig(level=logging.INFO)
 # Stage 03 (T-38): install the redacting filter before anything can log. Every
 # handler on the root logger — including uvicorn's — gets it.
 install_log_redaction()
+# Stage 07: configure level/format and correlate application logs. This is
+# deliberately after the Stage 03 redaction factory so both controls compose.
+setup_structured_logging()
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +123,11 @@ app.add_middleware(
     max_age=600,
 )
 app.add_middleware(SecurityHeadersMiddleware)
+# Stage 07: metrics is inside request-ID middleware so all observations carry
+# the same correlation context. RequestID is added last and therefore runs
+# outermost on the Starlette middleware stack.
+app.add_middleware(MetricsMiddleware)
+app.add_middleware(RequestIDMiddleware)
 
 
 @app.exception_handler(StarletteHTTPException)
@@ -180,6 +196,11 @@ for router in (
     admin.router,
 ):
     app.include_router(router, prefix=settings.API_V1_PREFIX)
+
+# Readiness is under the versioned API prefix; metrics follows the Prometheus
+# convention and remains at the bare /metrics path.
+app.include_router(health_routes.router, prefix=settings.API_V1_PREFIX)
+app.include_router(health_routes.metrics_router)
 
 # Serve local storage in dev (S3 serves media in production).
 # Stage 03: `validate_runtime()` refuses STORAGE_BACKEND=local in production, so

@@ -1,0 +1,78 @@
+# ============================================================================
+# PRODUCTION OVERLAY — docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# ============================================================================
+# Production adds three things over the base compose:
+#   1. APP_ENV=production — activates every boot-time fail-safe in
+#      app/core/config.py (strong SECRET_KEY, real REDIS_URL, https origin,
+#      Fernet key, S3 storage, no demo seeding). Missing/misconfigured values
+#      now STOP the container instead of serving unsafely.
+#   2. Resource limits so one runaway container cannot starve the host.
+#   3. A `maintenance` one-shot loop that enforces the documented audit-log
+#      retention window (IR-SEC-007): AUDIT_LOG_RETENTION_DAYS (default 180)
+#      rows are purged daily and the run is logged for alerting.
+#
+# Required .env values (see .env.example): SECRET_KEY, FERNET_KEY,
+# FRONTEND_ORIGIN (https), POSTGRES_PASSWORD, REDIS_URL, STORAGE_BACKEND=s3
+# + S3_*, AI_PROVIDER + key, PAYMENT_PROVIDER + merchant id.
+# ============================================================================
+
+services:
+  backend:
+    environment:
+      APP_ENV: production
+      LOG_FORMAT: json
+      # Never set SEED_DEMO_ACCOUNTS here: production boot refuses it.
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+          cpus: "2.0"
+    healthcheck:
+      start_period: 60s
+
+  postgres:
+    deploy:
+      resources:
+        limits:
+          memory: 1024M
+          cpus: "2.0"
+
+  redis:
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  frontend:
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.5"
+
+  caddy:
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.5"
+
+  # Daily audit-log retention enforcement (IR-SEC-007). Runs prune_audit_logs
+  # once per day; the log line "pruned=N" is the alerting signal. Restart
+  # policy keeps the loop alive; it is idempotent by design.
+  maintenance:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:?}:${POSTGRES_PASSWORD:?}@postgres:5432/${POSTGRES_DB:-decor}
+      AUDIT_LOG_RETENTION_DAYS: ${AUDIT_LOG_RETENTION_DAYS:-180}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "while true; do python scripts/prune_audit_logs.py || echo 'prune failed' >&2; sleep 86400; done"

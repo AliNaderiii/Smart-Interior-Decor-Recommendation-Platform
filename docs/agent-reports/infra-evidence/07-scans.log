@@ -1,0 +1,18 @@
+=== LOCAL security/dependency/docs scans (final tracked tree) ===
+$ cd backend && /tmp/infra-venv/bin/ruff check app ai scripts tests
+All checks passed!
+$ /tmp/infra-venv/bin/pip-audit -r backend/requirements.txt
+No known vulnerabilities found
+$ /tmp/infra-venv/bin/python scripts/audit_secrets.py
+tracked files            : 310
+[FINDINGS]                0
+[FORBIDDEN TRACKED PATHS] 0
+RESULT: PASS
+$ /tmp/infra-venv/bin/python scripts/audit_docs_links.py
+markdown files audited     : 38
+[BROKEN LINKS] 0
+[MISSING FILE REFERENCES] 0
+RESULT: PASS
+$ npx tsx scripts/auditDeadKeys.ts
+TOTAL: 0 DEAD, 0 PARTIAL, 0 OK-DISABLED
+RESULT: PASS — 0 DEAD

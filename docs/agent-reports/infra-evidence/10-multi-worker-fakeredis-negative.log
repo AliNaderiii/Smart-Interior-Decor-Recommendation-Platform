@@ -1,0 +1,8 @@
+=== negative control: per-process fakeredis must NOT pass shared-worker checks ===
+[setup] workers ready on :8101 and :8102
+CHECK blacklist-shared: FAIL — refresh after logout-on-A via B -> HTTP 200 (expect 401)
+CHECK lockout-shared: FAIL — correct password via B after 5 failures via A -> HTTP 200 (expect 429)
+CHECK rate-limit-shared: FAIL — burst via A -> HTTP 429; then via B -> HTTP 200 (expect 429/429)
+SUMMARY multi-worker shared-redis: 0/3 checks passed
+observed exit=1 (expected 1 because fakeredis is not shared)
+NEGATIVE CONTROL: PASS (test has teeth)
