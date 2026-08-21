@@ -110,6 +110,29 @@ def test_boot_guard_is_a_no_op_outside_production(reset_settings, db):
 # ------------------------------------------------------- end-to-end, real seeder
 
 def _run_seeder(tmp_path: Path, env_overrides: dict[str, str], argv: list[str]):
+    # Stage 04 note: production no longer permits seeding a catalog with hash
+    # embeddings (ai.embedding_service raises EmbeddingBackendError — see
+    # docs/ai/model-versions.md). The documented deploy flow is "seed once at
+    # deployment time (development profile or --from-json with committed real
+    # vectors), serve in production", so this fixture pre-seeds the database in
+    # development mode first. The production-mode invocation under test then
+    # exercises the `--if-empty` steady state exactly as compose runs it.
+    # The dev pre-seed never carries --seed-demo-accounts: the production
+    # invocation must still be the one that refuses the flag.
+    dev_argv = [a for a in argv if a != "--seed-demo-accounts"]
+    dev_env = dict(os.environ)
+    dev_env.update({
+        "APP_ENV": "development",
+        "AI_PROVIDER": "mock", "EMBEDDING_BACKEND": "hash",
+        "STORAGE_BACKEND": "local", "PAYMENT_PROVIDER": "mock",
+        "DATABASE_URL": f"sqlite:///{tmp_path / 'seed.sqlite3'}",
+        "LOCAL_STORAGE_DIR": str(tmp_path / "storage"),
+    })
+    dev_env.pop("SEED_DEMO_ACCOUNTS", None)
+    subprocess.run(
+        [sys.executable, *dev_argv], cwd=BACKEND, env=dev_env,
+        capture_output=True, text=True, timeout=600,
+    )
     env = dict(os.environ)
     env.update({
         "APP_ENV": "production", "SECRET_KEY": "p" * 48,
