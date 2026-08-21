@@ -1,23 +1,35 @@
-"""Designer B2B2C: projects, share links (signed token), public share view."""
+"""Designer B2B2C: projects, share links (signed token), public share view.
+
+Stage 03 hardening (probe `R-01`, `T-19`):
+  * ``GET /share/{token}`` is rate limited per IP. It is the only
+    unauthenticated endpoint that returns tenant data *and* runs a
+    recommendation, so it was simultaneously a scraping surface, a token
+    brute-force surface and an unmetered compute surface.
+  * share creation is audited, and the emailed link is HTML-escaped.
+"""
 from __future__ import annotations
 
+import html
 import secrets
 from datetime import timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
-
-from app.schemas.sanitize import SafeText
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_designer
+from app.core.config import settings
+from app.core.rate_limit import enforce_rate_limit
 from app.db.session import get_db
+from app.models import audit_log as actions
 from app.models.base import utcnow
 from app.models.project import Project, ShareLink
 from app.models.quiz import StyleQuiz
 from app.models.user import User
 from app.schemas.common import ok
+from app.schemas.sanitize import SafeText
+from app.services import audit
 from app.services.emailer import send_email
 from app.services.recommender import recommend
 
@@ -38,7 +50,7 @@ class ProjectIn(BaseModel):
 class ShareIn(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    quiz_id: str = Field(max_length=32)
+    quiz_id: str = Field(min_length=1, max_length=32)
     send_to_email: EmailStr | None = None
     expires_days: int = Field(default=30, ge=1, le=365)
 
@@ -85,12 +97,21 @@ def get_project(project_id: str, user: User = Depends(require_designer), db: Ses
 
 
 @router.delete("/projects/{project_id}")
-def delete_project(project_id: str, user: User = Depends(require_designer), db: Session = Depends(get_db)):
+def delete_project(
+    project_id: str,
+    request: Request,
+    user: User = Depends(require_designer),
+    db: Session = Depends(get_db),
+):
     project = db.get(Project, project_id)
     if project is None or project.designer_id != user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found")
     db.delete(project)
     db.commit()
+    audit.record(
+        db, actions.ACTION_PROJECT_DELETE, user_id=user.id,
+        detail=f"project={project_id}", request=request,
+    )
     return ok({"message": "deleted"})
 
 
@@ -98,6 +119,7 @@ def delete_project(project_id: str, user: User = Depends(require_designer), db: 
 def share_project(
     project_id: str,
     body: ShareIn,
+    request: Request,
     user: User = Depends(require_designer),
     db: Session = Depends(get_db),
 ):
@@ -120,17 +142,42 @@ def share_project(
 
     share_url = f"/share/{link.token}"
     if body.send_to_email:
+        # `full_name` is SafeText-stripped on the way in, but this string is
+        # interpolated into an HTML email body — escape at the point of use so
+        # the guarantee does not depend on a validator three modules away.
+        sender = html.escape(user.full_name or "Your designer")
         send_email(
             str(body.send_to_email),
-            f"{user.full_name or 'Your designer'} shared decor recommendations with you",
-            f'<p>View your personalized living room plan: <a href="{share_url}">Open</a></p>',
+            f"{sender} shared decor recommendations with you",
+            f'<p>View your personalized living room plan: '
+            f'<a href="{html.escape(share_url)}">Open</a></p>',
         )
+    audit.record(
+        db, actions.ACTION_SHARE_CREATE, user_id=user.id,
+        detail=f"project={project.id} quiz={quiz.id} expires_days={body.expires_days}"
+               f" emailed={bool(body.send_to_email)}",
+        request=request,
+    )
     return ok({"token": link.token, "share_url": share_url, "expires_at": link.expires_at.isoformat()})
 
 
 @router.get("/share/{token}")
-def public_share_view(token: str, db: Session = Depends(get_db)):
+def public_share_view(
+    token: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
     """Public, read-only recommendations for a shared quiz. No auth."""
+    # R-01: unauthenticated, returns another tenant's data, and each miss costs
+    # a database round trip while each hit costs a full recommendation. The
+    # 256-bit token makes guessing infeasible; the limit makes *trying*
+    # expensive and caps scraping of links that leaked through a mail client.
+    enforce_rate_limit(
+        f"share:{audit.client_ip(request)}",
+        limit=settings.SHARE_RATE_LIMIT_PER_MINUTE,
+    )
+    if len(token) > 128:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Share link not found")
     link = db.scalar(select(ShareLink).where(ShareLink.token == token))
     if link is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Share link not found")
