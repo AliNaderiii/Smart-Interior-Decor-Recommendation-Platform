@@ -1,0 +1,84 @@
+I001 [*] Import block is un-sorted or un-formatted
+  --> app/api/routes/projects.py:2:1
+   |
+ 1 |   """Designer B2B2C: projects, share links (signed token), public share view."""
+ 2 | / from __future__ import annotations
+ 3 | |
+ 4 | | import secrets
+ 5 | | from datetime import timedelta
+ 6 | |
+ 7 | | from fastapi import APIRouter, Depends, HTTPException, status
+ 8 | | from pydantic import BaseModel, ConfigDict, EmailStr, Field
+ 9 | |
+10 | | from app.schemas.sanitize import SafeText
+11 | | from sqlalchemy import select
+12 | | from sqlalchemy.orm import Session
+13 | |
+14 | | from app.api.deps import require_designer
+15 | | from app.db.session import get_db
+16 | | from app.models.base import utcnow
+17 | | from app.models.project import Project, ShareLink
+18 | | from app.models.quiz import StyleQuiz
+19 | | from app.models.user import User
+20 | | from app.schemas.common import ok
+21 | | from app.services.emailer import send_email
+22 | | from app.services.recommender import recommend
+   | |______________________________________________^
+23 |
+24 |   router = APIRouter(tags=["projects"])
+   |
+help: Organize imports
+   |
+8  | from pydantic import BaseModel, ConfigDict, EmailStr, Field
+   -
+   - from app.schemas.sanitize import SafeText
+9  | from sqlalchemy import select
+--------------------------------------------------------------------------------
+18 | from app.schemas.common import ok
+19 + from app.schemas.sanitize import SafeText
+20 | from app.services.emailer import send_email
+   |
+
+E401 [*] Multiple imports on one line
+  --> scripts/seed_perf_products.py:16:1
+   |
+14 |     DELETE FROM products WHERE id LIKE 'perf-%';
+15 | """
+16 | import os, random, sys
+   | ^^^^^^^^^^^^^^^^^^^^^^
+17 | sys.path.insert(0, os.getcwd())
+18 | from sqlalchemy import create_engine, text
+   |
+help: Split imports
+   |
+15 | """
+   - import os, random, sys
+16 + import os
+17 + import random
+18 + import sys
+19 | sys.path.insert(0, os.getcwd())
+   |
+
+I001 [*] Import block is un-sorted or un-formatted
+  --> scripts/seed_perf_products.py:16:1
+   |
+14 |     DELETE FROM products WHERE id LIKE 'perf-%';
+15 | """
+16 | import os, random, sys
+   | ^^^^^^^^^^^^^^^^^^^^^^
+17 | sys.path.insert(0, os.getcwd())
+18 | from sqlalchemy import create_engine, text
+   |
+help: Organize imports
+   |
+15 | """
+   - import os, random, sys
+16 + import os
+17 + import random
+18 + import sys
+19 +
+20 | sys.path.insert(0, os.getcwd())
+   |
+
+Found 3 errors.
+[*] 3 fixable with the `--fix` option.

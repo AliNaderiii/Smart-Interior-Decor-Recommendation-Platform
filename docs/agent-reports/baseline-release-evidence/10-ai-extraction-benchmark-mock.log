@@ -1,0 +1,5 @@
+mode             : MOCK
+images evaluated : 50
+mean accuracy    : 100.0%
+images >= 0.8    : 50/50
+RESULT: PASS (>= 80% required)

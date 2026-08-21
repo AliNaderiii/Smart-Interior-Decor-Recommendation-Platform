@@ -1,0 +1,49 @@
+Git state capture — baseline release governance
+Captured: 2026-08-21T13:32:48Z (UTC)
+
+$ git rev-parse HEAD
+f97bfad371c7a33cb4fe9f52b7c51520a363fb43
+
+$ git log -1 --format=fuller
+commit f97bfad371c7a33cb4fe9f52b7c51520a363fb43
+Author:     Ali Naderi <135335634+AliNaderiii@users.noreply.github.com>
+AuthorDate: Fri Aug 21 14:19:35 2026 +0100
+Commit:     GitHub <noreply@github.com>
+CommitDate: Fri Aug 21 14:19:35 2026 +0100
+
+    Merge pull request #4 from AliNaderiii/chore/add-agent-master-prompts
+    
+    chore: add agent master prompt execution pack
+
+$ git status --short --branch
+## arena/01a0247e-smart-interior-decor-recommend
+?? docs/agent-reports/
+?? scripts/audit_docs_links.py
+?? scripts/audit_secrets.py
+
+$ git rev-parse --is-shallow-repository
+true
+(NOTE: this workspace is a SHALLOW clone — depth 1. Full history was read via the GitHub API instead; see report §2.)
+
+$ git branch -a
+* arena/01a0247e-smart-interior-decor-recommend
+  main
+  remotes/origin/HEAD -> origin/main
+  remotes/origin/main
+
+$ git tag -l
+(no tags exist in this repository)
+
+$ gh api repos/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/branches --jq '.[].name'
+agent/baseline-release-2026-08-21
+arena/01a01bbd-smart-interior-decor-recommend
+arena/01a01dc4-smart-interior-decor-recommend
+arena/01a02073-smart-interior-decor-recommend
+chore/add-agent-master-prompts
+main
+v2-strict-mode
+
+--- head commit of each relevant branch (GitHub API) ---
+main                                     0998ba4bf070c55ee30a678b3d22c65b9df68669
+v2-strict-mode                           f97bfad371c7a33cb4fe9f52b7c51520a363fb43
+agent/baseline-release-2026-08-21        f97bfad371c7a33cb4fe9f52b7c51520a363fb43

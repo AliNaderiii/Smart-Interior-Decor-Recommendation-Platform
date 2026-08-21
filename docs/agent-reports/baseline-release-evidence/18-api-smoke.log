@@ -1,0 +1,24 @@
+=== GET /health ===
+HTTP/1.1 404 Not Found
+date: Fri, 21 Aug 2026 13:31:40 GMT
+server: uvicorn
+content-length: 49
+content-type: application/json
+content-security-policy: default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://*.s3.ir-thr1.arvanstorage.ir https://images.unsplash.com; connect-src 'self' https://generativelanguage.googleapis.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'
+x-frame-options: DENY
+x-content-type-options: nosniff
+referrer-policy: strict-origin-when-cross-origin
+permissions-policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
+cross-origin-opener-policy: same-origin
+cross-origin-resource-policy: same-site
+x-permitted-cross-domain-policies: none
+server: Smart Decor
+
+{"success":false,"data":null,"error":"Not Found"}
+=== GET /api/v1/products?limit=2 (unauth) ===
+status=401
+=== POST /api/v1/auth/login (demo homeowner) ===
+status=200
+=== GET /openapi.json paths count ===
+paths: 29
+title: Smart Decor 1.0.0

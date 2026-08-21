@@ -1,0 +1,48 @@
+$ python3 scripts/audit_docs_links.py --json docs/agent-reports/baseline-release-evidence/16-docs-link-audit.json
+Captured: 2026-08-21T13:46:11Z (UTC) — run against the full file set of this branch
+
+=== DOCS LINK AUDIT ===
+markdown files audited     : 29
+relative links checked     : 22
+backtick path refs checked : 121
+external links (not fetched): 6
+audit reports excluded from the file-reference check: 7 (use --include-reports to audit them too)
+
+[BROKEN LINKS] 0
+
+[MISSING FILE REFERENCES] 5
+  docs/ARCHITECTURE.md:64 -> backend/seed_data/embeddings_real.json
+  docs/DATASETS_AUDIT.md:49 -> .env.example.v2
+  docs/DEPLOYMENT.md:28 -> backend/seed_data/embeddings_real.json
+  docs/DEPLOYMENT.md:114 -> .env.example.v2
+  docs/reports/ACCEPTANCE_REPORT.md:13 -> seed_data/embeddings_real.json
+
+RESULT: FAIL
+report : docs/agent-reports/baseline-release-evidence/16-docs-link-audit.json
+
+EXIT=1
+
+--- sanity re-run with --include-reports (the 14 extra hits are this stage's own
+--- intentional citations of missing/proposed paths, listed for auditability) ---
+[MISSING FILE REFERENCES] 19
+  docs/ARCHITECTURE.md:64 -> backend/seed_data/embeddings_real.json
+  docs/DATASETS_AUDIT.md:49 -> .env.example.v2
+  docs/DEPLOYMENT.md:28 -> backend/seed_data/embeddings_real.json
+  docs/DEPLOYMENT.md:114 -> .env.example.v2
+  docs/RELEASE_BASELINE.md:160 -> backend/seed_data/embeddings_real.json
+  docs/RELEASE_BASELINE.md:160 -> .env.example.v2
+  docs/RELEASE_BASELINE.md:182 -> .github/workflows/ci.yml
+  docs/RELEASE_BASELINE.md:199 -> backend/seed_data/embeddings_real.json
+  docs/RELEASE_BASELINE.md:202 -> .env.example.v2
+  docs/RELEASE_CHECKLIST.md:29 -> .env.example.v2
+  docs/REPRODUCIBILITY.md:111 -> backend/requirements.lock.txt
+  docs/REPRODUCIBILITY.md:217 -> backend/requirements.lock.txt
+  docs/agent-reports/baseline-release-report.md:94 -> .env.example.v2
+  docs/reports/ACCEPTANCE_REPORT.md:13 -> seed_data/embeddings_real.json
+  integration-request.md:164 -> backend/seed_data/embeddings_real.json
+  integration-request.md:165 -> .env.example.v2
+  integration-request.md:172 -> backend/seed_data/embeddings_real.json
+  integration-request.md:173 -> .env.example.v2
+  integration-request.md:346 -> backend/requirements.lock.txt
+
+RESULT: FAIL

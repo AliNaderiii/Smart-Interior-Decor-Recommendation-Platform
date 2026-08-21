@@ -1,0 +1,55 @@
+live endpoints (openapi.json): 39
+live paths                   : 29
+
+--- live endpoint inventory ---
+  GET /api/v1/admin/stats
+  GET /api/v1/admin/subscriptions
+  GET /api/v1/admin/taxonomy
+  GET /api/v1/admin/users
+  PATCH /api/v1/admin/users/{user_id}
+  POST /api/v1/auth/login
+  POST /api/v1/auth/logout
+  GET /api/v1/auth/me
+  POST /api/v1/auth/refresh
+  POST /api/v1/auth/register
+  DELETE /api/v1/feedback
+  GET /api/v1/feedback
+  POST /api/v1/feedback
+  GET /api/v1/health
+  GET /api/v1/moodboards
+  POST /api/v1/moodboards
+  DELETE /api/v1/moodboards/{moodboard_id}
+  GET /api/v1/moodboards/{moodboard_id}
+  PATCH /api/v1/moodboards/{moodboard_id}
+  POST /api/v1/payment/request
+  POST /api/v1/payment/verify
+  GET /api/v1/products
+  POST /api/v1/products
+  POST /api/v1/products/upload
+  DELETE /api/v1/products/{product_id}
+  PATCH /api/v1/products/{product_id}
+  POST /api/v1/products/{product_id}/verify
+  GET /api/v1/projects
+  POST /api/v1/projects
+  DELETE /api/v1/projects/{project_id}
+  GET /api/v1/projects/{project_id}
+  POST /api/v1/projects/{project_id}/share
+  GET /api/v1/quiz
+  POST /api/v1/quiz
+  GET /api/v1/quiz/{quiz_id}
+  POST /api/v1/recommend
+  GET /api/v1/share/{token}
+  GET /api/v1/subscriptions/me
+  DELETE /api/v1/users/me
+
+--- live paths NOT mentioned in docs/API.md ---
+  /api/v1/admin/users/{user_id}
+  /api/v1/feedback
+  /api/v1/health
+  /api/v1/moodboards/{moodboard_id}
+  /api/v1/products/{product_id}
+  /api/v1/products/{product_id}/verify
+  /api/v1/projects/{project_id}
+  /api/v1/projects/{project_id}/share
+  /api/v1/quiz/{quiz_id}
+total undocumented paths: 9
