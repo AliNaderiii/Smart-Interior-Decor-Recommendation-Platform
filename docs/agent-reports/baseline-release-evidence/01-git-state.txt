@@ -47,3 +47,47 @@ v2-strict-mode
 main                                     0998ba4bf070c55ee30a678b3d22c65b9df68669
 v2-strict-mode                           f97bfad371c7a33cb4fe9f52b7c51520a363fb43
 agent/baseline-release-2026-08-21        f97bfad371c7a33cb4fe9f52b7c51520a363fb43
+
+===================================================================
+CORRECTION appended 2026-08-21T13:49:48Z (UTC)
+===================================================================
+
+The line '(no tags exist in this repository)' above is WRONG and is retained
+verbatim to preserve the audit trail. Local 'git tag -l' returned empty because
+this workspace is a depth-1 SHALLOW clone: tags pointing at unfetched commits
+are not transferred, and 'git fetch --all --prune' does not repair that.
+The remote was re-queried directly:
+
+$ git ls-remote --tags origin
+a847ad51dbc014972db431a83c5b859d9ff0ccbf	refs/tags/v1.1-final-p0p1-fixed
+900edcb965fd1b520908a13ae28398446d663468	refs/tags/v2-datasets-realistic
+f7447d4309680408f29e8a4557ae9838fa6e9c17	refs/tags/v2-datasets-realistic^{}
+939e05c80b92a5b3f9ddf70fb41948c11012f601	refs/tags/v2-datasets-realistic-merged
+cc735190800283aca61f1802108cf305c4af5bf2	refs/tags/v2-final
+dd2c34d07c8b851daa1adf4a07b8f46a831c1aa9	refs/tags/v2-final^{}
+7b16e4f650a8fc6d66e9735d6819f55c64d159a3	refs/tags/v2-phase0-audit-complete
+7c986beeffeae5d45107c2995413676505197e82	refs/tags/v2-phase2-performance
+c3170a02ee18e68ad79f78115bd4aa79ef6841e9	refs/tags/v2-phase2-performance^{}
+cd96d5c7e2cf45377025c228a0ba696ad7477377	refs/tags/v2-phase3-ui
+7bec5e303e5dfbab37627e5c753c96250c1ceb2c	refs/tags/v2-phase3-ui^{}
+2a7299b10cc309b753f9290cb108aa9fffaf4d1a	refs/tags/v2-phase4-deadkeys
+87501f50a408752e9a8d25b6911600b7a1c2be5c	refs/tags/v2-phase4-deadkeys^{}
+
+$ gh api repos/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/tags --jq '.[] | "\(.name)  \(.commit.sha[0:7])"'
+v2-phase4-deadkeys  87501f5
+v2-phase3-ui  7bec5e3
+v2-phase2-performance  c3170a0
+v2-phase0-audit-complete  7b16e4f
+v2-final  dd2c34d
+v2-datasets-realistic-merged  939e05c
+v2-datasets-realistic  f7447d4
+v1.1-final-p0p1-fixed  a847ad5
+
+$ gh api repos/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/releases --jq 'length'
+0
+(0 GitHub Releases published)
+
+CORRECTED FINDING: 8 tags exist. None is SemVer-compliant, none points at the
+baseline commit f97bfad, and none has an associated GitHub Release or release
+notes. The most recent tag is v2-datasets-realistic-merged (939e05c), which is
+4 commits behind the baseline.

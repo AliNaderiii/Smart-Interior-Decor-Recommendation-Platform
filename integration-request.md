@@ -357,11 +357,14 @@ explicitly outside this stage's scope.
 - `backend/pyproject.toml` → `version = "1.0.0"`
 - `frontend/package.json` → `version = "0.0.0"`
 - `openapi.json` → `Smart Decor 1.0.0`
-- Repository tags: **none**
+- Repository tags: **8**, all non-SemVer milestone names (`v1.1-final-p0p1-fixed`, `v2-phase0-audit-complete`, `v2-phase2-performance`, `v2-phase3-ui`, `v2-phase4-deadkeys`, `v2-final`, `v2-datasets-realistic`, `v2-datasets-realistic-merged`); none points at the baseline `f97bfad`
+- GitHub Releases: **0** — no tag carries release notes
 - `CHANGELOG.md`: **absent**
 
 **Requested:** adopt the SemVer policy in `docs/ROLLBACK_AND_VERSIONING.md`, tag
-`v1.2.0-baseline` on `f97bfad`, align both version fields, and start a CHANGELOG.
+`v1.2.0-baseline` on `f97bfad`, align both version fields, start a CHANGELOG, and
+publish GitHub Releases going forward. Keep the 8 legacy tags as historical
+markers — do not rename them.
 
 ---
 
@@ -392,5 +395,5 @@ be executed as written.
 | IR-007 | High | 08 | No executable frontend test path |
 | IR-008 | Medium | 03 | Unfixable `ecdsa` CVE via `python-jose` |
 | IR-009 | Medium | 07 | Python dependencies not locked |
-| IR-010 | Low | 10 | Inconsistent version metadata, no tags, no CHANGELOG |
+| IR-010 | Low | 10 | Inconsistent version metadata, no SemVer tag on the baseline, no CHANGELOG |
 | IR-011 | Medium | 07 | Rollback not executable (floating images, no backups, untested downgrade) |

@@ -1,5 +1,5 @@
 $ python3 scripts/audit_docs_links.py --json docs/agent-reports/baseline-release-evidence/16-docs-link-audit.json
-Captured: 2026-08-21T13:46:11Z (UTC) — run against the full file set of this branch
+Captured: 2026-08-21T13:50:48Z (UTC) — final run against the full file set of this branch
 
 === DOCS LINK AUDIT ===
 markdown files audited     : 29
@@ -22,18 +22,18 @@ report : docs/agent-reports/baseline-release-evidence/16-docs-link-audit.json
 
 EXIT=1
 
---- sanity re-run with --include-reports (the 14 extra hits are this stage's own
+--- sanity re-run with --include-reports (the extra hits are this stage's own
 --- intentional citations of missing/proposed paths, listed for auditability) ---
 [MISSING FILE REFERENCES] 19
   docs/ARCHITECTURE.md:64 -> backend/seed_data/embeddings_real.json
   docs/DATASETS_AUDIT.md:49 -> .env.example.v2
   docs/DEPLOYMENT.md:28 -> backend/seed_data/embeddings_real.json
   docs/DEPLOYMENT.md:114 -> .env.example.v2
-  docs/RELEASE_BASELINE.md:160 -> backend/seed_data/embeddings_real.json
-  docs/RELEASE_BASELINE.md:160 -> .env.example.v2
-  docs/RELEASE_BASELINE.md:182 -> .github/workflows/ci.yml
-  docs/RELEASE_BASELINE.md:199 -> backend/seed_data/embeddings_real.json
-  docs/RELEASE_BASELINE.md:202 -> .env.example.v2
+  docs/RELEASE_BASELINE.md:189 -> backend/seed_data/embeddings_real.json
+  docs/RELEASE_BASELINE.md:189 -> .env.example.v2
+  docs/RELEASE_BASELINE.md:211 -> .github/workflows/ci.yml
+  docs/RELEASE_BASELINE.md:228 -> backend/seed_data/embeddings_real.json
+  docs/RELEASE_BASELINE.md:231 -> .env.example.v2
   docs/RELEASE_CHECKLIST.md:29 -> .env.example.v2
   docs/REPRODUCIBILITY.md:111 -> backend/requirements.lock.txt
   docs/REPRODUCIBILITY.md:217 -> backend/requirements.lock.txt

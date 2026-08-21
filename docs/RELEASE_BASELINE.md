@@ -24,7 +24,7 @@
 | PR target | `v2-strict-mode` (not merged by this agent) |
 | Audit date | 2026-08-21 (UTC) |
 | Governing prompts | `agent-master-prompts/00-README.md`, `agent-master-prompts/01-baseline-release-governance.md` |
-| Existing git tags | **none** — this repository has never been tagged |
+| Existing git tags | **8**, none SemVer-compliant and none on the baseline commit: `v1.1-final-p0p1-fixed` (`a847ad5`), `v2-phase0-audit-complete`, `v2-phase2-performance`, `v2-phase3-ui`, `v2-phase4-deadkeys`, `v2-final` (`dd2c34d`), `v2-datasets-realistic`, `v2-datasets-realistic-merged` (`939e05c`). **0 GitHub Releases.** See §2.1 |
 
 ### 1.1 Branch-name deviation (must be read)
 
@@ -63,6 +63,35 @@ shows one commit only. Full listing:
 | `f7447d4` | 2026-08-20 | V3 realistic Persian dataset integration |
 | `11e5a00` | 2026-08-21 | Agent master-prompt execution pack |
 | `f97bfad` | 2026-08-21 | **Baseline commit** |
+
+### 2.1 Correction issued during this audit — existing tags
+
+An earlier step of this audit recorded "no tags exist", because local `git tag -l`
+returns empty in a depth-1 shallow clone (tags pointing at unfetched commits are
+not transferred, and `git fetch --all --prune` does not repair it). The remote was
+re-queried directly and **the finding was wrong**:
+
+```
+$ git ls-remote --tags origin
+v1.1-final-p0p1-fixed          -> a847ad5
+v2-phase0-audit-complete       -> 7b16e4f
+v2-phase2-performance          -> c3170a0
+v2-phase3-ui                   -> 7bec5e3
+v2-phase4-deadkeys             -> 87501f5
+v2-final                       -> dd2c34d
+v2-datasets-realistic          -> f7447d4
+v2-datasets-realistic-merged   -> 939e05c
+$ gh api …/releases --jq 'length'
+0
+```
+
+The original wrong output and the correction are both retained verbatim in
+`…/01-git-state.txt`. Corrected finding: **8 milestone tags exist, none is
+SemVer-compliant, none points at the baseline commit `f97bfad`, none has a
+GitHub Release or release notes, and the most recent (`v2-datasets-realistic-merged`)
+is 4 commits behind the baseline.** The versioning recommendation in
+`docs/ROLLBACK_AND_VERSIONING.md` is unchanged in substance: the baseline still
+has no immutable reference of its own.
 
 This history explains the single biggest documentation defect in the repository:
 **three different test counts (43 / 45 / 97) are asserted simultaneously**, each
@@ -225,7 +254,7 @@ Ordered by severity. "Owner" is the master prompt that owns the fix.
 | **B-9** | **Medium** | **Python dependencies are unpinned.** `backend/requirements.txt` uses `>=` for all 20 direct dependencies with no lock/constraints file, so two installs a week apart can resolve to different trees. See `docs/REPRODUCIBILITY.md`. | `backend/requirements.txt`, `20-backend-pip-freeze.txt` | Prompt 07 — **IR-009** |
 | **B-10** | **Medium** | **Seller links are unverified.** 100 catalog links returned 0/100 valid here purely because egress is blocked, and the shipped catalog links are sample/derived URLs, not a live feed. Acceptance criterion #6 remains open. | `13-seller-link-check.log`, `docs/DATASETS_AUDIT.md` | Prompt 06 — deploy-host run |
 | **B-11** | **Low** | **CSP host mismatch** would block production product images (D-10). | `Caddyfile`, `.env.example` | Prompt 07 — **IR-005** |
-| **B-12** | **Low** | **No release tag, no CHANGELOG, no rollback point.** Zero tags exist. There is no immutable reference to roll back to. | `git tag -l` (empty) | This stage — see `docs/ROLLBACK_AND_VERSIONING.md` |
+| **B-12** | **Low** | **No SemVer tag on the baseline, no CHANGELOG, no GitHub Release.** 8 ad-hoc milestone tags exist (`v2-final`, `v2-phase3-ui`, …), but none is SemVer, none points at `f97bfad`, and 0 Releases are published — so the baseline has no immutable reference to roll back to. | `git ls-remote --tags origin`, `gh api …/releases` → 0 | This stage — see `docs/ROLLBACK_AND_VERSIONING.md` |
 
 ---
 

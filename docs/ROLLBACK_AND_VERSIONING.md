@@ -10,7 +10,8 @@ agent is scoped to documentation/metadata and must not mutate shared refs.
 
 | Fact | Value |
 |---|---|
-| Tags in the repository | **none** |
+| Tags in the repository | **8**, all ad-hoc milestone names, none SemVer, none on the baseline: `v1.1-final-p0p1-fixed` (`a847ad5`), `v2-phase0-audit-complete`, `v2-phase2-performance`, `v2-phase3-ui`, `v2-phase4-deadkeys`, `v2-final` (`dd2c34d`), `v2-datasets-realistic`, `v2-datasets-realistic-merged` (`939e05c`) |
+| GitHub Releases published | **0** — no tag has release notes |
 | `CHANGELOG.md` | **absent** |
 | GitHub default branch | `main` |
 | Authoritative development branch | `v2-strict-mode` |
@@ -19,9 +20,12 @@ agent is scoped to documentation/metadata and must not mutate shared refs.
 | Frontend version declared | `frontend/package.json` → `version = "0.0.0"` (never maintained) |
 | Version reported by the API | `openapi.json` → `Smart Decor 1.0.0` |
 
-Consequences today: **there is no immutable point to roll back to**, the two
-version declarations disagree, and a contributor who clones the default branch
-receives a tree that is 7 commits stale.
+Consequences today: the newest tag (`v2-datasets-realistic-merged`, `939e05c`) is
+**4 commits behind the baseline**, so **`f97bfad` has no immutable reference of its
+own**; the tag names carry no ordering or compatibility semantics (`v2-final` is
+not the final v2 commit — `f97bfad` is); no tag has release notes; the two version
+declarations disagree; and a contributor who clones the default branch receives a
+tree that is 7 commits stale.
 
 ---
 
@@ -42,9 +46,13 @@ Build metadata is not used; the commit SHA is recorded in the release notes.
 ### 2.1 Version derivation for the current tree
 
 `1.0.0` (declared) predates the V2 strict-mode work (security hardening, feedback
-API, perf rework, UI rebuild) and the V3 dataset integration. Those added
-endpoints (`/feedback` ×3) and behaviour without breaking existing contracts →
-**two MINOR increments** since `1.0.0`.
+API, perf rework, UI rebuild) and the V3 dataset integration. The existing tag
+`v1.1-final-p0p1-fixed` marks the 1.1 line at `a847ad5`, which is consistent with
+`1.0.0` + one MINOR. Since then V2 added endpoints (`/feedback` ×3) and V3 added
+the dataset pipeline, backward compatibly → **one further MINOR**.
+
+The existing tags should be kept as historical markers and **not** renamed;
+SemVer starts from the baseline forward.
 
 **Recommended baseline tag: `v1.2.0-baseline`** on `f97bfad`.
 
@@ -114,14 +122,14 @@ Rules (from `agent-master-prompts/00-README.md`, enforced by this stage):
 
 Record honestly: **this repository cannot currently execute a clean rollback**, because
 
-- no tag or image digest identifies a known-good build (B-12);
+- the 8 existing tags are ad-hoc milestone markers with no release notes, none points at the baseline, and no image digest identifies a known-good build (B-12);
 - `docker-compose.yml` uses floating tags (`ankane/pgvector:latest`, `caddy:2-alpine`, `redis:7-alpine`) — "the previous image" is not reproducible;
 - there is no documented backup schedule, only the advisory line "scheduled `pg_dump` backups" in `docs/DEPLOYMENT.md` §1;
 - `alembic downgrade` has never been exercised (and revision `0003`'s `downgrade()` uses `op.drop_constraint`, which SQLite also rejects).
 
 Closing those three gaps is **IR-011** (Prompt 07).
 
-### 4.3 Application + schema rollback (once tags exist)
+### 4.3 Application + schema rollback (once SemVer tags and pinned images exist)
 
 ```bash
 # 0. Freeze traffic
@@ -131,7 +139,7 @@ docker compose exec caddy caddy stop        # or drain at the load balancer
 docker compose exec postgres pg_dump -U decor -Fc decor > rollback-$(date -u +%Y%m%dT%H%M%SZ).dump
 
 # 2. Identify the target
-git tag -l --sort=-v:refname | head -5
+git ls-remote --tags origin | sort   # 8 legacy milestone tags + any SemVer tags
 TARGET=v1.2.0-baseline
 
 # 3. Downgrade the schema to the target's alembic revision

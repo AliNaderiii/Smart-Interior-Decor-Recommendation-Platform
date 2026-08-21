@@ -20,7 +20,7 @@ Legend: `[x]` verified · `[!]` verified FAILING · `[ ]` not verified / blocked
 - [x] `.gitignore` covers venvs, caches, build output, Playwright output, key material and local DBs
 - [x] `.env.example` documents every variable with required/optional status and safe placeholders
 - [x] No tracked file was accidentally ignored by a `.gitignore` change — `git ls-files | git check-ignore --stdin` → empty
-- [ ] Baseline tag created and pushed — **no tags exist**; see `docs/ROLLBACK_AND_VERSIONING.md`
+- [ ] Baseline tag created and pushed — 8 ad-hoc milestone tags exist but **none is SemVer and none points at `f97bfad`**; see `docs/ROLLBACK_AND_VERSIONING.md`
 - [ ] `CHANGELOG.md` exists — **absent**
 
 ## B. Documentation integrity
@@ -86,7 +86,7 @@ Legend: `[x]` verified · `[!]` verified FAILING · `[ ]` not verified / blocked
 
 - [ ] CI active in `.github/workflows/` and green — **CI has never run** (B-2)
 - [ ] All required status checks configured as branch protection on `v2-strict-mode`
-- [ ] SemVer tag applied to the release commit
+- [ ] SemVer tag applied to the release commit (existing tags are non-SemVer milestone names)
 - [ ] Rollback point identified and documented — see `docs/ROLLBACK_AND_VERSIONING.md` §4
 - [ ] `main` reconciled with `v2-strict-mode` (currently 7 commits behind)
 - [x] PR opened against the designated integration branch, not merged by the authoring agent

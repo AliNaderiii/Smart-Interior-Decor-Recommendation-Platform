@@ -33,7 +33,7 @@ formally handed over (out of scope).
 | Sub-agent | What it did | Where the output landed |
 |---|---|---|
 | **CTO / Software Architect** | Mapped the tree, the four runtime profiles (MOCK/LOCAL/STAGING/PRODUCTION), the live API surface (29 paths / 39 operations) and the migration-vs-model drift risk | `RELEASE_BASELINE.md` §4, `REPRODUCIBILITY.md` §6, evidence `19` |
-| **Senior Git / Release Engineer** | Confirmed HEAD, detected the depth-1 shallow clone and recovered the full 26-commit history via the GitHub API; verified no destructive operation; authored the SemVer + rollback strategy | evidence `01`, `21`; `ROLLBACK_AND_VERSIONING.md` |
+| **Senior Git / Release Engineer** | Confirmed HEAD, detected the depth-1 shallow clone and recovered the full 26-commit history via the GitHub API; **caught and corrected its own wrong "no tags exist" finding** (a shallow-clone artifact — 8 tags do exist on the remote); verified no destructive operation; authored the SemVer + rollback strategy | evidence `01`, `21`; `ROLLBACK_AND_VERSIONING.md` |
 | **Dependency / Supply-Chain Engineer** | Clean-room installs (pip + `npm ci`), `pip-audit`, `npm audit`, froze the resolved tree, assessed pinning and container-image determinism | evidence `02`, `04`, `08`, `09`, `20`; `REPRODUCIBILITY.md` §4–5 |
 | **Technical Writer** | Rewrote `.env.example` (52 variables, required/optional/unused), corrected `README.md`, built the Documentation Accuracy Register | `.env.example`, `README.md`, `RELEASE_BASELINE.md` §6 |
 | **QA Evidence Auditor** | Ran every feasible check, wrote two new audit tools, and — critically — **refused to record any result that could not be executed** | `scripts/audit_docs_links.py`, `scripts/audit_secrets.py`, evidence `03`,`05`,`06`,`07`,`10`–`18`,`22` |
@@ -131,7 +131,7 @@ carried forward as if it were current.**
 `B-3` CI would fail on ruff · `B-4` no frontend test execution · `B-5` no real-model
 AI evidence · `B-6` stale Postgres parity · `B-7` Postgres-only migrations ·
 `B-8` unfixable `ecdsa` CVE · `B-9` unpinned Python deps · `B-10` unverified seller
-links · `B-11` CSP host mismatch · `B-12` no tag / CHANGELOG / rollback point.
+links · `B-11` CSP host mismatch · `B-12` no SemVer tag on the baseline / no CHANGELOG / no GitHub Release.
 
 Detail and evidence: `docs/RELEASE_BASELINE.md` §7.
 
@@ -148,6 +148,20 @@ Detail and evidence: `docs/RELEASE_BASELINE.md` §7.
 | No destructive git operation | **Yes** | No merge, rebase, reset, force-push, cherry-pick or tag. Only branch touched is the session branch. |
 | Atomic commits | **Yes** | 6 commits, one logical subject each (§8 of the final response). |
 | PR opened, not merged | **Yes** | Targets `v2-strict-mode`. |
+
+### Self-correction issued during review
+
+The Senior Git/Release Engineer initially recorded **"no tags exist"** from
+`git tag -l`. The Release Manager challenged it against the remote and the finding
+was **wrong**: 8 tags exist (`v1.1-final-p0p1-fixed`, `v2-final`, `v2-phase*`,
+`v2-datasets-*`). `git tag -l` returns empty in a depth-1 shallow clone because
+tags pointing at unfetched commits are never transferred, and `git fetch --all
+--prune` does not repair it. The original wrong output **and** the correction are
+both retained verbatim in `baseline-release-evidence/01-git-state.txt`, and every
+affected document was corrected. The corrected finding is materially the same
+blocker — none of the 8 tags is SemVer, none points at `f97bfad`, and 0 GitHub
+Releases exist — but a governance report that quietly overwrites its own mistakes
+is worth nothing.
 
 ### Findings the Release Manager rejected during review
 
