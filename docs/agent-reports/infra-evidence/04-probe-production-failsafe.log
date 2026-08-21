@@ -20,7 +20,7 @@ workdir: /tmp/prodfailsafe-mk7vsuo3
            observed: REFUSED: REDIS_URL is empty in production. fakeredis is per-process, so rate limits, brute-force lockouts and the refresh-token blacklist would not be shared between workers.
 [SECURE  ] F-06 With Redis down, production must fail CLOSED on login
            expected: 503 + Retry-After (never an unthrottled 401/200)
-           observed: status=503 retry_after=5 
+           observed: status=503 retry_after=5
 [SECURE  ] F-07 Production must not expose docs, loopback CORS or local media
            expected: docs/openapi/redoc disabled, exactly one CORS origin, no /media mount
            observed: {"docs_url": null, "openapi_url": null, "redoc_url": null, "cors_origins": ["https://app.smartdecor.example"], "media_mounted": false}
