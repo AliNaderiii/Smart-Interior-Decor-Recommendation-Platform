@@ -27,6 +27,13 @@
 		-Server
 	}
 
+	# Prometheus scrapes the bare endpoint; restrict access at the network
+	# boundary or collector-facing listener in a deployment that is not
+	# private. The application emits no user or token labels.
+	handle /metrics {
+		reverse_proxy backend:8000
+	}
+
 	handle /api/* {
 		reverse_proxy backend:8000
 	}

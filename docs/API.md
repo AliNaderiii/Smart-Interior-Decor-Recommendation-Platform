@@ -49,3 +49,15 @@ Auth: `Authorization: Bearer <access_token>` (HS256, 15 min; refresh 7 days).
 ## Admin
 | GET | `/admin/users`, `/admin/subscriptions`, `/admin/stats`, `/admin/taxonomy` |
 | PATCH | `/admin/users/{id}` | toggle active / change role |
+
+## Health, readiness and metrics
+
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/api/v1/health` | Liveness only; returns `200` when the process is running and does not require database or Redis access. |
+| GET | `/api/v1/health/ready` | Readiness; checks PostgreSQL with `SELECT 1` and the shared Redis with `PING`. Returns `200` only when both are available, otherwise `503` with `checks.database` and `checks.redis`. |
+| GET | `/metrics` | Prometheus text exposition. Includes request counters, latency histograms, in-flight requests, `redis_up`, and static `app_info`; it deliberately has no user, email, token, or route-id labels. Set `METRICS_ENABLED=false` to disable it. |
+
+Every response from the API carries `X-Request-ID`. A valid incoming `X-Request-ID` (letters, numbers, `.`, `_`, or `-`, up to 64 characters) is echoed; invalid or missing values are replaced with a generated identifier. Include this value when reporting an incident so it can be correlated with structured application logs.
+
+Interactive `/docs`, `/redoc`, and `/openapi.json` are enabled outside production. They are disabled by the application in production; expose the API through the Caddy HTTPS proxy and keep `/metrics` restricted to the monitoring network.
