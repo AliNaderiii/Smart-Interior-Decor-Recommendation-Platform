@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { User } from "@/lib/types";
-import { tokenStore } from "@/lib/api";
+import { tokenStore, usingCookieAuth } from "@/lib/api";
 
 interface AuthState {
   user: User | null;
@@ -15,7 +15,16 @@ export const useAuthStore = create<AuthState>()(
     (set) => ({
       user: null,
       setAuth: (user, access, refresh) => {
-        tokenStore.set(access, refresh);
+        // Stage 03 (T-11): when the backend has issued httpOnly cookies the
+        // tokens are already held out of JavaScript's reach. Persisting a
+        // second copy in localStorage would re-open the exfiltration path the
+        // cookies closed, and that copy outlives the session. Only the Bearer
+        // fallback (`USE_COOKIE_AUTH=false`) keeps tokens client-side.
+        if (usingCookieAuth()) {
+          tokenStore.clear();
+        } else {
+          tokenStore.set(access, refresh);
+        }
         set({ user });
       },
       setUser: (user) => set({ user }),
@@ -24,6 +33,11 @@ export const useAuthStore = create<AuthState>()(
         set({ user: null });
       },
     }),
-    { name: "sd_auth" },
+    {
+      name: "sd_auth",
+      // Persist the profile only. Nothing credential-shaped belongs in a
+      // storage area every script on the origin can read.
+      partialize: (state) => ({ user: state.user }),
+    },
   ),
 );

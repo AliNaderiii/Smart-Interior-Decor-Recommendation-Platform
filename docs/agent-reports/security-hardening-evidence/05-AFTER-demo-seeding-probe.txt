@@ -1,0 +1,196 @@
+==============================================================================
+PROBE — predictable demo / default-admin account creation
+==============================================================================
+
+--- load_realistic_products.py in PRODUCTION (docker-compose boot command)
+    argv                 : scripts/load_realistic_products.py --realistic --expand-to 150 --if-empty --from-json
+    APP_ENV              : production
+    SEED_DEMO_ACCOUNTS   : <unset>
+    exit code            : 0
+    users rows created   : 0
+    DEMO ACCOUNTS CREATED: NONE
+    stderr| INFO Reading 150 realistic products from /home/user/Smart-Interior-Decor-Recommendation-Platform/datasets/products_realistic_150.json
+    stderr| WARNING seed_data/embeddings_real.json is absent; using configured embedding backend. Generate it on a networked machine with seed_products.py --real-embeddings
+    stderr| CRITICAL Refusing to create demo/default accounts: APP_ENV=production. This is not overridable — see docs/security/DEMO_ACCOUNTS.md.
+    stderr| INFO Loaded 150 realistic products with 150 retailer links, avg price 22.6M Toman, categories: {'sofa': 30, 'coffee_table': 20, 'rug': 20, 'lighting': 20, 'chair': 20, 'storage': 20, 'decor': 20}, embedding=hash; table count=150
+
+--- seed_products.py in PRODUCTION
+    argv                 : scripts/seed_products.py --if-empty
+    APP_ENV              : production
+    SEED_DEMO_ACCOUNTS   : <unset>
+    exit code            : 0
+    users rows created   : 0
+    DEMO ACCOUNTS CREATED: NONE
+    stderr| Refusing to create demo/default accounts: APP_ENV=production. This is not overridable — see docs/security/DEMO_ACCOUNTS.md.
+    stdout| seeded 100 products
+    stdout| demo accounts not created (production, or SEED_DEMO_ACCOUNTS is false — this is the safe default)
+
+--- load_realistic_products.py in PRODUCTION with SEED_DEMO_ACCOUNTS=true (explicit opt-in must still be refused)
+    argv                 : scripts/load_realistic_products.py --realistic --if-empty
+    APP_ENV              : production
+    SEED_DEMO_ACCOUNTS   : true
+    exit code            : 0
+    users rows created   : 0
+    DEMO ACCOUNTS CREATED: NONE
+    stderr| INFO Reading 20 realistic products from /home/user/Smart-Interior-Decor-Recommendation-Platform/datasets/products_realistic.json
+    stderr| CRITICAL Refusing to create demo/default accounts: APP_ENV=production. This is not overridable — see docs/security/DEMO_ACCOUNTS.md.
+    stderr| INFO Loaded 20 realistic products with 20 retailer links, avg price 26.1M Toman, categories: {'sofa': 5, 'coffee_table': 3, 'rug': 3, 'lighting': 3, 'chair': 2, 'storage': 3, 'decor': 1}, embedding=hash; table count=20
+
+--- load_realistic_products.py in DEVELOPMENT, no opt-in
+    argv                 : scripts/load_realistic_products.py --realistic --if-empty
+    APP_ENV              : development
+    SEED_DEMO_ACCOUNTS   : <unset>
+    exit code            : 0
+    users rows created   : 0
+    DEMO ACCOUNTS CREATED: NONE
+    stderr| INFO Reading 20 realistic products from /home/user/Smart-Interior-Decor-Recommendation-Platform/datasets/products_realistic.json
+    stderr| INFO Skipping demo accounts: SEED_DEMO_ACCOUNTS is false (default). Set SEED_DEMO_ACCOUNTS=true in a development environment to create the documented demo logins.
+    stderr| INFO Loaded 20 realistic products with 20 retailer links, avg price 26.1M Toman, categories: {'sofa': 5, 'coffee_table': 3, 'rug': 3, 'lighting': 3, 'chair': 2, 'storage': 3, 'decor': 1}, embedding=hash; table count=20
+
+--- load_realistic_products.py in DEVELOPMENT with SEED_DEMO_ACCOUNTS=true
+    argv                 : scripts/load_realistic_products.py --realistic --if-empty
+    APP_ENV              : development
+    SEED_DEMO_ACCOUNTS   : true
+    exit code            : 0
+    users rows created   : 3
+    DEMO ACCOUNTS CREATED: [('admin@smartdecor.dev', 'admin'), ('demo@smartdecor.dev', 'homeowner'), ('designer@smartdecor.dev', 'designer')]
+    stderr| INFO Reading 20 realistic products from /home/user/Smart-Interior-Decor-Recommendation-Platform/datasets/products_realistic.json
+    stderr| WARNING DEVELOPMENT ONLY: created 3 demo account(s) with well-known passwords (admin@smartdecor.dev, designer@smartdecor.dev, demo@smartdecor.dev). APP_ENV=development. These can never be created in production.
+    stderr| INFO Loaded 20 realistic products with 20 retailer links, avg price 26.1M Toman, categories: {'sofa': 5, 'coffee_table': 3, 'rug': 3, 'lighting': 3, 'chair': 2, 'storage': 3, 'decor': 1}, embedding=hash; table count=20
+
+--- seed_products.py in DEVELOPMENT with SEED_DEMO_ACCOUNTS=true
+    argv                 : scripts/seed_products.py --if-empty
+    APP_ENV              : development
+    SEED_DEMO_ACCOUNTS   : true
+    exit code            : 0
+    users rows created   : 3
+    DEMO ACCOUNTS CREATED: [('admin@smartdecor.dev', 'admin'), ('demo@smartdecor.dev', 'homeowner'), ('designer@smartdecor.dev', 'designer')]
+    stderr| DEVELOPMENT ONLY: created 3 demo account(s) with well-known passwords (admin@smartdecor.dev, designer@smartdecor.dev, demo@smartdecor.dev). APP_ENV=development. These can never be created in production.
+    stdout| seeded 100 products
+    stdout| DEVELOPMENT ONLY: demo accounts created (admin@smartdecor.dev, designer@smartdecor.dev, demo@smartdecor.dev) — see docs/security/DEMO_ACCOUNTS.md
+
+==============================================================================
+VERDICT: production runs that created demo accounts = 0
+         (requirement: 0)
+==============================================================================
+[
+  {
+    "case": "load_realistic_products.py in PRODUCTION (docker-compose boot command)",
+    "argv": "scripts/load_realistic_products.py --realistic --expand-to 150 --if-empty --from-json",
+    "APP_ENV": "production",
+    "SEED_DEMO_ACCOUNTS": "<unset>",
+    "exit_code": 0,
+    "users_created": 0,
+    "demo_accounts_created": [],
+    "stdout_tail": [],
+    "stderr_tail": [
+      "INFO Reading 150 realistic products from /home/user/Smart-Interior-Decor-Recommendation-Platform/datasets/products_realistic_150.json",
+      "WARNING seed_data/embeddings_real.json is absent; using configured embedding backend. Generate it on a networked machine with seed_products.py --real-embeddings",
+      "CRITICAL Refusing to create demo/default accounts: APP_ENV=production. This is not overridable \u2014 see docs/security/DEMO_ACCOUNTS.md.",
+      "INFO Loaded 150 realistic products with 150 retailer links, avg price 22.6M Toman, categories: {'sofa': 30, 'coffee_table': 20, 'rug': 20, 'lighting': 20, 'chair': 20, 'storage': 20, 'decor': 20}, embedding=hash; table count=150"
+    ]
+  },
+  {
+    "case": "seed_products.py in PRODUCTION",
+    "argv": "scripts/seed_products.py --if-empty",
+    "APP_ENV": "production",
+    "SEED_DEMO_ACCOUNTS": "<unset>",
+    "exit_code": 0,
+    "users_created": 0,
+    "demo_accounts_created": [],
+    "stdout_tail": [
+      "seeded 100 products",
+      "demo accounts not created (production, or SEED_DEMO_ACCOUNTS is false \u2014 this is the safe default)"
+    ],
+    "stderr_tail": [
+      "Refusing to create demo/default accounts: APP_ENV=production. This is not overridable \u2014 see docs/security/DEMO_ACCOUNTS.md."
+    ]
+  },
+  {
+    "case": "load_realistic_products.py in PRODUCTION with SEED_DEMO_ACCOUNTS=true (explicit opt-in must still be refused)",
+    "argv": "scripts/load_realistic_products.py --realistic --if-empty",
+    "APP_ENV": "production",
+    "SEED_DEMO_ACCOUNTS": "true",
+    "exit_code": 0,
+    "users_created": 0,
+    "demo_accounts_created": [],
+    "stdout_tail": [],
+    "stderr_tail": [
+      "INFO Reading 20 realistic products from /home/user/Smart-Interior-Decor-Recommendation-Platform/datasets/products_realistic.json",
+      "CRITICAL Refusing to create demo/default accounts: APP_ENV=production. This is not overridable \u2014 see docs/security/DEMO_ACCOUNTS.md.",
+      "INFO Loaded 20 realistic products with 20 retailer links, avg price 26.1M Toman, categories: {'sofa': 5, 'coffee_table': 3, 'rug': 3, 'lighting': 3, 'chair': 2, 'storage': 3, 'decor': 1}, embedding=hash; table count=20"
+    ]
+  },
+  {
+    "case": "load_realistic_products.py in DEVELOPMENT, no opt-in",
+    "argv": "scripts/load_realistic_products.py --realistic --if-empty",
+    "APP_ENV": "development",
+    "SEED_DEMO_ACCOUNTS": "<unset>",
+    "exit_code": 0,
+    "users_created": 0,
+    "demo_accounts_created": [],
+    "stdout_tail": [],
+    "stderr_tail": [
+      "INFO Reading 20 realistic products from /home/user/Smart-Interior-Decor-Recommendation-Platform/datasets/products_realistic.json",
+      "INFO Skipping demo accounts: SEED_DEMO_ACCOUNTS is false (default). Set SEED_DEMO_ACCOUNTS=true in a development environment to create the documented demo logins.",
+      "INFO Loaded 20 realistic products with 20 retailer links, avg price 26.1M Toman, categories: {'sofa': 5, 'coffee_table': 3, 'rug': 3, 'lighting': 3, 'chair': 2, 'storage': 3, 'decor': 1}, embedding=hash; table count=20"
+    ]
+  },
+  {
+    "case": "load_realistic_products.py in DEVELOPMENT with SEED_DEMO_ACCOUNTS=true",
+    "argv": "scripts/load_realistic_products.py --realistic --if-empty",
+    "APP_ENV": "development",
+    "SEED_DEMO_ACCOUNTS": "true",
+    "exit_code": 0,
+    "users_created": 3,
+    "demo_accounts_created": [
+      [
+        "admin@smartdecor.dev",
+        "admin"
+      ],
+      [
+        "demo@smartdecor.dev",
+        "homeowner"
+      ],
+      [
+        "designer@smartdecor.dev",
+        "designer"
+      ]
+    ],
+    "stdout_tail": [],
+    "stderr_tail": [
+      "INFO Reading 20 realistic products from /home/user/Smart-Interior-Decor-Recommendation-Platform/datasets/products_realistic.json",
+      "WARNING DEVELOPMENT ONLY: created 3 demo account(s) with well-known passwords (admin@smartdecor.dev, designer@smartdecor.dev, demo@smartdecor.dev). APP_ENV=development. These can never be created in production.",
+      "INFO Loaded 20 realistic products with 20 retailer links, avg price 26.1M Toman, categories: {'sofa': 5, 'coffee_table': 3, 'rug': 3, 'lighting': 3, 'chair': 2, 'storage': 3, 'decor': 1}, embedding=hash; table count=20"
+    ]
+  },
+  {
+    "case": "seed_products.py in DEVELOPMENT with SEED_DEMO_ACCOUNTS=true",
+    "argv": "scripts/seed_products.py --if-empty",
+    "APP_ENV": "development",
+    "SEED_DEMO_ACCOUNTS": "true",
+    "exit_code": 0,
+    "users_created": 3,
+    "demo_accounts_created": [
+      [
+        "admin@smartdecor.dev",
+        "admin"
+      ],
+      [
+        "demo@smartdecor.dev",
+        "homeowner"
+      ],
+      [
+        "designer@smartdecor.dev",
+        "designer"
+      ]
+    ],
+    "stdout_tail": [
+      "seeded 100 products",
+      "DEVELOPMENT ONLY: demo accounts created (admin@smartdecor.dev, designer@smartdecor.dev, demo@smartdecor.dev) \u2014 see docs/security/DEMO_ACCOUNTS.md"
+    ],
+    "stderr_tail": [
+      "DEVELOPMENT ONLY: created 3 demo account(s) with well-known passwords (admin@smartdecor.dev, designer@smartdecor.dev, demo@smartdecor.dev). APP_ENV=development. These can never be created in production."
+    ]
+  }
+]

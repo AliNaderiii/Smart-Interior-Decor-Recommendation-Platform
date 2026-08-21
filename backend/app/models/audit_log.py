@@ -27,6 +27,9 @@ ACTION_PROJECT_DELETE = "project_delete"
 ACTION_MOODBOARD_DELETE = "moodboard_delete"
 ACTION_ROLE_CHANGE = "role_change"
 ACTION_PRODUCT_VERIFY = "product_verify"
+ACTION_GDPR_EXPORT = "gdpr_export"
+ACTION_PRODUCT_UPLOAD = "product_upload"
+ACTION_UPLOAD_REJECTED = "upload_rejected"
 
 
 class AuditLog(Base, UUIDPk, TimestampMixin):

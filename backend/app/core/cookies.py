@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import secrets
 
-from fastapi import Request, Response
+from fastapi import HTTPException, Request, Response, status
 
 from app.core.config import settings
 
@@ -81,3 +81,26 @@ def verify_csrf(request: Request) -> bool:
     if not cookie or not header:
         return False
     return secrets.compare_digest(cookie, header)
+
+
+def require_csrf_for_cookie_session(request: Request) -> None:
+    """Enforce double-submit on endpoints that do not resolve a current user.
+
+    Stage 03 (T-09). ``get_current_user`` performs this check, so every
+    authenticated state change was covered — but ``/auth/refresh`` and
+    ``/auth/logout`` deliberately do *not* require a valid access token (that
+    is the point of a refresh endpoint), so they were protected by
+    ``SameSite=Strict`` alone. ``COOKIE_SAMESITE`` is configuration, and a
+    deployment that legitimately needs ``none`` (SPA on a different origin from
+    the API) would have silently lost CSRF protection on the one endpoint that
+    mints new credentials. The check is cheap; make it unconditional.
+    """
+    if not settings.USE_COOKIE_AUTH:
+        return
+    # No auth cookie present -> the caller is not riding an ambient session.
+    if not request.cookies.get(REFRESH_COOKIE) and not request.cookies.get(ACCESS_COOKIE):
+        return
+    if not verify_csrf(request):
+        raise HTTPException(
+            status.HTTP_403_FORBIDDEN, "CSRF token missing or invalid"
+        )

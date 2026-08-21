@@ -84,10 +84,15 @@ export default function Layout() {
 
   async function handleLogout() {
     try {
+      // Stage 03 (T-12): this used to be skipped whenever there was no token
+      // in localStorage — which is exactly the cookie-auth case. The session
+      // then survived "Sign out" completely: the httpOnly refresh cookie stayed
+      // valid until it expired, and clearing local state only hid it. Always
+      // tell the server, and let it revoke the token and expire the cookies.
       const refresh = tokenStore.refresh;
-      if (refresh) await post("/auth/logout", { refresh_token: refresh });
+      await post("/auth/logout", refresh ? { refresh_token: refresh } : {});
     } catch {
-      /* logout is idempotent */
+      /* logout is idempotent — a failed call must never trap the user in */
     }
     logout();
     navigate("/login");

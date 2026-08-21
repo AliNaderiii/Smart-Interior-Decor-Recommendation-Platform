@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { get } from "@/lib/api";
 import type { Moodboard } from "@/lib/types";
 import { CATEGORY_LABELS, formatToman } from "@/lib/constants";
+import { safeUrl } from "@/lib/safeUrl";
 import { Card, Skeleton } from "@/components/ui";
 import { EmptyState, ErrorState } from "@/components/states";
 import { OptimizedImage } from "@/components/OptimizedImage";
@@ -284,14 +285,19 @@ export default function ShoppingListPage() {
                     >
                       {p.seller_link_ok ? "Link verified" : p.seller_link_ok === false ? "Link broken" : "Not checked"}
                     </span>
-                    <a
-                      href={p.seller_link}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="text-xs font-medium text-[var(--color-muted)] underline-offset-2 hover:text-[var(--color-ink)] hover:underline"
-                    >
-                      Open store ↗
-                    </a>
+                    {/* X-01: stored seller links are sanitised at render, and
+                        a rejected link renders as nothing rather than as a
+                        dead `href=""` that reloads the page. */}
+                    {safeUrl(p.seller_link) && (
+                      <a
+                        href={safeUrl(p.seller_link)}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="text-xs font-medium text-[var(--color-muted)] underline-offset-2 hover:text-[var(--color-ink)] hover:underline"
+                      >
+                        Open store ↗
+                      </a>
+                    )}
                   </div>
                 </div>
                 <QuantityStepper value={n} onChange={(v) => setQuantity(p.id, v)} label={p.title} />

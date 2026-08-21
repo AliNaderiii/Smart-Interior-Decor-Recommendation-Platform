@@ -13,8 +13,12 @@ Policy
 * ``MAX_ATTEMPTS`` (5) failures within ``WINDOW`` ⇒ blocked for ``BLOCK`` (15 min).
 * A successful login clears the counter.
 * Responses carry a real ``Retry-After`` header, not just prose in the body.
-* Fails **open** if Redis is unavailable: availability beats throttling, and
-  the event is logged loudly.
+* Failure policy (Stage 03 — T-25): **fail closed in production** (503), fail
+  open in development/test. The v2 code failed open everywhere, which meant an
+  attacker who could disrupt Redis — or who simply attacked during a failover —
+  turned the lockout off entirely, with the outage visible only as a WARNING
+  line. See ``app.core.rate_limit`` for the same reasoning applied to the
+  request-rate limiter.
 """
 from __future__ import annotations
 
@@ -22,6 +26,8 @@ import logging
 
 from fastapi import HTTPException, status
 
+from app.core.config import settings
+from app.core.log_redaction import pseudonymise_email
 from app.core.redis_client import get_redis
 
 logger = logging.getLogger(__name__)
@@ -39,13 +45,30 @@ def _block_key(ip: str, email: str) -> str:
     return f"login_block:{ip}:{email.lower()}"
 
 
+def _unavailable(exc: Exception) -> None:
+    """Apply the environment's failure policy for an unusable lockout store."""
+    if settings.is_production:
+        logger.error("brute-force store unavailable (%s); failing CLOSED", exc)
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Authentication temporarily unavailable, please retry",
+            headers={"Retry-After": "5"},
+        )
+    logger.warning(
+        "brute-force store unavailable (%s); failing open (APP_ENV=%s)",
+        exc, settings.APP_ENV,
+    )
+
+
 def check_not_blocked(ip: str, email: str) -> None:
     """Raise 429 (with Retry-After) when this ip+email pair is locked out."""
     try:
         redis = get_redis()
         ttl = redis.ttl(_block_key(ip, email))
-    except Exception as exc:  # Redis down -> fail open
-        logger.warning("brute-force check unavailable (%s); failing open", exc)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _unavailable(exc)
         return
     if ttl and ttl > 0:
         raise HTTPException(
@@ -67,12 +90,15 @@ def register_failure(ip: str, email: str) -> int:
             redis.setex(_block_key(ip, email), BLOCK_SECONDS, "1")
             redis.delete(key)
             logger.warning(
-                "brute-force lockout engaged for email=%s ip=%s after %d attempts",
-                email, ip, count,
+                "brute-force lockout engaged for account=%s ip=%s after %d attempts",
+                # T-38/P-01: never write the raw address to a log stream.
+                pseudonymise_email(email), ip, count,
             )
         return count
-    except Exception as exc:  # pragma: no cover - defensive
-        logger.warning("brute-force counter unavailable (%s)", exc)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        _unavailable(exc)
         return 0
 
 

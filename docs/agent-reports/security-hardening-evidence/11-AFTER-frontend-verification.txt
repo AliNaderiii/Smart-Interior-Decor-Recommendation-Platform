@@ -1,0 +1,39 @@
+# Stage 03 — frontend security verification
+# date: 2026-08-21T16:09:31Z
+
+== 1. Type-check + production build (cd frontend && npm run build) ==
+dist/assets/proxy-B7xT4H3N.js                           125.30 kB │ gzip: 40.75 kB
+dist/assets/index-CDFx9GV3.js                           131.68 kB │ gzip: 41.20 kB
+dist/assets/html2canvas-BxJQVYMI.js                     199.53 kB │ gzip: 46.80 kB
+dist/assets/vendor-Bvo_F7WR.js                          221.32 kB │ gzip: 70.82 kB
+
+✓ built in 632ms
+
+== 2. Demo credentials must not appear in ANY production bundle ==
+$ grep -rl 'Admin123\|Demo1234\|Design123' frontend/dist/
+(no matches — the demo-account hint is compiled out by import.meta.env.DEV)
+
+== 3. Lint (cd frontend && npm run lint) ==
+
+Found 12 warnings and 0 errors.
+Finished in 98ms on 51 files with 116 rules using 2 threads.
+
+== 4. safeUrl unit tests ==
+$ node --experimental-strip-types --test tests/unit/safeUrl.test.ts
+  duration_ms: 1.344343
+  type: 'suite'
+  ...
+1..3
+# tests 9
+# suites 3
+# pass 9
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 108.803895
+
+== 5. Every seller_link render site now goes through safeUrl ==
+frontend/src/components/ProductCard.tsx:337:            href={safeUrl(product.seller_link)}
+frontend/src/pages/SharePage.tsx:92:                    <a href={safeUrl(p.seller_link)} target="_blank" rel="noreferrer noopener"
+frontend/src/pages/ShoppingListPage.tsx:293:                        href={safeUrl(p.seller_link)}
