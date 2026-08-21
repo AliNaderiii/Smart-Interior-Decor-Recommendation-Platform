@@ -1,22 +1,30 @@
-# ---- Stage 1: build wheels ----
-FROM python:3.12-slim AS builder
+# ---- Stage 1: build locked dependency wheels ----
+FROM python:3.12.9-slim AS builder
 WORKDIR /build
-COPY requirements.txt .
-RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 PIP_NO_CACHE_DIR=1
+COPY requirements.lock.txt ./
+RUN python -m pip wheel --wheel-dir /wheels -r requirements.lock.txt
 
-# ---- Stage 2: runtime ----
-FROM python:3.12-slim
+# ---- Stage 2: minimal non-root runtime ----
+FROM python:3.12.9-slim
 WORKDIR /app
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
 
 COPY --from=builder /wheels /wheels
-COPY requirements.txt .
-RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.txt \
+COPY requirements.lock.txt ./
+RUN python -m pip install --no-index --find-links=/wheels -r requirements.lock.txt \
     && rm -rf /wheels
 
 COPY . .
 
-RUN useradd --create-home appuser && chown -R appuser:appuser /app
+# The API and maintenance image never run as root. The official container
+# orchestrator may still need root for port binding; the application process is
+# always appuser and listens on the unprivileged container port 8000.
+RUN useradd --create-home --shell /usr/sbin/nologin appuser \
+    && chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 8000
