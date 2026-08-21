@@ -25,9 +25,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sqlalchemy import delete, func, select  # noqa: E402
 
 from ai.embedding_service import get_backend, get_embedding, product_to_text  # noqa: E402
-from app.core.security import hash_password  # noqa: E402
 from app.db.session import SessionLocal, engine  # noqa: E402
-from app.models import Base, Product, Subscription, User  # noqa: E402
+from app.models import Base, Product  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logger = logging.getLogger("realistic-products")
@@ -106,16 +105,18 @@ def to_model(row: dict, embeddings: dict[str, list[float]]) -> Product:
 
 
 def ensure_default_accounts(db) -> None:
-    defaults = [
-        ("admin@smartdecor.dev", "Admin123!", "admin", "Platform Admin"),
-        ("designer@smartdecor.dev", "Design123!", "designer", "Sara Designer"),
-        ("demo@smartdecor.dev", "Demo1234!", "homeowner", "Demo Homeowner"),
-    ]
-    for email, password, role, name in defaults:
-        if not db.scalar(select(User).where(User.email == email)):
-            user = User(email=email, hashed_password=hash_password(password), role=role, full_name=name)
-            user.subscription = Subscription(plan="free", is_active=False)
-            db.add(user)
+    """Create the documented **development** demo logins, if allowed.
+
+    Stage 03 / IR-001: this function used to create
+    ``admin@smartdecor.dev / Admin123!`` unconditionally, on every run, in every
+    environment — and `docker-compose.yml` runs this script on every backend
+    start. The credential list and the environment gate now live in
+    ``app.core.demo_seed``; production is refused unconditionally and every
+    other environment needs ``SEED_DEMO_ACCOUNTS=true``.
+    """
+    from app.core.demo_seed import ensure_demo_accounts
+
+    ensure_demo_accounts(db)
 
 
 def load(*, if_empty: bool = False, clear: bool = False, expand_to: int | None = None, from_json: bool = False) -> int:
@@ -155,7 +156,17 @@ def main() -> None:
     parser.add_argument("--from-json", action="store_true")
     parser.add_argument("--expand", action="store_true", help="Alias for --expand-to 150")
     parser.add_argument("--expand-to", type=int)
+    parser.add_argument(
+        "--seed-demo-accounts",
+        action="store_true",
+        help="DEV ONLY: also create the documented demo logins. Refused when "
+             "APP_ENV=production (see docs/security/DEMO_ACCOUNTS.md).",
+    )
     args = parser.parse_args()
+    if args.seed_demo_accounts:
+        from app.core.demo_seed import enable_for_this_process
+
+        enable_for_this_process(reason="--seed-demo-accounts")
     expand_to = args.expand_to or (150 if args.expand else None)
     load(if_empty=args.if_empty, clear=args.clear, expand_to=expand_to, from_json=args.from_json)
 
