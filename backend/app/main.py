@@ -13,13 +13,15 @@ from app.api.routes import (
     admin,
     auth,
     feedback,
-    health as health_routes,
     moodboards,
     products,
     projects,
     quiz,
     subscriptions,
     users,
+)
+from app.api.routes import (
+    health as health_routes,
 )
 from app.core.config import Settings, settings
 from app.core.json_response import ORJSONResponse
