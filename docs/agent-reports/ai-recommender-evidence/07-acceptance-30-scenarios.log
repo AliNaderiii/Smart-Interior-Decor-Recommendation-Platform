@@ -1,0 +1,4 @@
+== Acceptance: 30 recommender scenarios (tests/test_recommender.py) ==
+$ cd backend && /tmp/ai-venv/bin/python -m pytest tests/test_recommender.py -p no:warnings
+..............................                                           [100%]
+30 passed in 4.91s

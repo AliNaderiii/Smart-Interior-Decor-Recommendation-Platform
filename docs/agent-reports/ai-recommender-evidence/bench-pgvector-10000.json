@@ -1,0 +1,60 @@
+{
+  "versions": {
+    "ai_stack_version": "2026-08-21.1",
+    "extraction": {
+      "provider": "mock",
+      "model": "filename-heuristic (offline dev/CI only)",
+      "prompt_version": "p2",
+      "taxonomy_version": "2.1"
+    },
+    "embedding": {
+      "backend": "hash",
+      "model": "feature-hash-512 (DETERMINISTIC FALLBACK \u2014 NOT a semantic model)",
+      "dim": 512
+    },
+    "recommender_config_version": "2026-08-21.1"
+  },
+  "environment": {
+    "hnsw_ef_search": 400,
+    "candidate_limit": 100,
+    "budget_window_toman": [
+      1000000,
+      150000000
+    ],
+    "note": "DB-level latency; pgserver PostgreSQL 16.2 + pgvector 0.6.2 sandbox unless stated otherwise"
+  },
+  "results": [
+    {
+      "catalog_size": 10000,
+      "rows_total": 11000,
+      "rows_verified": 9388,
+      "plan": "Limit  (cost=1024.40..1024.65 rows=100 width=26) (actual time=5.933..5.943 rows=100 loops=1)\n  Buffers: shared hit=4946\n  ->  Sort  (cost=1024.40..1027.75 rows=1342 width=26) (actual time=5.931..5.936 rows=100 loops=1)\n        Sort Key: ((style_embedding <=> '[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0.258199,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0.258199,0,0,0,0,0,0]'::vector)), id\n        Sort Method: top-N heapsort  Memory: 36kB\n        Buffers: shared hit=4946\n        ->  Bitmap Heap Scan on products  (cost=28.41..973.11 rows=1342 width=26) (actual time=0.283..5.552 rows=1342 loops=1)\n              Recheck Cond: ((category)::text = 'sofa'::text)\n              Filter: (is_verified AND (style_embedding IS NOT NULL) AND (price_toman >= 1000000) AND (price_toman <= 150000000) AND ((room_type)::text = 'living_room'::text))\n              Rows Removed by Filter: 230\n              Heap Blocks: exact=466\n              Buffers: shared hit=4940\n              ->  Bitmap Index Scan on ix_products_category  (cost=0.00..28.07 rows=1572 width=0) (actual time=0.131..0.132 rows=3001 loops=1)\n                    Index Cond: ((category)::text = 'sofa'::text)\n                    Buffers: shared hit=4\nPlanning:\n  Buffers: shared hit=63\nPlanning Time: 0.190 ms\nExecution Time: 5.978 ms",
+      "plan_uses_hnsw": false,
+      "plan_uses_seq_scan": false,
+      "cold_p50_ms": 6.3,
+      "cold_p95_ms": 7.1,
+      "cold_max_ms": 8.0,
+      "cold_mean_rows_per_query": 100.0,
+      "warm_p50_ms": 6.2,
+      "warm_p95_ms": 6.7,
+      "warm_max_ms": 7.9,
+      "warm_mean_rows_per_query": 100.0,
+      "exact_candidates_sofa": 100,
+      "ann_candidates_sofa": 100,
+      "recall_at_limit_sofa": 1.0,
+      "no_result_ms": 0.8,
+      "hnsw_probe": {
+        "ef40": {
+          "rows_returned": 40,
+          "latency_ms": 1.9
+        },
+        "ef400": {
+          "rows_returned": 100,
+          "latency_ms": 5.0
+        }
+      },
+      "hnsw_probe_plan_uses_index": true,
+      "hnsw_probe_plan": "Limit  (cost=108.60..142.10 rows=100 width=26) (actual time=2.798..3.248 rows=100 loops=1)\n  ->  Index Scan using ix_products_style_embedding on products  (cost=108.60..3794.10 rows=11000 width=26) (actual time=2.797..3.240 rows=100 loops=1)\n        Order By: (style_embedding <=> '[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0.258199,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0.258199,0,0,0,0,0,0]'::vector)\n        Filter: (style_embedding IS NOT NULL)\nPlanning Time: 0.049 ms\nExecution Time: 3.267 ms"
+    }
+  ]
+}
