@@ -243,3 +243,17 @@ The final docs/evidence checkpoint will be listed here after it is committed.
 See `docs/agent-reports/infra-evidence/README.md` for the evidence index and
 `docs/DISASTER_RECOVERY.md` for operational recovery. Do not treat the existence
 of a workflow definition as evidence that GitHub Actions has run.
+
+## Final tracked-tree scan after evidence commit
+
+After committing the report and evidence, the scans were rerun against the
+tracked tree at `ca573ba`:
+
+- `scripts/audit_secrets.py`: 310 tracked files, 0 findings, 0 forbidden paths,
+  PASS.
+- `scripts/audit_docs_links.py`: 38 Markdown files, 0 broken links, 0 missing
+  file references, PASS.
+- `ruff check app ai scripts tests`: all checks passed.
+- `pip-audit -r backend/requirements.txt`: no known vulnerabilities.
+
+This final scan transcript is `infra-evidence/07-scans.log`.
