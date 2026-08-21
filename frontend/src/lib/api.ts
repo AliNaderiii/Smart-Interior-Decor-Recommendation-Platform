@@ -48,6 +48,20 @@ function readCookie(name: string): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+/**
+ * True when the backend is running in httpOnly-cookie mode.
+ *
+ * Stage 03 (T-11): the readable `csrf_token` cookie is only ever set alongside
+ * the httpOnly `access_token`/`refresh_token` pair, so its presence is a
+ * reliable signal that credentials are already held somewhere JavaScript
+ * cannot read. When that is true the SPA must **not** also keep copies in
+ * `localStorage` — doing so hands an XSS the very tokens the cookie migration
+ * was introduced to protect, and leaves them on disk after the tab closes.
+ */
+export function usingCookieAuth(): boolean {
+  return readCookie(CSRF_COOKIE) !== null;
+}
+
 /** Standard envelope from the backend: {success, data, error} */
 export interface Envelope<T> {
   success: boolean;

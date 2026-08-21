@@ -65,10 +65,23 @@ export default function LoginPage() {
         <p className="mt-4 text-center text-sm text-[var(--color-muted)]">
           No account? <Link to="/register" className="font-semibold text-[var(--color-ink)] underline underline-offset-2">Create one</Link>
         </p>
-        <div className="mt-6 rounded-xl border border-[var(--color-line)] bg-[var(--color-canvas)] p-3 text-xs text-[var(--color-muted)]">
-          <p className="font-semibold text-[var(--color-ink)]">Demo accounts</p>
-          <p>demo@smartdecor.dev / Demo1234! · designer@smartdecor.dev / Design123! · admin@smartdecor.dev / Admin123!</p>
-        </div>
+        {/* Stage 03 (T-02): the demo credentials used to be published to every
+            visitor, including in production, where `admin@smartdecor.dev /
+            Admin123!` was a working login. Production no longer creates those
+            accounts at all (see `docs/security/DEMO_ACCOUNTS.md`), so the hint
+            would be misleading as well as dangerous — it is compiled out of
+            production bundles entirely by `import.meta.env.DEV`, which Vite
+            resolves statically at build time. */}
+        {import.meta.env.DEV && (
+          <div className="mt-6 rounded-xl border border-[var(--color-line)] bg-[var(--color-canvas)] p-3 text-xs text-[var(--color-muted)]">
+            <p className="font-semibold text-[var(--color-ink)]">Demo accounts (development build)</p>
+            <p>
+              Available only when the backend was seeded with{" "}
+              <code>SEED_DEMO_ACCOUNTS=true</code> outside production.
+            </p>
+            <p>demo@smartdecor.dev / Demo1234! · designer@smartdecor.dev / Design123! · admin@smartdecor.dev / Admin123!</p>
+          </div>
+        )}
       </Card>
     </div>
   );

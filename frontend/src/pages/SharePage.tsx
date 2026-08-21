@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { get } from "@/lib/api";
 import type { RecommendedProduct } from "@/lib/types";
 import { CATEGORY_LABELS, formatToman } from "@/lib/constants";
+import { safeUrl } from "@/lib/safeUrl";
 import { Badge, Card, Skeleton } from "@/components/ui";
 import { ErrorState } from "@/components/states";
 import { OptimizedImage } from "@/components/OptimizedImage";
@@ -84,8 +85,11 @@ export default function SharePage() {
                   <h3 className="line-clamp-2 text-sm font-semibold text-[var(--color-ink)]">{p.title}</h3>
                   <p className="font-semibold tabular-nums text-[var(--color-ink)]">{formatToman(p.price_toman)}</p>
                   <p className="text-xs leading-relaxed text-[var(--color-muted)]">{p.explanation.summary}</p>
-                  {p.seller_link && (
-                    <a href={p.seller_link} target="_blank" rel="noreferrer noopener"
+                  {/* X-01: this page is unauthenticated and reachable by
+                      anyone holding a share token, which makes it the highest
+                      value stored-XSS target in the SPA. */}
+                  {safeUrl(p.seller_link) && (
+                    <a href={safeUrl(p.seller_link)} target="_blank" rel="noreferrer noopener"
                        className="inline-block rounded-xl border border-[var(--color-line)] px-3 py-1.5 text-xs font-semibold text-[var(--color-ink)] hover:bg-[var(--color-line)]">
                       View at seller
                     </a>

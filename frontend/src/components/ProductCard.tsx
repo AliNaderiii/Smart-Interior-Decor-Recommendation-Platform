@@ -4,6 +4,7 @@ import * as HoverCard from "@radix-ui/react-hover-card";
 import { Link } from "react-router-dom";
 import type { RecommendedProduct } from "@/lib/types";
 import { formatToman } from "@/lib/constants";
+import { safeUrl } from "@/lib/safeUrl";
 import { MotionCard } from "@/components/ui";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { crossfade, spring } from "@/lib/motion";
@@ -329,9 +330,11 @@ function ProductCardInner({ product, rank, onAdd, added, feedback, onFeedback }:
           <FeedbackButtons product={product} value={feedback} onFeedback={onFeedback} />
         </div>
 
-        {product.seller_link && (
+        {safeUrl(product.seller_link) && (
           <a
-            href={product.seller_link}
+            /* X-01: never render a stored URL into `href` unchecked — a
+               `javascript:` link would execute in the SPA's origin. */
+            href={safeUrl(product.seller_link)}
             target="_blank"
             rel="noreferrer noopener"
             className="rounded-lg border border-[var(--color-line)] px-2 py-1.5 text-center text-[11px] font-semibold text-[var(--color-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-ink)]"
