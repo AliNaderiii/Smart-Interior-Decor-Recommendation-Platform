@@ -1,0 +1,22 @@
+=== blocked environment checks (sandbox) ===
+$ docker compose config -q
+bash: line 1: docker: command not found
+exit=127
+$ docker build -f backend/Dockerfile backend
+bash: line 1: docker: command not found
+exit=127
+$ hadolint backend/Dockerfile
+bash: line 1: hadolint: command not found
+exit=127
+$ trivy image decor-backend:ci
+bash: line 1: trivy: command not found
+exit=127
+$ google-chrome --version
+bash: line 1: google-chrome: command not found
+exit=127
+$ chromium --version
+bash: line 1: chromium: command not found
+exit=127
+$ test -n "$GEMINI_API_KEY"
+GEMINI_API_KEY is unset/empty
+exit=0

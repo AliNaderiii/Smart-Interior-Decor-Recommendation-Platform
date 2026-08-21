@@ -124,6 +124,18 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str = ""
     EMAIL_FROM: str = "noreply@smartdecor.dev"
 
+    # ---- Observability (Stage 07) ----
+    #: Root log level. Accepts any logging level name (DEBUG..CRITICAL).
+    LOG_LEVEL: str = "INFO"
+    #: "text" = readable multi-line logs (dev/test default); "json" = one
+    #: machine-parseable JSON object per line, redacted, with request_id
+    #: correlation (see app/core/observability.py). The production compose
+    #: overlay sets LOG_FORMAT=json; the application itself defaults to text.
+    LOG_FORMAT: Literal["text", "json"] = "text"
+    #: Expose the Prometheus-text /metrics endpoint. Disable only if the
+    #: collector is on a hostile network and the proxy cannot restrict it.
+    METRICS_ENABLED: bool = True
+
     @property
     def is_postgres(self) -> bool:
         return self.DATABASE_URL.startswith(("postgresql", "postgres"))

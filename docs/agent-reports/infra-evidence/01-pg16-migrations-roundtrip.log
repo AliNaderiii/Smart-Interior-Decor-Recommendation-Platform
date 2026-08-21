@@ -1,0 +1,38 @@
+=== PostgreSQL 16 + pgvector migration roundtrip ===
+SERVER: pgserver embedded PostgreSQL 16.2 + pgvector 0.6.2
+$ alembic downgrade base (ensure empty schema)
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running downgrade 0003 -> 0002, product_feedback table — 👍/👎 signals that re-rank recommendations
+INFO  [alembic.runtime.migration] Running downgrade 0002 -> 0001, audit_logs table — OWASP A09 security logging
+INFO  [alembic.runtime.migration] Running downgrade 0001 -> , initial schema — pgvector extension, all tables, hot-path indexes
+$ alembic upgrade head (empty schema)
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001, initial schema — pgvector extension, all tables, hot-path indexes
+INFO  [alembic.runtime.migration] Running upgrade 0001 -> 0002, audit_logs table — OWASP A09 security logging
+INFO  [alembic.runtime.migration] Running upgrade 0002 -> 0003, product_feedback table — 👍/👎 signals that re-rank recommendations
+$ alembic current
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+0003 (head)
+$ alembic downgrade base
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running downgrade 0003 -> 0002, product_feedback table — 👍/👎 signals that re-rank recommendations
+INFO  [alembic.runtime.migration] Running downgrade 0002 -> 0001, audit_logs table — OWASP A09 security logging
+INFO  [alembic.runtime.migration] Running downgrade 0001 -> , initial schema — pgvector extension, all tables, hot-path indexes
+$ alembic upgrade head (round-trip second pass)
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+INFO  [alembic.runtime.migration] Running upgrade  -> 0001, initial schema — pgvector extension, all tables, hot-path indexes
+INFO  [alembic.runtime.migration] Running upgrade 0001 -> 0002, audit_logs table — OWASP A09 security logging
+INFO  [alembic.runtime.migration] Running upgrade 0002 -> 0003, product_feedback table — 👍/👎 signals that re-rank recommendations
+$ alembic current
+INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
+INFO  [alembic.runtime.migration] Will assume transactional DDL.
+0003 (head)
+$ pgvector extension/index verification
+vector_extension= 0.6.2
+hnsw_index= ix_products_style_embedding
+RESULT: PASS

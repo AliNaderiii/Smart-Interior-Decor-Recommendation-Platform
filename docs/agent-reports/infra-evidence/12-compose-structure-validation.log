@@ -1,0 +1,8 @@
+docker-compose.yml: YAML parsed; services=backend, caddy, frontend, postgres, redis
+docker-compose.dev.yml: YAML parsed; services=backend, frontend, postgres, redis
+docker-compose.prod.yml: YAML parsed; services=backend, caddy, frontend, maintenance, postgres, redis
+docker-compose.test.yml: YAML parsed; services=backend, postgres
+compose structural invariants: PASS
+workflow YAML parsed; jobs=backend, docker, frontend, lighthouse, multi-worker, security-scans
+Dockerfile/proxy structural invariants: PASS
+NOTE: this is YAML/text validation only; docker compose config -q and image builds require Docker and remain BLOCKED.

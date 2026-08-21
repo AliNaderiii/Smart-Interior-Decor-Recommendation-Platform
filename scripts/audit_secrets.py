@@ -77,6 +77,12 @@ PLACEHOLDER_FILES = {
     "datasets/service_keys_template.env",
 }
 
+# Stage 07: fixture files under backend/tests/ deliberately contain generated
+# test-only credentials (Fernet keys, realistic JWT samples for the redaction
+# tests). They are acknowledged so the CI secret gate fails only on
+# application-code findings — a real credential in app code still fails.
+TEST_FIXTURE_ROOT = "backend/tests/"
+
 FORBIDDEN_TRACKED = [
     re.compile(r"(^|/)\.env$"),
     re.compile(r"(^|/)\.env\.(?!example)[A-Za-z0-9_.\-]+$"),
@@ -178,6 +184,9 @@ def scan() -> dict:
                 ):
                     record["reason"] = "documented local compose credential"
                     acknowledged.append(record)
+                elif rel.startswith(TEST_FIXTURE_ROOT):
+                    record["reason"] = "generated test-fixture credential"
+                    acknowledged.append(record)
                 else:
                     findings.append(record)
 
@@ -191,6 +200,9 @@ def scan() -> dict:
                     acknowledged.append(record)
                 elif placeholder_file:
                     record["reason"] = f"{rel} is a documented placeholder template"
+                    acknowledged.append(record)
+                elif rel.startswith(TEST_FIXTURE_ROOT):
+                    record["reason"] = "generated test-fixture credential"
                     acknowledged.append(record)
                 else:
                     record["value_preview"] = val_clean[:16] + "…"

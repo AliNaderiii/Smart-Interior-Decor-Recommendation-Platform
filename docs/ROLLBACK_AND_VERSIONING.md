@@ -212,3 +212,18 @@ path they do not own must instead file an entry in `integration-request.md`.
 | `docs/client/**`, `docs/proposal/**`, `docs/demo/**` | 09 — Sales & Demo Documentation |
 | Merges, tags, `CHANGELOG.md`, branch protection | 10 — Integration & Release Manager |
 | `backend/alembic/**`, `backend/requirements.txt`, `frontend/package.json` | Shared — **integration request required** |
+
+---
+
+## Stage 07 rollback delta — 2026-08-21
+
+The historical prerequisites in §4.2 describe the pre-infrastructure baseline.
+The current branch adds versioned image tags in compose/Dockerfiles, the
+`backend/requirements.lock.txt` install artifact, `scripts/backup.sh`, and the
+full restore/rollback runbook in `docs/DISASTER_RECOVERY.md`. Migration 0003 is
+now batch-mode reversible on SQLite and PostgreSQL, and the CI definition
+exercises upgrade → downgrade base → upgrade once activated.
+
+Residual deployment-owner actions are digest pinning, a real-backup restore
+drill, managed-Postgres PITR selection, and branch protection. The Stage 07
+report does not claim those actions occurred in this sandbox.

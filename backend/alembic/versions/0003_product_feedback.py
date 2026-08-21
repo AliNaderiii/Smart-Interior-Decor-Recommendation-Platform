@@ -43,13 +43,19 @@ def upgrade() -> None:
     op.create_index("ix_product_feedback_product_id", "product_feedback", ["product_id"])
     # One verdict per user per product — a repeated thumb overwrites rather
     # than stacking, so a user cannot skew their own ranking by spamming.
-    op.create_unique_constraint(
-        "uq_feedback_user_product", "product_feedback", ["user_id", "product_id"]
-    )
+    # Batch mode (IR-002): SQLite cannot ALTER TABLE ... ADD CONSTRAINT, so
+    # `op.create_unique_constraint` failed the documented SQLite migration
+    # path. batch_alter_table recreates the table on SQLite and is a passthrough
+    # on PostgreSQL — one migration, both dialects.
+    with op.batch_alter_table("product_feedback") as batch_op:
+        batch_op.create_unique_constraint(
+            "uq_feedback_user_product", ["user_id", "product_id"]
+        )
 
 
 def downgrade() -> None:
-    op.drop_constraint("uq_feedback_user_product", "product_feedback", type_="unique")
+    with op.batch_alter_table("product_feedback") as batch_op:
+        batch_op.drop_constraint("uq_feedback_user_product", type_="unique")
     op.drop_index("ix_product_feedback_product_id", table_name="product_feedback")
     op.drop_index("ix_product_feedback_user_id", table_name="product_feedback")
     op.drop_table("product_feedback")

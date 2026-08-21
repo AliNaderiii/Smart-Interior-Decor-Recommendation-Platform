@@ -1,0 +1,33 @@
+==============================================================================
+PRODUCTION FAIL-SAFE PROBE
+==============================================================================
+workdir: /tmp/prodfailsafe-mk7vsuo3
+
+[SECURE  ] F-01 An insecure production configuration must refuse to boot
+           expected: RuntimeError naming every problem
+           observed: refused=True problems=7: ['SECRET_KEY must be >=32 chars (got 5)', 'REDIS_URL is empty — fakeredis is per-process, so rate limits and brute-force lockouts would not be shared across workers', 'COOKIE_SECURE must be true in production', 'SEED_DEMO_ACCOUNTS is true — demo/default accounts must never be created in production (see docs/security/DEMO_ACCOUNTS.md)', "FRONTEND_ORIGIN must be an https:// origin in production (got 'http://localhost:5173')", 'FERNET_KEY is empty — a random key would be generated per process, making at-rest ciphertext unrecoverable', 'STORAGE_BACKEND=local serves uploaded bytes from the application origin; production must use S3-compatible storage']
+[SECURE  ] F-02 A correct production configuration must boot
+           expected: no exception
+           observed: stdout='BOOTED' rc=0
+[SECURE  ] F-03 Demo seeding must be refused in production, opt-in or not
+           expected: allowed: False and the CLI flag refused
+           observed: allowed: | False | CLI | OPT-IN | REFUSED: | --seed-demo-accounts | refused: | APP_ENV=production. | Demo | accounts | are | never | creatable | in | production | (docs/security/DEMO_ACCOUNTS.md).
+[SECURE  ] F-04 A production database containing demo rows must stop startup
+           expected: RuntimeError at boot
+           observed: REFUSED TO SERVE: Refusing to start: production database contains predictable demo account(s): admin@smartdecor.dev. Delete or rename them (and rotate anything they touched) before serving traffic. See docs/security/DEMO_ACCOUNTS.md.
+[SECURE  ] F-05 Production must refuse the per-process fakeredis fallback
+           expected: RedisUnavailable
+           observed: REFUSED: REDIS_URL is empty in production. fakeredis is per-process, so rate limits, brute-force lockouts and the refresh-token blacklist would not be shared between workers.
+[SECURE  ] F-06 With Redis down, production must fail CLOSED on login
+           expected: 503 + Retry-After (never an unthrottled 401/200)
+           observed: status=503 retry_after=5
+[SECURE  ] F-07 Production must not expose docs, loopback CORS or local media
+           expected: docs/openapi/redoc disabled, exactly one CORS origin, no /media mount
+           observed: {"docs_url": null, "openapi_url": null, "redoc_url": null, "cors_origins": ["https://app.smartdecor.example"], "media_mounted": false}
+[SECURE  ] F-08 Production responses must carry HSTS and an upgraded CSP
+           expected: HSTS present, CSP has upgrade-insecure-requests and no inline script
+           observed: hsts='max-age=63072000; includeSubDomains; preload' csp="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://images.unsplash.com; connect-src 'self' https://generativelanguage.googleapis.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests"
+
+==============================================================================
+SUMMARY: 8 checks, 8 secure, 0 INSECURE
+==============================================================================

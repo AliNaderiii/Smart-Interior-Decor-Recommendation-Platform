@@ -1,11 +1,12 @@
 # Postgres-parity test overlay — runs the full pytest suite against the real
 # pgvector stack instead of the SQLite dev fallback.
 #
-#   docker-compose -f docker-compose.yml -f docker-compose.test.yml \
+#   docker compose -f docker-compose.yml -f docker-compose.test.yml \
 #     run --rm backend sh -c "alembic upgrade head && pytest tests/ -v"
 #
-# The suite asserts the fused pgvector query path (Stage A+B in one
-# `ORDER BY style_embedding <=> :emb` statement) and the HNSW index migration.
+# The suite exercises the fused pgvector query path and the real Redis tests
+# (TEST_REDIS_URL, database 9) in addition to the default application Redis
+# database (database 1).
 version: "3.9"
 
 services:
@@ -13,11 +14,17 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-decor}:${POSTGRES_PASSWORD:-decor}@postgres:5432/${POSTGRES_DB:-decor}_test
       REDIS_URL: redis://redis:6379/1
+      TEST_REDIS_URL: redis://redis:6379/9
       AI_PROVIDER: mock
       EMBEDDING_BACKEND: hash
+      STORAGE_BACKEND: local
       PAYMENT_PROVIDER: mock
+      EMAIL_PROVIDER: mock
       SECRET_KEY: test-secret
       APP_ENV: test
+      SEED_DEMO_ACCOUNTS: "true"
+      COOKIE_SECURE: "false"
+      LOG_FORMAT: text
     command: sh -c "alembic upgrade head && pytest tests/ -v"
     depends_on:
       postgres:

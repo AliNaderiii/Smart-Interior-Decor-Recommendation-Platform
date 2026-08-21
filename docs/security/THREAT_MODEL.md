@@ -227,3 +227,12 @@ CI/CD secret handling and branch protection (Prompt 07), Playwright E2E and
 Lighthouse (Prompt 08), real-model AI benchmarking (Prompt 04), infrastructure
 TLS/WAF/backup execution (client-owned). Findings touching those areas are
 recorded as integration requests, not silently fixed.
+
+## Stage 07 supply-chain addendum — 2026-08-21
+
+The historical T-46 entry above records the pre-migration `python-jose` state.
+The current tree implements IR-SEC-002: `backend/app/core/security.py` uses
+PyJWT, `backend/requirements.txt` declares `pyjwt[crypto]`, and the generated
+lockfile contains neither `python-jose` nor `ecdsa`. The HS256/384/512 allowlist
+and auth tests remain in place. Re-run `pip-audit -r backend/requirements.txt`
+after every dependency update and in the activated GitHub workflow.

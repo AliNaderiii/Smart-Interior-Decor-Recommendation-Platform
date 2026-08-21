@@ -73,7 +73,28 @@ INTENTIONALLY_UNTRACKED = {
     ".env.local",
     "backend/decor.sqlite3",
     "frontend/dist",
+    "dist/index.html",  # generated frontend artifact cited by the performance report
     "lighthouse-report.json",
+    # ---- Stage 07 additions: pre-existing dangling refs, each registered in
+    # integration-request.md (IR-003 / IR-SEC-007) with its owning stage. They
+    # are allowlisted so the CI docs-link gate fails only on NEW defects:
+    #   docs/DATASETS_AUDIT.md:49  (owner 04) — .env.example.v2 never existed
+    #   docs/reports/ACCEPTANCE_REPORT.md:13 (owner 08) — embeddings_real.json
+    #     is generated on a networked machine, not committed;
+    #   docs/ARCHITECTURE.md:64 uses the backend/-prefixed spelling (same file)
+    #   docs/security/PRODUCTION_SECURITY_CHECKLIST.md:86 (owner 03) —
+    #     /openapi.json is a runtime artifact, disabled in production
+    #   docs/security/THREAT_MODEL.md:220 (owner 03) — anticipated script name;
+    #     implemented as backend/scripts/prune_audit_logs.py (Stage 07)
+    ".env.example.v2",
+    "seed_data/embeddings_real.json",
+    "backend/seed_data/embeddings_real.json",
+    "/openapi.json",
+    "scripts/purge_audit_logs.py",
+    # ci/README.md documents the activation path: the workflow file is created
+    # there by scripts/enable_ci.sh when a token with `workflows` scope pushes
+    # it (the agent App token cannot — see infra-report, CI-activation).
+    ".github/workflows/ci.yml",
 }
 
 # Governance/audit documents whose *purpose* is to enumerate paths that do not
@@ -89,6 +110,8 @@ AUDIT_REPORT_FILES = {
     "docs/ROLLBACK_AND_VERSIONING.md",
     "docs/agent-reports/baseline-release-report.md",
     "docs/agent-reports/baseline-release-evidence/README.md",
+    "docs/agent-reports/infra-report.md",
+    "docs/agent-reports/infra-evidence/README.md",
 }
 
 SKIP_DEFAULT = {

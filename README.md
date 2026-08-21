@@ -16,7 +16,7 @@ Zarinpal-based Pro paywall. **MVP scope: living_room only.**
 | Layer | Tech |
 |---|---|
 | Frontend | React 19 · Vite · TypeScript (strict) · Tailwind CSS · Zustand · TanStack Query · react-grid-layout |
-| Backend | Python · FastAPI · SQLAlchemy 2.0 · Alembic · Pydantic v2 · python-jose · passlib[bcrypt] |
+| Backend | Python · FastAPI · SQLAlchemy 2.0 · Alembic · Pydantic v2 · PyJWT · passlib[bcrypt] |
 | Data | PostgreSQL 16 + pgvector (`vector(512)`, HNSW) · Redis |
 | AI | CLIP ViT-B/32 embeddings (offline hash fallback) · Gemini / OpenAI vision extraction (provider-agnostic via `.env`) |
 | Infra | Docker Compose · Caddy (TLS 1.3) · GitHub Actions CI |
@@ -25,13 +25,14 @@ Zarinpal-based Pro paywall. **MVP scope: living_room only.**
 
 ```bash
 cp .env.example .env          # then set SECRET_KEY, FERNET_KEY
-docker-compose up --build
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
 → App at `https://localhost` (Caddy, TLS 1.3) · API docs at `https://localhost/docs`.
 On first boot the backend runs `alembic upgrade head` and then
 `load_realistic_products.py --realistic --expand-to 150 --if-empty --from-json`,
-which loads the **150-row Persian demo catalog** plus the demo accounts below.
+which loads the **150-row Persian demo catalog**. Demo accounts are enabled
+only by the development overlay; the production overlay never enables them.
 (`backend/scripts/seed_products.py`, which generates 100 synthetic products, is
 the separate no-Docker path documented under *Local development*.)
 
@@ -69,7 +70,7 @@ parity as *previously evidenced, currently unverified at HEAD*; re-run it before
 release:
 
 ```bash
-docker-compose -f docker-compose.yml -f docker-compose.test.yml \
+docker compose -f docker-compose.yml -f docker-compose.test.yml \
   run --rm backend sh -c "alembic upgrade head && pytest tests/ -v"
 ```
 
@@ -89,12 +90,11 @@ npm ci                                    # npm ci, not npm install: package-loc
 npm run dev
 ```
 
-> Do **not** run `alembic upgrade head` against the SQLite fallback: revision
-> `0003_product_feedback` calls `op.create_unique_constraint`, which SQLite
-> rejects (`NotImplementedError: No support for ALTER of constraints in SQLite
-> dialect`). The SQLite path is schema-provisioned by `Base.metadata.create_all()`
-> inside the seed scripts. Alembic is the Postgres path only. Evidence:
-> `docs/agent-reports/baseline-release-evidence/14-alembic-upgrade-sqlite.log`.
+> Revision `0003_product_feedback` uses Alembic batch mode for its unique
+> constraint. The migration chain now runs on both SQLite and PostgreSQL; the
+> production validation target remains PostgreSQL 16 + pgvector. The dev seed
+> script still uses `Base.metadata.create_all()` for a fast, isolated fixture
+> setup, while CI and the test compose profile run the real migration chain.
 
 ## Tests & acceptance gates
 

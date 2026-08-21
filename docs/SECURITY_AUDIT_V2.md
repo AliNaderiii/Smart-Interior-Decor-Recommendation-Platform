@@ -373,3 +373,14 @@ still logs in with 200.
 - ✅ `npm audit` 0 high; `pip-audit` 1 documented no-fix advisory
 - ✅ All A01 access-control probes still pass
 - ✅ **71/71 backend tests green** (45 pre-existing + 26 new security tests)
+
+## Stage 07 infrastructure addendum — 2026-08-21
+
+This document's baseline findings retain their original evidence and date. The
+Stage 07 branch addresses the infrastructure-owned follow-ups: PyJWT replaces
+`python-jose`, production-safe compose profiles isolate demo accounts,
+`backend/scripts/prune_audit_logs.py` enforces the documented retention window,
+and the CI workflow includes dependency/security scans. See
+`docs/agent-reports/infra-report.md` for current command evidence and the
+explicit distinction between local sandbox results, blocked Docker checks, and
+blocked real GitHub Actions activation.

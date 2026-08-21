@@ -1,0 +1,7 @@
+=== two-process shared Redis verification ===
+[setup] workers ready on :8101 and :8102
+CHECK blacklist-shared: PASS — refresh after logout-on-A via B -> HTTP 401 (expect 401)
+CHECK lockout-shared: PASS — correct password via B after 5 failures via A -> HTTP 429 (expect 429)
+CHECK rate-limit-shared: PASS — burst via A -> HTTP 429; then via B -> HTTP 429 (expect 429/429)
+SUMMARY multi-worker shared-redis: 3/3 checks passed
+RESULT: PASS

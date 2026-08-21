@@ -1,0 +1,53 @@
+============================= test session starts ==============================
+platform linux -- Python 3.11.2, pytest-9.1.1, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /home/user/Smart-Interior-Decor-Recommendation-Platform/backend
+configfile: pyproject.toml
+plugins: anyio-4.14.2, benchmark-5.2.3, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 400 items
+
+tests/test_audit_retention.py ...                                        [  0%]
+tests/test_auth.py .............                                         [  4%]
+tests/test_auth_hardening.py ................................            [ 12%]
+tests/test_config_fail_safe.py ..........................                [ 18%]
+tests/test_demo_seeding.py .................                             [ 22%]
+tests/test_feedback_v2.py ................                               [ 26%]
+tests/test_gdpr.py .............................                         [ 34%]
+tests/test_idor_rbac.py ................................................ [ 46%]
+                                                                         [ 46%]
+tests/test_input_validation.py ......................................... [ 56%]
+....                                                                     [ 57%]
+tests/test_observability.py .............                                [ 60%]
+tests/test_perf_v2.py ..........                                         [ 63%]
+tests/test_rate_limit.py ..                                              [ 63%]
+tests/test_recommender.py ..............................                 [ 71%]
+tests/test_redis_real.py ........                                        [ 73%]
+tests/test_security_headers.py ....................                      [ 78%]
+tests/test_security_v2.py ..........................                     [ 84%]
+tests/test_upload_security.py ............................               [ 91%]
+tests/test_url_safety.py ..................................              [100%]
+
+=============================== warnings summary ===============================
+../../../../tmp/infra-venv/lib/python3.11/site-packages/fastapi/testclient.py:1
+  /tmp/infra-venv/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_upload_security.py::test_dangerous_uploads_are_rejected[empty.png--image/png]
+  /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/app/core/uploads.py:132: StarletteDeprecationWarning: 'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated. Use 'HTTP_422_UNPROCESSABLE_CONTENT' instead.
+    data = read_bounded(upload)
+
+tests/test_upload_security.py::test_oversized_upload_is_413_not_500
+  /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/app/core/uploads.py:132: StarletteDeprecationWarning: 'HTTP_413_REQUEST_ENTITY_TOO_LARGE' is deprecated. Use 'HTTP_413_CONTENT_TOO_LARGE' instead.
+    data = read_bounded(upload)
+
+tests/test_upload_security.py::test_read_bounded_stops_before_buffering_everything
+  /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/tests/test_upload_security.py:108: StarletteDeprecationWarning: 'HTTP_413_REQUEST_ENTITY_TOO_LARGE' is deprecated. Use 'HTTP_413_CONTENT_TOO_LARGE' instead.
+    uploads.read_bounded(_fake_upload("x.bin", b"a" * 5000, "image/png"))
+
+tests/test_upload_security.py::test_decompression_bomb_is_rejected
+  /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/app/api/routes/products.py:137: StarletteDeprecationWarning: 'HTTP_413_REQUEST_ENTITY_TOO_LARGE' is deprecated. Use 'HTTP_413_CONTENT_TOO_LARGE' instead.
+    image = validate_image_upload(file)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================== 400 passed, 5 warnings in 78.92s (0:01:18) ==================
