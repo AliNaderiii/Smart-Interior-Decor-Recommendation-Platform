@@ -57,10 +57,22 @@ def read_products(expand_to: int | None = None) -> list[dict]:
     return rows
 
 
-def _precomputed(enabled: bool) -> dict[str, list[float]]:
+def _precomputed(enabled: bool, *, strict: bool = False) -> dict[str, list[float]]:
     if not enabled:
         return {}
     if not EMBEDDINGS_JSON.exists():
+        if strict:
+            # Stage 04: --from-json is the operator's explicit statement that
+            # this deploy must run on real CLIP vectors. Falling back to the
+            # configured backend here is exactly the silent hash-fallback path
+            # Master Prompt 04 forbids — fail loudly with the runbook pointer.
+            raise SystemExit(
+                "ERROR: --from-json was requested but seed_data/embeddings_real.json "
+                "is absent. Generate it on a networked machine with: "
+                "python scripts/seed_products.py --real-embeddings "
+                "(see docs/ai/model-versions.md §re-embedding), commit the file, "
+                "and redeploy."
+            )
         logger.warning(
             "seed_data/embeddings_real.json is absent; using configured embedding backend. "
             "Generate it on a networked machine with seed_products.py --real-embeddings"
@@ -122,7 +134,7 @@ def ensure_default_accounts(db) -> None:
 def load(*, if_empty: bool = False, clear: bool = False, expand_to: int | None = None, from_json: bool = False) -> int:
     Base.metadata.create_all(engine)
     rows = read_products(expand_to)
-    embeddings = _precomputed(from_json)
+    embeddings = _precomputed(from_json, strict=from_json)
     with SessionLocal() as db:
         count = db.scalar(select(func.count(Product.id))) or 0
         if if_empty and count:
