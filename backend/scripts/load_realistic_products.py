@@ -68,14 +68,17 @@ def _precomputed(enabled: bool, *, strict: bool = False) -> dict[str, list[float
             # Master Prompt 04 forbids — fail loudly with the runbook pointer.
             raise SystemExit(
                 "ERROR: --from-json was requested but seed_data/embeddings_real.json "
-                "is absent. Generate it on a networked machine with: "
+                "is absent. Generate it on an egress-enabled machine with: "
                 "python scripts/seed_products.py --real-embeddings "
-                "(see docs/ai/model-versions.md §re-embedding), commit the file, "
-                "and redeploy."
+                "(see docs/ai/model-versions.md §5 bootstrap), then provide it to "
+                "this deployment as a controlled deployment artifact or mounted "
+                "volume at backend/seed_data/embeddings_real.json. Do NOT commit "
+                "the artifact to git (tests enforce its absence) and never embed "
+                "credentials in it."
             )
         logger.warning(
             "seed_data/embeddings_real.json is absent; using configured embedding backend. "
-            "Generate it on a networked machine with seed_products.py --real-embeddings"
+            "Generate it on an egress-enabled machine with seed_products.py --real-embeddings"
         )
         return {}
     return json.loads(EMBEDDINGS_JSON.read_text(encoding="utf-8"))

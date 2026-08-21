@@ -46,6 +46,26 @@ class TestFromJsonArtifactRule:
         assert "--real-embeddings" in message
         assert "model-versions.md" in message
 
+    def test_from_json_message_never_instructs_committing_the_artifact(
+        self, monkeypatch, tmp_path
+    ):
+        """Housekeeping regression (independent review): the strict failure
+        message must guide operators to a controlled deployment artifact /
+        mounted volume — never to committing embeddings_real.json, which
+        tests forbid and which would bake vectors into git history."""
+        monkeypatch.setattr(
+            "scripts.load_realistic_products.EMBEDDINGS_JSON",
+            tmp_path / "absent-embeddings_real.json",
+        )
+        with pytest.raises(SystemExit) as exc:
+            _precomputed(True, strict=True)
+        message = str(exc.value)
+        lowered = message.lower()
+        assert "commit the file" not in lowered
+        assert "egress-enabled machine" in lowered
+        assert ("artifact" in lowered or "mounted volume" in lowered)
+        assert "do not commit" in lowered or "never commit" in lowered
+
     def test_artifact_is_not_committed(self):
         # A committed (fabricated or stale) artefact would be worse than none:
         # generation requires an egress-enabled machine and the real CLIP model.

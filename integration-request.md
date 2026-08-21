@@ -882,3 +882,30 @@ this remediation is a clearly-labelled local-sandbox result.
 (commit needs a token with `workflows` permission) — then confirm the
 backend job's "Real-service AI modules must RUN, not skip" step is green,
 and consolidate the two files so they cannot drift.
+
+## Remediation housekeeping (post-independent-review, 2026-08-22)
+
+- **IR-AI-009 · MEDIUM · Stage 04/07** — `load_realistic_products.py --from-json`
+  commits catalog rows and *then* exits 1 when CLIP cannot load, because the
+  completion-summary log line calls `get_backend()` after the commit. On a
+  compliant production host (CLIP loadable — startup validation already
+  requires it) the job exits 0 and the path is unreachable; on a CLIP-less
+  host the data is still committed (idempotent re-run skips) but the
+  non-zero exit can mislead an operator into thinking the bootstrap failed.
+  Deliberately NOT changed in the housekeeping pass (no refactor without a
+  safe, tested path); fix options for the owner: resolve the backend identity
+  *before* seeding, or log the summary without `get_backend()` when
+  `--from-json` supplied every vector.
+- **IR-AI-010 · LOW · baseline owner** — `docs/ARCHITECTURE.md` ("Offline
+  deploys: commit that JSON once …") still instructs committing
+  `embeddings_real.json`; that guidance predates the never-commit policy
+  (tests enforce the artifact's absence; `docs/ai/model-versions.md` §5 and
+  the corrected seeder messages say controlled artifact / mounted volume).
+  Shared doc — owner action, not edited in this branch.
+
+Housekeeping changes shipped with these entries: the strict `--from-json`
+failure message and the non-strict warning no longer mention committing the
+artifact (egress-enabled machine + controlled deployment artifact / mounted
+volume, "do NOT commit"), `seed_products.py`'s docstring aligned, and a
+regression test added asserting the message never instructs committing
+(`tests/test_production_seeding.py`).
