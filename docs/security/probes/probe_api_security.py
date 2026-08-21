@@ -346,6 +346,14 @@ def main() -> int:
           f"distinct_status={sorted(set(share_codes))}",
           429 in share_codes)
 
+    # R-01 deliberately exhausted the share bucket; clear it so R-02 measures
+    # the 404 behaviour and not the throttle it just triggered.
+    try:
+        from app.core.redis_client import get_redis as _gr
+        for _k in _gr().scan_iter("rl:share:*"):
+            _gr().delete(_k)
+    except Exception:
+        pass
     nf = client.get("/api/v1/share/" + "z" * 43)
     check("R-02", "Unknown share token must not leak whether it ever existed",
           "404 with a generic message",

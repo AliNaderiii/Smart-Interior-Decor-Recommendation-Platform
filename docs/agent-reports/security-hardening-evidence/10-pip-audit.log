@@ -1,0 +1,19 @@
+# Stage 03 — dependency advisory scan
+# command: cd backend && .venv/bin/pip-audit -r requirements.txt
+# date: 2026-08-21T16:09:11Z
+
+Found 1 known vulnerability in 1 package
+Name  Version ID              Fix Versions
+----- ------- --------------- ------------
+ecdsa 0.19.2  PYSEC-2026-1325
+
+# --- installed environment (pip-audit on the resolved venv) ---
+Found 6 known vulnerabilities in 2 packages
+Name       Version ID              Fix Versions
+---------- ------- --------------- ------------
+ecdsa      0.19.2  PYSEC-2026-1325
+setuptools 66.1.1  PYSEC-2025-49   78.1.1
+setuptools 66.1.1  PYSEC-2025-49   78.1.1
+setuptools 66.1.1  PYSEC-2026-1918 70.0.0
+setuptools 66.1.1  PYSEC-2026-3447 83.0.0
+setuptools 66.1.1  PYSEC-2026-3447 83.0.0
