@@ -261,3 +261,6 @@ This final scan transcript is `infra-evidence/07-scans.log`.
 Checkpoint completion: the report/evidence commits are now
 `e02c2f7` (evidence + report), `ca573ba` (final scan evidence), and `4a6c050`
 (final tracked-tree scan note). The working tree is clean at this point.
+
+A final transcript-whitespace-only correction was committed as `79e2e0b`; the
+branch was pushed again and `git diff --check 7f424f0..HEAD` is clean.
