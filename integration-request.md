@@ -852,3 +852,33 @@ demanded); intent of each test unchanged, all original assertions preserved:
 
 No real credential is or ever was stored in any fixture — values are obvious
 placeholders (`test-gemini-key-placeholder`).
+
+## Remediation addendum — CI was never wired into GitHub Actions; wiring is blocked in this session
+
+`.github/workflows/` did not exist in the repository: the CI definition
+lived only at `ci/github-ci.yml`, a path GitHub Actions never executes. The
+repo's CI gates (backend suite incl. the pgvector/Redis services, lint,
+secret/docs scans, benchmark bar, compose validation) have therefore **never
+produced a check run on any PR** — including PR #9 (its empty status rollup
+confirms it).
+
+The remediation branch makes the CI *definition* correct (dedicated
+`decor_pgvector_test` database, `TEST_DATABASE_URL`, a no-skip visibility
+step) so that it is ready to execute. Wiring it in was attempted and is
+**blocked in this session**: creating `.github/workflows/ci.yml` was
+rejected by GitHub with
+
+    remote: (refusing to allow a GitHub App to create or update workflow
+    `.github/workflows/ci.yml` without `workflows` permission)
+
+i.e. the agent token lacks the `workflows` scope. GitHub CI is therefore
+**NOT RUN — NOT VERIFIED** for this branch; every test result reported by
+this remediation is a clearly-labelled local-sandbox result.
+
+**Owner action (Stage 07 / release, exact):** add the executable workflow —
+
+    mkdir -p .github/workflows && cp ci/github-ci.yml .github/workflows/ci.yml
+
+(commit needs a token with `workflows` permission) — then confirm the
+backend job's "Real-service AI modules must RUN, not skip" step is green,
+and consolidate the two files so they cannot drift.
