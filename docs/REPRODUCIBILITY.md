@@ -219,3 +219,27 @@ current defects is worse than none.
 | 5 | Make revision `0003` SQLite-compatible via `batch_alter_table` and add a migration round-trip job | 04/07 | gap §6, B-7 |
 | 6 | Tag `v1.2.0-baseline` | 10 | B-12 |
 | 7 | Re-run the Postgres parity suite at HEAD and re-stamp `docs/reports/postgres_parity.md` | 07/08 | B-6 |
+
+---
+
+## Stage 07 delta — current infrastructure branch (2026-08-21)
+
+The assessment above is a historical baseline snapshot at `f97bfad`; it is not
+the current Stage 07 verdict. This branch closes the repository-controlled
+parts of the listed gaps:
+
+- `backend/requirements.lock.txt` is generated and is the install source for
+  CI and both Docker images; `PyJWT` replaces `python-jose`.
+- Compose and CI use versioned PostgreSQL 16 + pgvector, Redis 7.4 and Caddy
+  2.8 tags. Digest pinning remains a deployment-owner hardening task.
+- Revision `0003_product_feedback` uses Alembic batch mode, so the migration
+  chain can be exercised on SQLite as well as PostgreSQL.
+- The canonical workflow runs the empty-Postgres migration, downgrade/re-upgrade
+  round trip and all scans, but its activation is blocked until a maintainer
+  with GitHub workflow-file permission installs `.github/workflows/ci.yml`.
+
+Current commands and evidence are maintained in
+`docs/agent-reports/infra-report.md` and
+`docs/agent-reports/infra-evidence/README.md`. Any check not run in the local
+sandbox remains explicitly BLOCKED rather than being inferred from this
+historical assessment.

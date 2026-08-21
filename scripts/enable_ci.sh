@@ -1,16 +1,55 @@
 #!/usr/bin/env bash
-# One-command CI activation.
+# Install the canonical workflow into GitHub's active path.
 #
-# The Arena sandbox's GitHub App token cannot push workflow files
-# (`refusing to allow a GitHub App to ... update workflow ... without
-# 'workflows' permission`), so the canonical workflow lives in ci/github-ci.yml.
-# Run this from a normally-authenticated clone (your laptop / PAT with
-# `workflow` scope):
+# The Arena sandbox GitHub App is intentionally unable to do this: GitHub
+# rejects a push that creates/updates .github/workflows/* without the App's
+# `workflows` permission. Run this script from a normal clone authenticated as
+# a repository owner/maintainer with a token that has the `workflow` scope:
+#
+#   cp ci/github-ci.yml .github/workflows/ci.yml
+#   ./scripts/enable_ci.sh
+#
+# The script commits only the workflow file and pushes the current branch. It
+# never asks for or stores credentials and never force-pushes.
 set -euo pipefail
+
 cd "$(git rev-parse --show-toplevel)"
+
+if [[ ! -f ci/github-ci.yml ]]; then
+  echo "ERROR: canonical workflow ci/github-ci.yml is missing" >&2
+  exit 1
+fi
+
 mkdir -p .github/workflows
 cp ci/github-ci.yml .github/workflows/ci.yml
 git add .github/workflows/ci.yml
-git commit -m "ci: enable GitHub Actions workflow"
-git push
-echo "CI enabled — check the Actions tab."
+
+# Do not accidentally include an unrelated staged change in the activation
+# commit. This is especially useful when an operator runs the command from a
+# working tree that contains an in-progress release.
+mapfile -t staged < <(git diff --cached --name-only)
+for path in "${staged[@]}"; do
+  if [[ "$path" != ".github/workflows/ci.yml" ]]; then
+    echo "ERROR: unrelated staged path would be included: $path" >&2
+    echo "Unstage it, then rerun this script." >&2
+    exit 1
+  fi
+done
+
+if git diff --cached --quiet; then
+  echo "Workflow already matches ci/github-ci.yml; no activation commit needed."
+else
+  git commit -m "ci: enable GitHub Actions workflow"
+fi
+
+branch=$(git branch --show-current)
+if [[ -z "$branch" ]]; then
+  echo "ERROR: detached HEAD; check out the intended branch before enabling CI." >&2
+  exit 1
+fi
+
+echo "Pushing workflow on branch: $branch"
+echo "This push requires GitHub workflow-file permission (PAT workflow scope or equivalent)."
+git push origin HEAD
+
+echo "CI workflow installed. Confirm a real run in the GitHub Actions tab before treating checks as active."

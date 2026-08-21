@@ -81,3 +81,17 @@ deployment that the platform team must own.
 | **O-03** | No intrusion detection or alerting on the audit log | `audit_logs` now records the events worth alerting on — nothing consumes them yet |
 | **O-04** | Backup/restore of the production database is undefined | Directly relevant to R-01: a restored staging dump is precisely what the boot guard exists to catch |
 | **O-05** | The payment provider integration is a mock | Real integration will need its own review (webhook signature verification, replay protection) |
+
+## Stage 07 closure addendum — 2026-08-21
+
+The historical entries above describe the pre-Stage-07 baseline. The current
+infrastructure branch closes the dependency portion of A-04/D-02: PyJWT is
+used for JWT encode/decode, the lockfile contains no `python-jose` or `ecdsa`,
+and the HMAC algorithm allowlist remains enforced. The remaining open risks in
+this area are operational (keep the lockfile regenerated after dependency
+changes and verify `pip-audit` in activated CI), not an installed ECDSA package.
+
+The other Stage 07 closures are recorded in `integration-request.md` and
+`docs/agent-reports/infra-report.md`: production-safe compose profiles,
+retention enforcement, shared-Redis verification, backups/rollback guidance,
+and the CI activation permission blocker.

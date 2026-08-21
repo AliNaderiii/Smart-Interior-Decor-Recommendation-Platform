@@ -670,3 +670,35 @@ manifests) and a small management command.
 | IR-SEC-005 | Low | 03 / product | No breached-password check at registration |
 | IR-SEC-006 | High | 07 | Security scans and probes are not in CI |
 | IR-SEC-007 | Medium | 07 / 03 | Audit-log retention promised to users but not enforced |
+
+---
+
+# Stage 07 resolution record — 2026-08-21
+
+The following resolutions are recorded separately from the historical request
+text above. They describe what this infrastructure branch changed and keep the
+remaining environment-dependent gates explicit.
+
+| Request | Stage 07 disposition | Implementation / evidence |
+|---|---|---|
+| IR-SEC-001 | **RESOLVED in repository** | Production-safe base/production compose profiles; demo seeding is explicit in `docker-compose.dev.yml` only and production boot rejects it. See `docs/agent-reports/infra-evidence/03-probe-demo-seeding.log` and `04-probe-production-failsafe.log`. |
+| IR-SEC-002 / IR-008 | **RESOLVED in repository** | `backend/app/core/security.py` now uses PyJWT, `backend/requirements.txt` and `backend/requirements.lock.txt` contain no `python-jose`/`ecdsa`; auth/security tests and `pip-audit` are rerun in the Stage 07 evidence battery. |
+| IR-SEC-006 / IR-006 | **IMPLEMENTED, ACTIVATION BLOCKED** | Complete PR/push workflow is in `ci/github-ci.yml`, including scans and probes. GitHub rejected the workflow push because the App lacks `workflows` permission; see `docs/agent-reports/infra-evidence/00-git-push-permission-test.log`. A maintainer must run `scripts/enable_ci.sh`, then a real Actions run must be observed. |
+| IR-SEC-007 | **RESOLVED in repository; policy owner confirmation pending** | `backend/scripts/prune_audit_logs.py` supports dry-run/retention configuration, `backend/tests/test_audit_retention.py` covers delete/no-op behaviour, and the production overlay runs it daily. The 180-day privacy-policy value still needs confirmation by the privacy owner. |
+| IR-002 | **RESOLVED in repository** | Revision `0003` uses Alembic batch mode for SQLite and PostgreSQL; the ruff import failure in the performance fixture was corrected. Fresh SQLite and PostgreSQL round-trip commands are captured in the Stage 07 evidence. |
+| IR-003 | **RESOLVED for Stage 07 scope** | Evidence/report paths and known generated artifacts are registered in `scripts/audit_docs_links.py`; `docs/agent-reports/infra-report.md` and the evidence index are now living reports. Frontend runner changes remain delegated to Stage 08 (IR-SEC-004/IR-007). |
+| IR-005 | **RESOLVED in repository** | Caddy's mirrored CSP now uses the documented `ir-thr-at1` endpoint, removes `unsafe-inline` from `script-src`, and includes the same worker/manifest directives as the FastAPI policy. Deployment-specific CDN origins still require an operator update. |
+| IR-009 | **RESOLVED in repository** | `backend/requirements.lock.txt` is the generated install source for Docker and CI; lock verification evidence records `pip check` and absence of `python-jose`/`ecdsa`. |
+| IR-011 | **RESOLVED with residual operational risks** | Compose/Docker image tags are pinned, `scripts/backup.sh` and `docs/DISASTER_RECOVERY.md` define backup/restore/rollback, and CI/local evidence exercises migration downgrade/re-upgrade. Digest pinning and a real-backup restore drill remain deployment-owner actions. |
+
+The canonical Stage 07 report is `docs/agent-reports/infra-report.md`. It
+must distinguish LOCAL sandbox evidence, unavailable Docker/sandbox checks,
+and real GitHub Actions evidence; absence of an Actions run is not a pass.
+
+## Delegations unchanged
+
+- IR-SEC-003 remains with Stage 05 (SSRF defence in the AI extractor).
+- IR-SEC-004 and IR-007 remain with Stage 08 (frontend unit runner/vitest).
+- IR-SEC-005 remains a product/privacy decision (breached-password corpus).
+- IR-004, IR-010 and release/tag/branch-protection work remain with the owning
+  integration/release stages.
