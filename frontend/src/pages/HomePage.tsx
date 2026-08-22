@@ -69,7 +69,7 @@ export default function HomePage() {
           </p>
         </div>
         <OptimizedImage
-          src="https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=960&q=70&fm=webp"
+          src="https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=640&q=60&fm=webp"
           alt="Warm modern living room with a beige sofa and walnut coffee table"
           width={960}
           height={640}

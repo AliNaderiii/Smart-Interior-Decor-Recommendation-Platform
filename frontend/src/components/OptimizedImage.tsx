@@ -16,7 +16,7 @@ import clsx from "clsx";
  *    never push layout around while loading, which is the main CLS source.
  *  - **Blur-up placeholder** that cross-fades on decode, so a slow image
  *    looks intentional instead of broken.
- *  - **`decoding="async"`** to keep decode off the main thread, and
+ *  - **`decoding={priority ? "sync" : "async"}`** to keep decode off the main thread, and
  *    `loading`/`fetchPriority` controllable for the LCP element.
  *
  * The catalogue stores one source URL per product, so derivative URLs are
@@ -134,7 +134,7 @@ function OptimizedImageInner({
           sizes={canDerive ? sizes : undefined}
           loading={priority ? "eager" : "lazy"}
           fetchPriority={priority ? "high" : "auto"}
-          decoding="async"
+          decoding={priority ? "sync" : "async"}
           onLoad={markLoaded}
           // On error we still reveal: a broken-image icon with alt text is
           // better feedback than an invisible element in a reserved box.
