@@ -54,6 +54,13 @@ def migrated(engine):
     The schema is dropped first so this module always starts from the
     migration chain itself (the main suite's conftest creates the same tables
     via ``create_all`` without alembic versioning when it shares the server).
+
+    ``alembic/env.py`` resolves its URL from the live ``settings`` object
+    (``settings.DATABASE_URL``), so when this module runs inside the full
+    suite — main suite on one database, this module on its dedicated one —
+    the URL is temporarily pointed at THIS module's database for the duration
+    of the alembic commands. Without this, alembic would run against the main
+    suite's already-migrated database and crash on ``DuplicateTable``.
     """
     from alembic.config import Config
 
@@ -63,9 +70,24 @@ def migrated(engine):
         c.execute(text("DROP SCHEMA public CASCADE"))
         c.execute(text("CREATE SCHEMA public"))
     cfg = Config("alembic.ini")
-    command.upgrade(cfg, "head")
-    command.downgrade(cfg, "base")
-    command.upgrade(cfg, "head")
+    original_url = settings.DATABASE_URL
+    object.__setattr__(settings, "DATABASE_URL", PG_URL)
+    try:
+        command.upgrade(cfg, "head")
+        command.downgrade(cfg, "base")
+        command.upgrade(cfg, "head")
+    finally:
+        object.__setattr__(settings, "DATABASE_URL", original_url)
+        # env.py runs logging.config.fileConfig(alembic.ini), which disables
+        # every logger that existed before it (default
+        # disable_existing_loggers=True) — including loggers pytest's caplog
+        # relies on for later modules in the same run. Re-enable them so this
+        # module cannot break log capture suite-wide.
+        import logging
+
+        for logger in logging.Logger.manager.loggerDict.values():
+            if isinstance(logger, logging.Logger) and logger.disabled:
+                logger.disabled = False
     with engine.begin() as c:
         c.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         c.execute(text("DELETE FROM products WHERE id LIKE 'pgt-%'"))

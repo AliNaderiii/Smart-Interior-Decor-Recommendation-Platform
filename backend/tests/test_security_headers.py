@@ -204,6 +204,9 @@ def test_production_hides_the_api_surface_map(reset_settings):
         FRONTEND_ORIGIN="https://app.example.com",
         FERNET_KEY="2xLmTPRPYxxLW8mM3jXfKcXo5G3iVYkYfQ2vYbFsC8Y=",
         STORAGE_BACKEND="s3", SEED_DEMO_ACCOUNTS=False,
+        # Stage 04 remediation: AI_PROVIDER=mock is production-invalid now.
+        # Placeholder key value — not a real credential.
+        AI_PROVIDER="gemini", GEMINI_API_KEY="test-gemini-key-placeholder",
     )
     import app.main as main_mod
 

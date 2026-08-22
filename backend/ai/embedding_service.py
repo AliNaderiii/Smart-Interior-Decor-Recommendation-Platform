@@ -140,17 +140,32 @@ def get_backend() -> str:
 
 
 def validate_embedding_runtime() -> dict:
-    """Eager startup check + info dict (wired via IR-AI-001).
+    """Eager startup check + info dict (called from ``app.main`` lifespan).
 
     Raises :class:`EmbeddingBackendError` under the same production rules as
     :func:`get_backend`; returns the backend identity for logging/metrics.
+
+    Stage 04 remediation (IR-AI-001 wiring): beyond backend resolution, a
+    probe embedding is verified for dimension, finiteness and unit norm, so a
+    mis-built or mismatched model (wrong output dim, bad normalization) fails
+    startup instead of corrupting the ``vector(512)`` column on first write.
     """
     backend = get_backend()
+    probe = get_embedding("startup validation probe")
+    problems = verify_embedding(probe)
+    if problems:
+        raise EmbeddingBackendError(
+            f"Embedding runtime failed its startup self-check: "
+            f"{'; '.join(problems)}. Backend {backend!r} does not produce valid "
+            f"{EMBEDDING_DIM}-dim unit vectors; refusing to serve — see "
+            f"docs/ai/model-versions.md (re-embedding runbook)."
+        )
     return {
         "backend": backend,
         "model": EMBEDDING_MODEL_BACKENDS[backend],
         "dim": EMBEDDING_DIM,
         "production": settings.is_production,
+        "self_check": "passed",
     }
 
 

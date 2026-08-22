@@ -1,0 +1,18 @@
+========================================================================
+MODE             : MOCK   ** NOT a vision-model accuracy claim **
+AI stack         : 2026-08-21.1 (prompt p2, taxonomy 2.1)
+images evaluated : 50
+mean accuracy    : 100.0%   (contract: >= 80% in REAL mode)
+images >= 0.8    : 50/50
+style micro P/R/F1     : 1.000 / 1.000 / 1.000
+material micro P/R/F1  : 1.000 / 0.500 / 0.667
+calibration ECE  : 0.1000
+  conf 0.90-1.00: n=50  actual=1.00 predicted=0.90
+latency p50/p95  : 0 / 0 ms
+failures         : 0/50
+needs review     : 0/50 (0%)
+cost             : 0.0000 USD (mock provider — no external calls)
+========================================================================
+report written   : /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/../docs/reports/extraction_report.json
+RESULT: MOCK BASELINE — harness sane (>= 0.80)
+exit=0

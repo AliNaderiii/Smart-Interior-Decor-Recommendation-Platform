@@ -1,0 +1,17 @@
+# REAL CLIP verification — BLOCKED (sandbox, 2026-08-21T22:49Z)
+# Step 1: Hugging Face egress probe (model weights host):
+curl: (35) OpenSSL SSL_connect: SSL_ERROR_SYSCALL in connection to huggingface.co:443 
+http_code=000
+exit=35
+# Step 2: sentence-transformers present in this venv?
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+ModuleNotFoundError: No module named 'sentence_transformers'
+exit=1
+# Step 3: torch present?
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+ModuleNotFoundError: No module named 'torch'
+exit=1
+# Full transcript of the original attempt (torch 2.13.0 + ST 6.0.0 installed,
+# HF download refused): docs/agent-reports/ai-recommender-evidence/03-clip-verification-BLOCKED.log (PR #9)
