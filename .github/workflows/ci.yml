@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: ankane/pgvector:v0.6.2-pg16
+        image: pgvector/pgvector:0.6.2-pg16
         env:
           POSTGRES_USER: decor
           POSTGRES_PASSWORD: decor
