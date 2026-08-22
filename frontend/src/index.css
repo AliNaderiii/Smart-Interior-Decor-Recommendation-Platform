@@ -66,7 +66,10 @@
   to   { transform: translateY(0); }
 }
 .page-enter {
-  animation: page-enter 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* The route wrapper contains the LCP candidate on the home page. Keep first
+     render fully paintable; component-level hover/toast motion still provides
+     the design-system motion without delaying Core Web Vitals. */
+  animation: none;
 }
 
 @keyframes toast-in {
