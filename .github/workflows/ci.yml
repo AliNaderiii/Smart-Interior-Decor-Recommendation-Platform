@@ -13,6 +13,7 @@ jobs:
   backend:
     name: Backend — pytest vs Postgres16+pgvector & Redis
     runs-on: ubuntu-latest
+
     services:
       postgres:
         image: pgvector/pgvector:0.6.2-pg16
@@ -20,26 +21,26 @@ jobs:
           POSTGRES_USER: decor
           POSTGRES_PASSWORD: decor
           POSTGRES_DB: decor_test
-        ports: ["5432:5432"]
+        ports:
+          - "5432:5432"
         options: >-
-          --health-cmd "pg_isready -U decor"
+          --health-cmd "pg_isready -U decor -d decor_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+
       redis:
         image: redis:7.4-alpine
-        ports: ["6379:6379"]
+        ports:
+          - "6379:6379"
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
+
     env:
       DATABASE_URL: postgresql+psycopg://decor:decor@localhost:5432/decor_test
-      # Stage 04 remediation: dedicated database for tests/test_pgvector_real.py
-      # (the module drops/recreates the public schema, so it must NOT share
-      # decor_test). Without this the module silently skipped in CI despite
-      # the pgvector service running right next to it.
       TEST_DATABASE_URL: postgresql+psycopg://decor:decor@localhost:5432/decor_pgvector_test
       REDIS_URL: redis://localhost:6379/1
       TEST_REDIS_URL: redis://localhost:6379/9
@@ -52,87 +53,130 @@ jobs:
       APP_ENV: test
       SEED_DEMO_ACCOUNTS: "true"
       COOKIE_SECURE: "false"
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: backend/requirements.lock.txt
-      - name: Install dependencies (pinned lockfile — IR-009)
+
+      - name: Install dependencies
         working-directory: backend
         run: |
+          python -m pip install --upgrade pip
           pip install -r requirements.lock.txt
           pip install ruff pip-audit
-      - name: Create dedicated pgvector database for the real-service AI module
+
+      - name: Create dedicated pgvector database
         working-directory: backend
         run: |
-          python - <<'EOF'
+          python - <<'PY'
           import psycopg
+
           conn = psycopg.connect(
-              "postgresql://decor:decor@localhost:5432/decor_test", autocommit=True
+              "postgresql://decor:decor@localhost:5432/decor_test",
+              autocommit=True,
           )
+
           exists = conn.execute(
-              "SELECT 1 FROM pg_database WHERE datname = 'decor_pgvector_test'"
+              "SELECT 1 FROM pg_database "
+              "WHERE datname = 'decor_pgvector_test'"
           ).fetchone()
+
           if not exists:
               conn.execute("CREATE DATABASE decor_pgvector_test")
+
           print("decor_pgvector_test ready")
-          EOF
-      - name: Migrate — upgrade head on EMPTY Postgres (pgvector ext + HNSW index)
+          conn.close()
+          PY
+
+      - name: Migrate — upgrade head
         working-directory: backend
-        run: alembic upgrade head
-      - name: Migration round-trip — downgrade base then re-upgrade (IR-011)
+        run: |
+          alembic upgrade head
+
+      - name: Migration round-trip — downgrade base then upgrade head
         working-directory: backend
         run: |
           alembic downgrade base
           alembic upgrade head
-      - name: Run test suite against Postgres 16 + pgvector + real Redis
+
+      - name: Run backend test suite
         working-directory: backend
-        run: pytest tests/ -v --tb=short
-      - name: Real-service AI modules must RUN, not skip (Stage 04 remediation)
+        run: |
+          pytest tests/ -v --tb=short
+
+      - name: Run real-service AI modules without skips
         working-directory: backend
         run: |
           set -o pipefail
-          pytest -q tests/test_pgvector_real.py tests/test_recommender_redis_real.py \
-            -ra --tb=short | tee pytest-realservices.log
+
+          pytest -q \
+            tests/test_pgvector_real.py \
+            tests/test_recommender_redis_real.py \
+            -ra \
+            --tb=short \
+            | tee pytest-realservices.log
+
           if grep -qi "skipped" pytest-realservices.log; then
-            echo "::error::real-service AI tests skipped in the integration job — TEST_DATABASE_URL/TEST_REDIS_URL or the backing service is missing"
+            echo "::error::Real-service AI tests were skipped."
+            echo "::error::Check TEST_DATABASE_URL, TEST_REDIS_URL, and service availability."
             exit 1
           fi
-          echo "real-service AI modules executed in full (no skips)"
-      - name: Lint (ruff — 0 errors required)
+
+          echo "Real-service AI modules executed successfully without skips."
+
+      - name: Lint
         working-directory: backend
-        run: ruff check app ai scripts tests
-      - name: Dependency audit (pip-audit — 0 known vulnerabilities required)
+        run: |
+          ruff check app ai scripts tests
+
+      - name: Dependency audit
         working-directory: backend
-        run: pip-audit -r requirements.txt
-      - name: Security probe — demo seeding is impossible in production (Stage 03)
+        run: |
+          pip-audit -r requirements.txt
+
+      - name: Security probe — production demo seeding refusal
         working-directory: backend
-        run: python ../docs/security/probes/probe_demo_seeding.py
-      - name: Security probe — production fail-safes (Stage 03)
+        run: |
+          python ../docs/security/probes/probe_demo_seeding.py
+
+      - name: Security probe — production fail-safes
         working-directory: backend
-        run: python ../docs/security/probes/probe_production_failsafe.py
-      - name: Extraction benchmark (>=80% required; MOCK mode — deterministic CI baseline)
+        run: |
+          python ../docs/security/probes/probe_production_failsafe.py
+
+      - name: Extraction benchmark — MOCK mode
         working-directory: backend
-        run: python scripts/evaluate_extraction.py
-      - name: Extraction benchmark — REAL mode (runs only when GEMINI_API_KEY secret set)
+        run: |
+          python scripts/evaluate_extraction.py
+
+      - name: Extraction benchmark — REAL mode when credential exists
         working-directory: backend
         env:
           AI_PROVIDER: gemini
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           if [ -n "$GEMINI_API_KEY" ]; then
-            python scripts/evaluate_extraction.py --real --sample 10 || \
-              echo "::warning::REAL-mode extraction below 80% — human-in-the-loop gate active"
+            python scripts/evaluate_extraction.py --real --sample 10 || {
+              echo "::warning::REAL-mode extraction is below the configured threshold."
+              echo "::warning::Human review gate remains active."
+            }
           else
-            echo "GEMINI_API_KEY secret not configured — skipping REAL-mode benchmark"
+            echo "GEMINI_API_KEY is not configured; REAL-mode benchmark is BLOCKED/SKIPPED."
           fi
 
   multi-worker:
     name: Multi-worker shared-Redis verification
     runs-on: ubuntu-latest
-    needs: [backend]
+    needs:
+      - backend
+
     services:
       postgres:
         image: pgvector/pgvector:0.6.2-pg16
@@ -140,126 +184,202 @@ jobs:
           POSTGRES_USER: decor
           POSTGRES_PASSWORD: decor
           POSTGRES_DB: decor_test
-        ports: ["5432:5432"]
+        ports:
+          - "5432:5432"
         options: >-
-          --health-cmd "pg_isready -U decor"
+          --health-cmd "pg_isready -U decor -d decor_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+
       redis:
         image: redis:7.4-alpine
-        ports: ["6379:6379"]
+        ports:
+          - "6379:6379"
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
+
     env:
       DATABASE_URL: postgresql+psycopg://decor:decor@localhost:5432/decor_test
       REDIS_URL: redis://localhost:6379/2
       SECRET_KEY: ci-secret
+      APP_ENV: test
+      AI_PROVIDER: mock
+      EMBEDDING_BACKEND: hash
+      PAYMENT_PROVIDER: mock
+      EMAIL_PROVIDER: mock
+      STORAGE_BACKEND: local
+      COOKIE_SECURE: "false"
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: backend/requirements.lock.txt
-      - name: Install dependencies (pinned lockfile — IR-009)
+
+      - name: Install dependencies
         working-directory: backend
-        run: pip install -r requirements.lock.txt
-      - name: Migrate empty Postgres
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.lock.txt
+
+      - name: Migrate empty PostgreSQL
         working-directory: backend
-        run: alembic upgrade head
-      - name: Blacklist / lockout / rate-limit shared across two real workers
+        run: |
+          alembic upgrade head
+
+      - name: Verify shared Redis across workers
         working-directory: backend
-        run: python scripts/verify_multi_worker_redis.py
+        run: |
+          python scripts/verify_multi_worker_redis.py
 
   frontend:
     name: Frontend — install, lint, typecheck, test, build
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
+
       - name: Install dependencies
         working-directory: frontend
-        run: npm ci
-      - name: Lint (oxlint — 0 errors required)
-        working-directory: frontend
-        run: npm run lint
-      - name: Typecheck (tsc -b, strict)
-        working-directory: frontend
-        run: npx tsc -b
-      - name: Unit tests (node:test — vitest pending IR-SEC-004)
-        working-directory: frontend
-        run: node --experimental-strip-types --test tests/unit/*.test.ts
-      - name: Build (vite production build)
-        working-directory: frontend
-        run: npm run build
-      - name: Dependency audit (npm audit — 0 vulnerabilities required)
-        working-directory: frontend
-        run: npm audit --audit-level=low
-      - name: Artifact secret scan (no credentials/PII may leave this job)
+        run: |
+          npm ci
+
+      - name: Lint
         working-directory: frontend
         run: |
-          HITS=$(grep -rIE "(BEGIN (RSA|OPENSSH|EC|PRIVATE) KEY|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|sk-[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{35})" dist/ | wc -l)
-          echo "credential-pattern hits in dist/: $HITS"
+          npm run lint
+
+      - name: Typecheck
+        working-directory: frontend
+        run: |
+          npx tsc -b
+
+      - name: Unit tests
+        working-directory: frontend
+        run: |
+          node --experimental-strip-types --test tests/unit/*.test.ts
+
+      - name: Production build
+        working-directory: frontend
+        run: |
+          npm run build
+
+      - name: Dependency audit
+        working-directory: frontend
+        run: |
+          npm audit --audit-level=low
+
+      - name: Artifact secret scan
+        working-directory: frontend
+        run: |
+          HITS=$(
+            grep -rIE \
+              "(BEGIN (RSA|OPENSSH|EC|PRIVATE) KEY|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|sk-[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{35})" \
+              dist/ \
+              | wc -l
+          )
+
+          echo "Credential-pattern hits in dist/: $HITS"
           test "$HITS" -eq 0
-      - name: Upload dist
+
+      - name: Upload frontend artifact
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
           path: frontend/dist
 
   security-scans:
-    name: Security & docs gates (secrets / links / dead keys)
+    name: Security & docs gates
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - uses: actions/setup-node@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: "22"
+
       - name: Repository secret scan
-        run: python scripts/audit_secrets.py
-      - name: Docs link audit (no NEW broken links or missing files)
+        run: |
+          python scripts/audit_secrets.py
+
+      - name: Documentation link audit
         run: |
           pip install pyyaml
           python scripts/audit_docs_links.py
-      - name: Dead translation keys audit (frontend)
+
+      - name: Dead translation keys audit
         run: |
           npm install -g typescript tsx
           npx tsx scripts/auditDeadKeys.ts
 
   docker:
-    name: Docker — compose config + image builds
+    name: Docker — compose config and image builds
     runs-on: ubuntu-latest
-    needs: [backend, frontend]
+    needs:
+      - backend
+      - frontend
+
     steps:
-      - uses: actions/checkout@v4
-      - name: Provide placeholder env for structural compose validation
-        run: cp .env.example .env
-      - name: Validate compose files (base + overlays)
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Provide placeholder environment
+        run: |
+          cp .env.example .env
+
+      - name: Validate Compose files
         run: |
           docker compose config -q
-          docker compose -f docker-compose.yml -f docker-compose.dev.yml config -q
-          docker compose -f docker-compose.yml -f docker-compose.prod.yml config -q
-          docker compose -f docker-compose.yml -f docker-compose.test.yml config -q
-      - uses: docker/setup-buildx-action@v3
-      - name: Build backend image (lockfile-pinned deps, non-root)
+          docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.dev.yml \
+            config -q
+          docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.prod.yml \
+            config -q
+          docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.test.yml \
+            config -q
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
         uses: docker/build-push-action@v6
         with:
           context: ./backend
           push: false
           load: true
           tags: decor-backend:ci
-      - name: Build frontend image (multi-stage nginx)
+
+      - name: Build frontend image
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
@@ -268,70 +388,238 @@ jobs:
           tags: decor-frontend:ci
 
   lighthouse:
-    name: Lighthouse CI (>=80, LCP<3s on recommendation page)
+    name: Lighthouse CI — performance and accessibility
     runs-on: ubuntu-latest
-    needs: [frontend, backend]
+    needs:
+      - frontend
+      - backend
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          node-version: 22
-      - uses: actions/setup-python@v5
+          node-version: "22"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install, migrate & seed backend (SQLite for speed)
+
+      - name: Install, migrate and seed backend
         working-directory: backend
         env:
           DATABASE_URL: sqlite:///./ci.sqlite3
           EMBEDDING_BACKEND: hash
+          APP_ENV: test
+          AI_PROVIDER: mock
+          STORAGE_BACKEND: local
+          PAYMENT_PROVIDER: mock
+          EMAIL_PROVIDER: mock
+          SECRET_KEY: ci-secret
+          COOKIE_SECURE: "false"
         run: |
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
           python scripts/seed_products.py
+
       - name: Start backend
         working-directory: backend
         env:
           DATABASE_URL: sqlite:///./ci.sqlite3
           EMBEDDING_BACKEND: hash
+          APP_ENV: test
+          AI_PROVIDER: mock
+          STORAGE_BACKEND: local
           PAYMENT_PROVIDER: mock
+          EMAIL_PROVIDER: mock
           SECRET_KEY: ci-secret
-        run: nohup uvicorn app.main:app --port 8000 &
-      - name: Build & preview frontend
+          COOKIE_SECURE: "false"
+        run: |
+          nohup uvicorn app.main:app \
+            --host 127.0.0.1 \
+            --port 8000 \
+            > /tmp/backend.log 2>&1 &
+
+      - name: Build and preview frontend
         working-directory: frontend
         run: |
           npm ci
           npm run build
-          nohup npm run preview -- --port 4173 &
-          sleep 3
-      - name: Lighthouse CI (budget-gated)
+
+          nohup npm run preview \
+            -- --host 127.0.0.1 --port 4173 \
+            > /tmp/frontend-preview.log 2>&1 &
+
+      - name: Wait for backend readiness
+        run: |
+          set -e
+
+          for i in {1..30}; do
+            if curl -fsS \
+              http://127.0.0.1:8000/api/v1/health/ready \
+              > /tmp/backend-ready.json; then
+
+              echo "Backend readiness check passed."
+              cat /tmp/backend-ready.json
+              exit 0
+            fi
+
+            echo "Waiting for backend readiness: attempt $i/30"
+            sleep 2
+          done
+
+          echo "::error::Backend did not become ready."
+          cat /tmp/backend.log 2>/dev/null || true
+          exit 1
+
+      - name: Wait for frontend routes and API proxy
+        run: |
+          set -e
+
+          frontend_ready=false
+
+          for i in {1..30}; do
+            if curl -fsS \
+              http://127.0.0.1:4173/ \
+              > /tmp/frontend-home.html; then
+
+              frontend_ready=true
+              echo "Frontend preview became ready."
+              break
+            fi
+
+            echo "Waiting for frontend preview: attempt $i/30"
+            sleep 2
+          done
+
+          if [ "$frontend_ready" != "true" ]; then
+            echo "::error::Frontend preview did not become ready."
+            cat /tmp/frontend-preview.log 2>/dev/null || true
+            exit 1
+          fi
+
+          curl -fsS \
+            http://127.0.0.1:4173/ \
+            > /tmp/frontend-home.html
+
+          curl -fsS \
+            http://127.0.0.1:4173/recommendations \
+            > /tmp/frontend-recommendations.html
+
+          curl -fsS \
+            http://127.0.0.1:4173/api/v1/health/ready \
+            > /tmp/frontend-proxy-ready.json
+
+          grep -q '<div id="root"></div>' \
+            /tmp/frontend-home.html
+
+          grep -q '<div id="root"></div>' \
+            /tmp/frontend-recommendations.html
+
+          echo "Frontend home route passed."
+          echo "Frontend recommendations route passed."
+          echo "Frontend API proxy passed."
+
+      - name: Show frontend and backend diagnostics
+        if: always()
+        run: |
+          echo "Backend log:"
+          cat /tmp/backend.log 2>/dev/null || true
+
+          echo "Frontend preview log:"
+          cat /tmp/frontend-preview.log 2>/dev/null || true
+
+          echo "Backend readiness response:"
+          cat /tmp/backend-ready.json 2>/dev/null || true
+
+          echo "Frontend proxy readiness response:"
+          cat /tmp/frontend-proxy-ready.json 2>/dev/null || true
+
+      - name: Lighthouse CI
         uses: treosh/lighthouse-ci-action@v12
         with:
           urls: |
-            http://localhost:4173/
-            http://localhost:4173/recommendations
+            http://127.0.0.1:4173/
+            http://127.0.0.1:4173/recommendations
           budgetPath: ./lighthouse-budget.json
           uploadArtifacts: true
           temporaryPublicStorage: false
-      - name: Assert performance >= 80 and LCP < 3000ms
+
+      - name: Assert performance and LCP/TTI thresholds
         run: |
           npm install -g lighthouse
-          lighthouse http://localhost:4173/ \
+
+          lighthouse http://127.0.0.1:4173/ \
             --only-categories=performance,accessibility,best-practices \
             --chrome-flags="--headless --no-sandbox" \
-            --output=json --output-path=./lighthouse-report.json --quiet
-          node -e "
-            const r = require('./lighthouse-report.json');
-            const perf = Math.round(r.categories.performance.score * 100);
-            const lcp = r.audits['largest-contentful-paint'].numericValue;
-            console.log('Performance:', perf, '| LCP:', Math.round(lcp), 'ms');
-            if (perf < 80) { console.error('Lighthouse performance < 80'); process.exit(1); }
-            if (lcp >= 3000) { console.error('LCP >= 3s'); process.exit(1); }
-          "
-      - name: Artifact secret scan (lighthouse report)
+            --output=json \
+            --output-path=./lighthouse-report.json \
+            --quiet
+
+          node - <<'NODE'
+          const fs = require('fs');
+
+          const report = JSON.parse(
+            fs.readFileSync('./lighthouse-report.json', 'utf8')
+          );
+
+          const performanceScore = Math.round(
+            report.categories.performance.score * 100
+          );
+
+          const lcp =
+            report.audits['largest-contentful-paint']?.numericValue;
+
+          const interactive =
+            report.audits['interactive']?.numericValue;
+
+          console.log('Performance:', performanceScore);
+          console.log('LCP:', lcp);
+          console.log('Interactive:', interactive);
+
+          if (!Number.isFinite(lcp)) {
+            console.error('LCP is null or non-numeric.');
+            process.exit(1);
+          }
+
+          if (!Number.isFinite(interactive)) {
+            console.error('Interactive is null or non-numeric.');
+            process.exit(1);
+          }
+
+          if (performanceScore < 80) {
+            console.error('Lighthouse performance score is below 80.');
+            process.exit(1);
+          }
+
+          if (lcp > 3000) {
+            console.error('LCP is greater than 3000 ms.');
+            process.exit(1);
+          }
+
+          if (interactive > 4000) {
+            console.error('Interactive is greater than 4000 ms.');
+            process.exit(1);
+          }
+          NODE
+
+      - name: Lighthouse report secret scan
         run: |
-          HITS=$(grep -cE "(BEGIN (RSA|OPENSSH|EC|PRIVATE) KEY|ghp_[A-Za-z0-9]{36}|sk-[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{35})" lighthouse-report.json || true)
-          echo "credential-pattern hits: $HITS"
+          HITS=$(
+            grep -cE \
+              "(BEGIN (RSA|OPENSSH|EC|PRIVATE) KEY|ghp_[A-Za-z0-9]{36}|sk-[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{35})" \
+              lighthouse-report.json \
+              || true
+          )
+
+          echo "Credential-pattern hits: $HITS"
           test "$HITS" -eq 0
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload Lighthouse report
+        uses: actions/upload-artifact@v4
         with:
           name: lighthouse-report
           path: lighthouse-report.json
