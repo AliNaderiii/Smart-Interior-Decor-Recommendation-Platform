@@ -22,7 +22,11 @@ VALID_PROD = dict(
     FERNET_KEY="2xLmTPRPYxxLW8mM3jXfKcXo5G3iVYkYfQ2vYbFsC8Y=",
     STORAGE_BACKEND="s3",
     SEED_DEMO_ACCOUNTS=False,
-    AI_PROVIDER="mock",
+    # Stage 04 remediation: AI_PROVIDER=mock is no longer a valid production
+    # configuration (keyword-derived features must never serve production).
+    # Placeholder key value — not a real credential.
+    AI_PROVIDER="gemini",
+    GEMINI_API_KEY="test-gemini-key-placeholder",
 )
 
 
@@ -46,7 +50,11 @@ def test_a_correct_production_configuration_boots():
     ({"FERNET_KEY": "not-a-valid-key"}, "FERNET_KEY"),
     ({"STORAGE_BACKEND": "local"}, "STORAGE_BACKEND"),
     ({"SEED_DEMO_ACCOUNTS": True}, "SEED_DEMO_ACCOUNTS"),
-    ({"AI_PROVIDER": "gemini"}, "AI_PROVIDER"),
+    # Stage 04 remediation: strict provider/key matching — a key for another
+    # provider no longer satisfies validation, and mock is production-invalid.
+    ({"AI_PROVIDER": "mock", "GEMINI_API_KEY": ""}, "AI_PROVIDER=mock"),
+    ({"AI_PROVIDER": "gemini", "GEMINI_API_KEY": ""}, "GEMINI_API_KEY"),
+    ({"AI_PROVIDER": "openai"}, "OPENAI_API_KEY"),
     ({"COOKIE_SAMESITE": "none", "COOKIE_SECURE": False}, "COOKIE_SAMESITE"),
 ])
 def test_insecure_production_settings_refuse_to_boot(override, expected):

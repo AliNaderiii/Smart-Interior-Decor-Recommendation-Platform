@@ -1,0 +1,12 @@
+# Environment 2026-08-21T22:49Z
+Python 3.11.2
+fastapi 0.141.1 | sqlalchemy 2.0.52 | pydantic 2.13.4
+psycopg 3.3.4
+server: PostgreSQL 16.2 on x86_64-pc-linux-gnu, compiled by gcc (GCC
+pgvector ext: 0.6.2
+redislite 6.2.912183
+17682:C 21 Aug 2026 22:49:39.393 # Can't chdir to 'redis://127.0.0.1:6399': No such file or directory
+Linux 6.1.158+ x86_64
+2
+redis server: 6.2.14
+labels: LOCAL-SANDBOX (not GitHub CI)

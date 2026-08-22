@@ -1,0 +1,3 @@
+ERROR: --real requires AI_PROVIDER=gemini|openai and the matching API key in the environment.
+Blocked command was: AI_PROVIDER=gemini GEMINI_API_KEY=<empty> OPENAI_API_KEY=<empty> python scripts/evaluate_extraction.py --real
+exit=1

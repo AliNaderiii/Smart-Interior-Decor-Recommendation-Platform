@@ -76,8 +76,64 @@ compared. Procedure:
 
 ## 4. Known drift items (integration requests)
 
-- `GEMINI_MODEL` default is `gemini-2.0-flash`, retired by Google on
-  2026-06-01 → **IR-AI-004** (config.py + .env.example owned by other stages).
-- Startup does not call `validate_embedding_runtime()` yet → **IR-AI-001**
-  (`app/main.py` lifespan; the module-level guard already protects every
-  embedding call in the meantime).
+- ~~`GEMINI_MODEL` default is `gemini-2.0-flash`, retired by Google on
+  2026-06-01 → **IR-AI-004**~~ **Fixed in the Stage 04 remediation branch**:
+  the default is now `gemini-3.5-flash` and boot refuses retired model IDs
+  (`Settings.RETIRED_GEMINI_MODELS`, enforced by `validate_runtime()` in
+  every environment). Selection rationale (2026-08-21):
+  - `gemini-2.0-flash` — shut down 2026-06-01 (Google model page: "shut down
+    June 1, 2026; migrate to Gemini 3.5 Flash").
+  - `gemini-2.5-flash` — active but scheduled to shut down **2026-10-16**
+    (~8 weeks away); a default that dies two months after adoption is not a
+    fix.
+  - `gemini-3.5-flash` — the 3.5 Flash generation Google's own migration
+    guidance points at; chosen as the default.
+  - **Caveat:** no real API request has been executed against
+    `gemini-3.5-flash` from this repository (no credential — the real
+    benchmark is BLOCKED). The first staged real run must confirm the model
+    id, JSON-output behaviour and pricing (cost assumptions in
+    `scripts/evaluate_extraction.py` are flash-tier estimates, unverified).
+- ~~Startup does not call `validate_embedding_runtime()`~~ **Fixed in the
+  Stage 04 remediation branch**: production lifespan now calls it before
+  serving (see `app/main.py`), including a probe-embedding self-check.
+
+## 5. Production catalog bootstrap (Stage 04 remediation, Option B)
+
+The base `docker-compose.yml` **no longer seeds the catalog on backend
+startup**. The previous command chained
+`load_realistic_products.py --realistic --expand-to 150 --if-empty --from-json`
+into every boot; because `seed_data/embeddings_real.json` must be generated on
+an egress-enabled machine (and is never committed), every deployment without
+the artefact crash-looped on the seeder's deliberate loud failure.
+
+**Current startup path (production):** `alembic upgrade head` → uvicorn.
+Before serving, the production lifespan also validates the embedding runtime
+(§2) — so a fresh production deployment now has a fully deterministic
+outcome:
+
+| Fresh-production bootstrap state | Expected outcome |
+| --- | --- |
+| `EMBEDDING_BACKEND=clip`, model loadable | serves; empty catalog (0 products) |
+| `EMBEDDING_BACKEND=hash` or CLIP unloadable | **startup fails** with `EmbeddingBackendError` (actionable message, this file) |
+| catalog empty | `/recommend` returns per-category empty results with `meta.empty_categories` — no fabricated results |
+| demo accounts present | startup fails (Stage 03 guard, unchanged) |
+
+**Operator bootstrap procedure (the explicit job):**
+
+1. On an egress-enabled machine with the repository checked out:
+   `python scripts/seed_products.py --real-embeddings` — forces CLIP
+   ViT-B/32, seeds, and exports `backend/seed_data/embeddings_real.json`
+   (512-dim, unit-norm; identity recorded via the registry stamps).
+2. Ship the artefact to the deployment host (volume/secret — **not** committed
+   to git; `tests/test_production_seeding.py` enforces its absence).
+3. Run the one-shot job:
+   `docker compose --profile bootstrap up catalog-bootstrap`
+   (idempotent via `--if-empty`; fails loudly if the artefact is missing;
+   never uses hash vectors; never seeds demo accounts).
+4. Optional: flush the recommendation cache (`rec:*`) after a re-seed so
+   warm results reflect the new catalog.
+
+The artefact carries model identity and dimension in the registry stamps of
+the seeded rows (`extraction_raw` / embedding backend column state); a
+checksum of the JSON is printed by the exporter. Generating it is the one
+remaining owner action tracked by IR-AI-003 (see `integration-request.md`).

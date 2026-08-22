@@ -10,7 +10,7 @@
       "description_for_embedding": "a modern walnut coffee table ...",
       "confidence": 0.87,
       "provider": "gemini",                  # which provider produced this
-      "model": "gemini-2.0-flash",
+      "model": "gemini-3.5-flash",
       "prompt_version": "p2",                # ai.model_registry stamp
       "taxonomy_version": "2.1",
       "needs_review": False,                 # ai.extraction_review gate
@@ -57,10 +57,18 @@ import httpx
 from ai import taxonomy as tax
 from ai.extraction_review import FALLBACK_CONFIDENCE_CAP, review_decision
 from ai.model_registry import EXTRACTION_PROMPT_VERSION
-from app.core.config import settings
+from app.core.config import ai_provider_problems, settings
 from app.core.url_safety import UnsafeUrl, validate_public_url
 
 logger = logging.getLogger(__name__)
+
+
+class ProviderConfigurationError(RuntimeError):
+    """The selected AI provider cannot run in this environment (fail-closed).
+
+    Raised in production when ``AI_PROVIDER``/its API key are misconfigured.
+    The message names the exact settings to fix and never contains key values.
+    """
 
 ALLOWED_STYLES = tax.styles()
 ALLOWED_MATERIALS = tax.materials()
@@ -289,18 +297,73 @@ def _empty_failed_extraction(image_url: str, error: Exception) -> dict[str, Any]
     }
 
 
+def _labelled_fallback(
+    result: dict[str, Any],
+    *,
+    error: Exception | None = None,
+    config_problem: str | None = None,
+) -> dict[str, Any]:
+    """Stamp a mock-derived result so it can never masquerade as model output.
+
+    Applied whenever the values did **not** come from the selected real
+    provider — provider construction failed on configuration, or the provider
+    raised at request time. Label ``provider="mock-fallback"`` + confidence
+    capped at ``FALLBACK_CONFIDENCE_CAP`` keeps the review gate rejecting it
+    in every environment.
+    """
+    result["provider"] = "mock-fallback"
+    result["model"] = "filename-heuristic (fallback)"
+    if error is not None:
+        result["provider_error"] = f"{type(error).__name__}: {str(error)[:300]}"
+    if config_problem:
+        result["provider_config_error"] = config_problem[:300]
+    conf = float(result.get("confidence", 0.0) or 0.0)
+    result["confidence"] = min(conf, FALLBACK_CONFIDENCE_CAP)
+    return result
+
+
 class FeatureExtractor:
-    """Facade — picks the provider from settings, with labelled fallback."""
+    """Facade — picks the provider from settings, fail-closed in production.
+
+    Stage 04 remediation: the previous constructor silently substituted
+    ``MockProvider`` whenever the selected provider's key was missing —
+    including in production, where the keyword heuristic's 0.9 confidence
+    could pass the review gate. Selection now goes through the single
+    authoritative rule in ``app.core.config.ai_provider_problems`` (the same
+    one ``Settings.validate_runtime`` enforces at startup):
+
+    * production + ``AI_PROVIDER=mock``                       → error
+    * production + ``gemini``/``openai`` without *its* key    → error
+      (a key for the other provider is not accepted)
+    * development/test with a misconfigured real provider     → the
+      deterministic fallback stays usable, but every result is labelled
+      ``provider="mock-fallback"`` and confidence-capped at 0.30
+    """
 
     def __init__(self, provider: str | None = None) -> None:
         name = provider or settings.AI_PROVIDER
-        if name == "gemini" and settings.GEMINI_API_KEY:
-            self.provider: BaseProvider = GeminiProvider()
-        elif name == "openai" and settings.OPENAI_API_KEY:
+        problems = ai_provider_problems(
+            name,
+            has_gemini_key=bool(settings.GEMINI_API_KEY),
+            has_openai_key=bool(settings.OPENAI_API_KEY),
+            production=settings.is_production,
+        )
+        self._fallback_problem: str | None = None
+        if problems:
+            if settings.is_production:
+                raise ProviderConfigurationError("; ".join(problems))
+            # Dev/test: keep the pipeline usable, but visibly degraded.
+            self._fallback_problem = "; ".join(problems)
+            logger.warning(
+                "AI provider misconfigured (%s); using labelled mock-fallback",
+                self._fallback_problem,
+            )
+            self.provider: BaseProvider = MockProvider()
+        elif name == "gemini":
+            self.provider = GeminiProvider()
+        elif name == "openai":
             self.provider = OpenAIProvider()
         else:
-            if name not in ("mock",):
-                logger.warning("AI provider %r has no API key; using mock", name)
             self.provider = MockProvider()
 
     def extract(self, image_url: str) -> dict[str, Any]:
@@ -318,17 +381,32 @@ class FeatureExtractor:
                 "extraction failed via %s: %s", type(self.provider).__name__, exc
             )
             if settings.is_production:
-                return _empty_failed_extraction(image_url, exc)
-            result = MockProvider().extract(image_url)
-            result["provider"] = "mock-fallback"
-            result["provider_error"] = f"{type(exc).__name__}: {str(exc)[:300]}"
-            result["confidence"] = min(result["confidence"], FALLBACK_CONFIDENCE_CAP)
+                result = _empty_failed_extraction(image_url, exc)
+            else:
+                result = _labelled_fallback(
+                    MockProvider().extract(image_url), error=exc
+                )
         else:
-            result.setdefault("provider", self.provider.name)
-            result.setdefault("model", _provider_model(self.provider.name))
+            if self._fallback_problem is not None:
+                result = _labelled_fallback(result, config_problem=self._fallback_problem)
+            else:
+                result.setdefault("provider", self.provider.name)
+                result.setdefault("model", _provider_model(self.provider.name))
             result.setdefault("prompt_version", EXTRACTION_PROMPT_VERSION)
             result.setdefault("taxonomy_version", tax.taxonomy_version())
             result.setdefault("image_url", image_url)
+
+        # Defence in depth (Stage 04 remediation): a mock-derived payload must
+        # never leave this method unflagged in production, whatever path got
+        # us here. Unreachable by construction; cheap to guarantee.
+        if settings.is_production and result.get("provider") in ("mock", "mock-fallback"):
+            result = _empty_failed_extraction(
+                image_url,
+                RuntimeError(
+                    f"mock provider output reached production extraction "
+                    f"(provider={result.get('provider')!r})"
+                ),
+            )
 
         decision = review_decision(result)
         result["needs_review"] = decision["needs_review"]

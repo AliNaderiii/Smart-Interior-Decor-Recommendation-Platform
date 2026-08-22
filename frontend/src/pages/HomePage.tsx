@@ -50,9 +50,9 @@ export default function HomePage() {
           </h1>
 
           <p className="mt-5 max-w-md text-lg leading-relaxed text-[var(--color-muted)]">
-            Answer a two-minute style quiz. Get ranked products per category with
-            transparent “why this” scores, an editable moodboard, a real-dimension
-            floorplan and a validated shopping list.
+            Answer a two-minute style quiz. Get ranked products per category
+            with transparent “why this” scores, an editable moodboard, a
+            real-dimension floorplan and a validated shopping list.
           </p>
 
           <div className="mt-8 flex flex-wrap gap-3">

@@ -5,7 +5,7 @@ version: "3.9"
 
 services:
   postgres:
-    image: ankane/pgvector:v0.6.2-pg16
+    image: pgvector/pgvector:0.6.2-pg16
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-decor}
@@ -53,12 +53,45 @@ services:
       timeout: 5s
       retries: 12
       start_period: 30s
-    # Production-safe catalog loading: --from-json is deterministic product
-    # data only, --if-empty is idempotent, and no demo-account flag is present.
+    # Stage 04 remediation (was IR-AI-003): catalog seeding is NO LONGER part
+    # of the backend startup path. The previous command ran
+    # load_realistic_products.py --from-json on every boot, which fails loudly
+    # (by design) when seed_data/embeddings_real.json is absent — i.e. every
+    # deployment without the real-embedding artefact crash-looped. Startup is
+    # now migrations + server only; the catalog is loaded by the explicit
+    # one-shot bootstrap job below (docker compose --profile bootstrap up
+    # catalog-bootstrap). Expected outcome of a fresh production bootstrap:
+    # an empty (but fully migrated and serving) catalog — /recommend returns
+    # empty-category metadata until the bootstrap job has run. See
+    # docs/ai/model-versions.md §bootstrap.
     command: >
       sh -c "alembic upgrade head &&
-             python scripts/load_realistic_products.py --realistic --expand-to 150 --if-empty --from-json &&
              exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --no-server-header --proxy-headers"
+
+  # Explicit catalog bootstrap job (Stage 04 remediation, Option B): runs the
+  # seeder once and exits. Does NOT run on `docker compose up` — it must be
+  # invoked deliberately by the operator after seed_data/embeddings_real.json
+  # has been generated on an egress-enabled machine and shipped to the host.
+  catalog-bootstrap:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: "no"
+    profiles: ["bootstrap"]
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-decor}:${POSTGRES_PASSWORD:-decor}@postgres:5432/${POSTGRES_DB:-decor}
+      REDIS_URL: redis://redis:6379/0
+      EMBEDDING_BACKEND: ${EMBEDDING_BACKEND:-clip}
+      LOG_FORMAT: ${LOG_FORMAT:-text}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Deterministic catalog data only; --if-empty keeps it idempotent; no
+    # demo-account flag. --from-json fails loudly if the real-embedding
+    # artefact is missing (never falls back to hash vectors).
+    command: >
+      sh -c "python scripts/load_realistic_products.py --realistic --expand-to 150 --if-empty --from-json"
 
   frontend:
     build:

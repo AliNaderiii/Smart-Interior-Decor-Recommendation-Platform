@@ -807,3 +807,105 @@ current recommender depends on it.
 | IR-AI-004 | High | 07 (config) | Retired `GEMINI_MODEL` default |
 | IR-AI-005 | Medium | 07 | Add real-service AI test modules to CI |
 | IR-AI-006 | Low | future | `feedback_events` implementation |
+
+---
+
+# Stage 04 · Production-Readiness Remediation (2026-08-21)
+
+Branch `arena/stage04-production-remediation-2026-08-21`, stacked on PR #9
+HEAD `ded3b5f` (original branch untouched). Addresses the independently
+identified production-readiness blockers. Status of the Stage 04 IRs after
+remediation:
+
+| ID | Severity | Status after remediation | Remaining owner action |
+|---|---|---|---|
+| IR-AI-001 | High | **CLOSED** — production lifespan now calls `validate_embedding_runtime()` (with probe self-check) before serving; dev/test startup unaffected | none |
+| IR-AI-002 | Medium | **OPEN (unchanged)** — audit proof added (`tests/test_review_workflow.py`): flags persisted in `extraction_raw`, `is_verified=False` quarantine enforced, admin can filter `?is_verified=false` + PATCH-approve; but no dedicated queue (filter by `needs_review`, reprocess action) | Stage 05/08: dedicated admin review surface |
+| IR-AI-003 | High | **PARTIALLY CLOSED (Option B)** — compose startup no longer seeds; explicit `catalog-bootstrap` profile job added; `--from-json` strict failure + artifact-absence enforced by tests | Deployment: generate `embeddings_real.json` on an egress-enabled machine (`python scripts/seed_products.py --real-embeddings`), ship to host, run the bootstrap job (runbook: `docs/ai/model-versions.md` §5) |
+| IR-AI-004 | High | **CLOSED** — default `gemini-3.5-flash`; boot refuses retired IDs in every environment (`Settings.RETIRED_GEMINI_MODELS`) | none (first staged real run should confirm model id + pricing — still BLOCKED here, no credential) |
+| IR-AI-005 | Medium | **CLOSED (pending CI observation)** — CI provisions a dedicated `decor_pgvector_test` database, sets `TEST_DATABASE_URL`, and fails the job if the real-service modules skip | Release manager: confirm the GitHub check runs green on the remediation PR |
+| IR-AI-006 | Low | **OPEN (unchanged)** | future |
+
+## New remediation items
+
+- **IR-AI-007 · MEDIUM · Release** — validate `gemini-3.5-flash` with one
+  real staged request (model id, JSON-output behaviour, per-image price) the
+  moment a `GEMINI_API_KEY` is available in a controlled environment; update
+  `COST_ASSUMPTIONS` in `scripts/evaluate_extraction.py` with measured
+  prices. Nothing in this repo has executed a real request against it.
+- **IR-AI-008 · LOW · Release/Legal** — unchanged sanctions/egress question
+  for US AI providers on a Persian catalog
+  (`docs/ai/privacy-cost-assessment.md`).
+
+## Disclosed cross-stage test-fixture changes (remediation, 3 files)
+
+Directly required by the new fail-closed provider rule
+(`AI_PROVIDER=mock` is now production-invalid, exactly as the blocker
+demanded); intent of each test unchanged, all original assertions preserved:
+
+1. `backend/tests/test_config_fail_safe.py` — `VALID_PROD` now
+   `AI_PROVIDER="gemini"` + placeholder `GEMINI_API_KEY`; two parametrize
+   rows updated to keep testing keyless/wrong-key rejections.
+2. `backend/tests/test_demo_seeding.py` — `_prod()` base likewise.
+3. `backend/tests/test_security_headers.py` — production-reload fixture
+   likewise (module-level `validate_runtime()` now refuses mock).
+
+No real credential is or ever was stored in any fixture — values are obvious
+placeholders (`test-gemini-key-placeholder`).
+
+## Remediation addendum — CI was never wired into GitHub Actions; wiring is blocked in this session
+
+`.github/workflows/` did not exist in the repository: the CI definition
+lived only at `ci/github-ci.yml`, a path GitHub Actions never executes. The
+repo's CI gates (backend suite incl. the pgvector/Redis services, lint,
+secret/docs scans, benchmark bar, compose validation) have therefore **never
+produced a check run on any PR** — including PR #9 (its empty status rollup
+confirms it).
+
+The remediation branch makes the CI *definition* correct (dedicated
+`decor_pgvector_test` database, `TEST_DATABASE_URL`, a no-skip visibility
+step) so that it is ready to execute. Wiring it in was attempted and is
+**blocked in this session**: creating `.github/workflows/ci.yml` was
+rejected by GitHub with
+
+    remote: (refusing to allow a GitHub App to create or update workflow
+    `.github/workflows/ci.yml` without `workflows` permission)
+
+i.e. the agent token lacks the `workflows` scope. GitHub CI is therefore
+**NOT RUN — NOT VERIFIED** for this branch; every test result reported by
+this remediation is a clearly-labelled local-sandbox result.
+
+**Owner action (Stage 07 / release, exact):** add the executable workflow —
+
+    mkdir -p .github/workflows && cp ci/github-ci.yml .github/workflows/ci.yml
+
+(commit needs a token with `workflows` permission) — then confirm the
+backend job's "Real-service AI modules must RUN, not skip" step is green,
+and consolidate the two files so they cannot drift.
+
+## Remediation housekeeping (post-independent-review, 2026-08-22)
+
+- **IR-AI-009 · MEDIUM · Stage 04/07** — `load_realistic_products.py --from-json`
+  commits catalog rows and *then* exits 1 when CLIP cannot load, because the
+  completion-summary log line calls `get_backend()` after the commit. On a
+  compliant production host (CLIP loadable — startup validation already
+  requires it) the job exits 0 and the path is unreachable; on a CLIP-less
+  host the data is still committed (idempotent re-run skips) but the
+  non-zero exit can mislead an operator into thinking the bootstrap failed.
+  Deliberately NOT changed in the housekeeping pass (no refactor without a
+  safe, tested path); fix options for the owner: resolve the backend identity
+  *before* seeding, or log the summary without `get_backend()` when
+  `--from-json` supplied every vector.
+- **IR-AI-010 · LOW · baseline owner** — `docs/ARCHITECTURE.md` ("Offline
+  deploys: commit that JSON once …") still instructs committing
+  `embeddings_real.json`; that guidance predates the never-commit policy
+  (tests enforce the artifact's absence; `docs/ai/model-versions.md` §5 and
+  the corrected seeder messages say controlled artifact / mounted volume).
+  Shared doc — owner action, not edited in this branch.
+
+Housekeeping changes shipped with these entries: the strict `--from-json`
+failure message and the non-strict warning no longer mention committing the
+artifact (egress-enabled machine + controlled deployment artifact / mounted
+volume, "do NOT commit"), `seed_products.py`'s docstring aligned, and a
+regression test added asserting the message never instructs committing
+(`tests/test_production_seeding.py`).

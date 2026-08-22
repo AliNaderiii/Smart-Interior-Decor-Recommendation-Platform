@@ -11,9 +11,10 @@ Usage:
 
 Embedding strategy (see docs/ARCHITECTURE.md ADR-004):
   * CI / offline dev: deterministic hash embeddings (EMBEDDING_BACKEND=hash)
-  * Production: real CLIP vectors — generate once on a networked machine with
-    `--real-embeddings`, commit `seed_data/embeddings_real.json`, then any
-    offline deploy can seed with `--from-json`.
+  * Production: real CLIP vectors — generate once on an egress-enabled machine
+    with `--real-embeddings`, then ship `seed_data/embeddings_real.json` to the
+    deployment as a controlled artifact or mounted volume (never commit it to
+    git) and seed offline with `--from-json`.
 
 Demo accounts (Stage 03 / IR-001):
     This script no longer creates default logins unconditionally. Demo accounts

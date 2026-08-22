@@ -62,10 +62,12 @@ REPORT = Path(__file__).resolve().parents[1] / ".." / "docs" / "reports" / "extr
 #: Per-image token assumptions for the REAL cost estimate (Gemini bills images
 #: as input tokens; a 768x768 image ≈ 258 tokens at standard detail). Prices
 #: must be re-verified before budgeting — see docs/ai/privacy-cost-assessment.md.
-#: NOTE 2026-08: gemini-2.0-flash was shut down 2026-06-01; the equivalent
-#: replacement at the same price point is gemini-2.5-flash-lite ($0.10/$0.40
-#: per 1M tokens). The GEMINI_MODEL default in app/core/config.py still says
-#: gemini-2.0-flash — see IR-AI-004.
+#: Stage 04 remediation (IR-AI-004): the GEMINI_MODEL default is now
+#: gemini-3.5-flash (gemini-2.0-flash shut down 2026-06-01; gemini-2.5-flash
+#: is scheduled to shut down 2026-10-16). Token counts below are unchanged;
+#: 3.5-generation pricing is UNVERIFIED (no credential in this environment —
+#: the real benchmark is BLOCKED), so the $ figures are an order-of-magnitude
+#: estimate based on the flash-lite tier until a real run re-measures them.
 COST_ASSUMPTIONS = {
     "gemini": {
         "input_tokens_per_image": 258,
@@ -73,7 +75,7 @@ COST_ASSUMPTIONS = {
         "output_tokens": 120,
         "price_per_1m_input_usd": 0.10,
         "price_per_1m_output_usd": 0.40,
-        "source": "https://ai.google.dev/gemini-api/docs/pricing (gemini-2.0-flash shut down 2026-06-01; prices shown match gemini-2.5-flash-lite — verify at budget time)",
+        "source": "https://ai.google.dev/gemini-api/docs/pricing (default model is now gemini-3.5-flash; prices shown are the flash-lite tier and are UNVERIFIED for 3.5-flash — re-verify with a real run before budgeting)",
     },
     "openai": {
         "input_tokens_per_image": 853,  # gpt-4o-mini low-detail image tokens

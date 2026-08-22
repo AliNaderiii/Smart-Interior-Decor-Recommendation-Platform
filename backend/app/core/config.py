@@ -89,7 +89,13 @@ class Settings(BaseSettings):
     # ---- AI ----
     AI_PROVIDER: Literal["gemini", "openai", "mock"] = "mock"
     GEMINI_API_KEY: str = ""
-    GEMINI_MODEL: str = "gemini-2.0-flash"
+    # Stage 04 remediation (IR-AI-004): gemini-2.0-flash was shut down by
+    # Google on 2026-06-01 and gemini-2.5-flash is scheduled for shutdown on
+    # 2026-10-16; Google's 2.0-flash migration guidance points at the 3.5
+    # Flash generation. The default is therefore gemini-3.5-flash. NOT yet
+    # validated with a real API request in this environment (no credentials —
+    # the real benchmark stays BLOCKED); see docs/ai/model-versions.md.
+    GEMINI_MODEL: str = "gemini-3.5-flash"
     OPENAI_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
     EMBEDDING_BACKEND: Literal["clip", "hash"] = "hash"
@@ -164,6 +170,26 @@ class Settings(BaseSettings):
         "demo@smartdecor.dev",
     )
 
+    #: Stage 04 remediation (IR-AI-004): Gemini model IDs that Google has
+    #: already shut down. Configuring one is a guaranteed 404 on the first
+    #: real request, so validate_runtime refuses them in every environment.
+    RETIRED_GEMINI_MODELS: ClassVar[frozenset[str]] = frozenset({
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-001",
+        "gemini-2.0-flash-exp",
+        "gemini-2.0-flash-lite",
+        "gemini-2.0-flash-lite-001",
+    })
+
+    def ai_provider_problems(self) -> list[str]:
+        """This instance's provider problems, via the shared authoritative rule."""
+        return ai_provider_problems(
+            self.AI_PROVIDER,
+            has_gemini_key=bool(self.GEMINI_API_KEY),
+            has_openai_key=bool(self.OPENAI_API_KEY),
+            production=self.is_production,
+        )
+
     def validate_runtime(self) -> None:
         """Fail fast on insecure configuration.
 
@@ -178,6 +204,16 @@ class Settings(BaseSettings):
             universal.append(
                 f"JWT_ALGORITHM must be one of "
                 f"{sorted(self.ALLOWED_JWT_ALGORITHMS)} (got {self.JWT_ALGORITHM!r})"
+            )
+        # Applies in every environment and regardless of the active provider:
+        # the moment AI_PROVIDER flips to gemini, a retired model id means
+        # every real request 404s. Fail fast at boot instead.
+        if self.GEMINI_MODEL in self.RETIRED_GEMINI_MODELS:
+            universal.append(
+                f"GEMINI_MODEL={self.GEMINI_MODEL!r} was shut down by Google "
+                f"(see ai.google.dev/gemini-api/docs/deprecations) — every real "
+                f"request would fail; set GEMINI_MODEL to a current model "
+                f"(default: gemini-3.5-flash)"
             )
         if universal:
             raise RuntimeError(
@@ -239,15 +275,77 @@ class Settings(BaseSettings):
                 "STORAGE_BACKEND=local serves uploaded bytes from the "
                 "application origin; production must use S3-compatible storage"
             )
-        if self.AI_PROVIDER != "mock" and not (
-            self.GEMINI_API_KEY or self.OPENAI_API_KEY
-        ):
-            problems.append(f"AI_PROVIDER={self.AI_PROVIDER} but no API key is set")
+        # Stage 04 remediation: strict provider/key matching (was: any key for
+        # any provider, and mock silently allowed in production).
+        problems.extend(self.ai_provider_problems())
 
         if problems:
             raise RuntimeError(
                 "Insecure production configuration:\n  - " + "\n  - ".join(problems)
             )
+
+
+#: Authoritative AI-provider → API-key-field mapping. A key for a different
+#: provider must never satisfy validation for the selected one (Stage 04
+#: remediation: the old rule accepted *any* key for *any* provider, so
+#: ``AI_PROVIDER=gemini`` + only ``OPENAI_API_KEY`` looked configured).
+AI_PROVIDER_KEY_FIELDS: dict[str, str] = {
+    "gemini": "GEMINI_API_KEY",
+    "openai": "OPENAI_API_KEY",
+}
+
+
+def ai_provider_problems(
+    provider: str,
+    *,
+    has_gemini_key: bool,
+    has_openai_key: bool,
+    production: bool,
+) -> list[str]:
+    """Single authoritative provider-selection rule (Stage 04 remediation).
+
+    Used by :meth:`Settings.validate_runtime` (startup) **and** by
+    ``ai.feature_extractor.FeatureExtractor`` (request-time construction), so
+    the two can never drift apart again. Messages are actionable and name the
+    exact setting to fix; they never include key values.
+
+    Rules:
+
+    * ``AI_PROVIDER=mock`` is dev/test-only — production must not run on
+      keyword-derived features.
+    * ``AI_PROVIDER=gemini`` requires ``GEMINI_API_KEY``; ``openai`` requires
+      ``OPENAI_API_KEY``. A key for another provider is not accepted.
+    * Unknown provider names are rejected.
+    """
+    problems: list[str] = []
+    if provider == "mock":
+        if production:
+            problems.append(
+                "AI_PROVIDER=mock derives features from the image "
+                "URL/filename, not from pixels — production must set "
+                "AI_PROVIDER=gemini (with GEMINI_API_KEY) or AI_PROVIDER=openai "
+                "(with OPENAI_API_KEY); AI_PROVIDER=mock is allowed in "
+                "development/test only"
+            )
+        return problems
+    key_field = AI_PROVIDER_KEY_FIELDS.get(provider)
+    if key_field is None:
+        problems.append(
+            f"AI_PROVIDER={provider!r} is not one of "
+            f"{sorted(AI_PROVIDER_KEY_FIELDS)} or 'mock'"
+        )
+        return problems
+    has_key = {
+        "GEMINI_API_KEY": has_gemini_key,
+        "OPENAI_API_KEY": has_openai_key,
+    }[key_field]
+    if not has_key:
+        problems.append(
+            f"AI_PROVIDER={provider} requires {key_field} to be set — an API key "
+            f"for a different provider is not accepted; set {key_field} or use "
+            "AI_PROVIDER=mock in development/test only"
+        )
+    return problems
 
 
 @lru_cache
