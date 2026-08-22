@@ -1,0 +1,30 @@
+# Git state at the start of Stage 03
+# Captured: 2026-08-21T15:21:33Z (UTC)
+
+$ git rev-parse HEAD
+2f0338c14718b7a38b167d195e4ec497a94a122b
+
+$ git rev-parse --abbrev-ref HEAD
+arena/01a024e4-smart-interior-decor-recommend
+
+$ git status --porcelain (empty == clean)
+?? docs/agent-reports/security-hardening-evidence/
+
+$ git log --oneline -5
+2f0338c Merge pull request #5 from AliNaderiii/arena/01a0247e-smart-interior-decor-recommend
+
+$ git ls-remote --heads origin
+f97bfad371c7a33cb4fe9f52b7c51520a363fb43	refs/heads/agent/baseline-release-2026-08-21
+2f0338c14718b7a38b167d195e4ec497a94a122b	refs/heads/agent/security-hardening-2026-08-21
+a847ad51dbc014972db431a83c5b859d9ff0ccbf	refs/heads/arena/01a01bbd-smart-interior-decor-recommend
+dd2c34d07c8b851daa1adf4a07b8f46a831c1aa9	refs/heads/arena/01a01dc4-smart-interior-decor-recommend
+efadc3bf3b1b323993cdf5eafd077e89303677d6	refs/heads/arena/01a02073-smart-interior-decor-recommend
+903d7b39b2d45dfd7080dc3d42f52fbc6163e0ac	refs/heads/arena/01a0247e-smart-interior-decor-recommend
+11e5a005600ffaa4f2fdfb1e5bb751f88b4322fc	refs/heads/chore/add-agent-master-prompts
+0998ba4bf070c55ee30a678b3d22c65b9df68669	refs/heads/main
+2f0338c14718b7a38b167d195e4ec497a94a122b	refs/heads/v2-strict-mode
+
+# NOTE: refs/heads/v2-strict-mode and refs/heads/agent/security-hardening-2026-08-21
+# both point at 2f0338c14718b7a38b167d195e4ec497a94a122b, which is also the commit
+# this session branch (arena/01a024e4-smart-interior-decor-recommend) was created from.
+# The session branch IS the Stage 03 working branch; the Arena session is bound to it.

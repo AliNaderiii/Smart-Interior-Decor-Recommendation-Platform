@@ -14,6 +14,28 @@ from pathlib import Path
 
 from app.core.config import settings
 
+#: Stage 03 (T-28/T-31): the object key must never inherit an extension from a
+#: client-supplied filename. `app.core.uploads` already normalises it from the
+#: sniffed image format, but a storage backend is a shared primitive that any
+#: future caller can reach, so it enforces the same rule itself.
+SAFE_EXTENSIONS = frozenset({".png", ".jpg", ".jpeg", ".webp", ".gif"})
+DEFAULT_EXTENSION = ".bin"
+
+
+def safe_extension(filename: str) -> str:
+    """Return an allowlisted extension, or `.bin` for anything unrecognised.
+
+    `.bin` is deliberate: an unknown object gets a name a browser will not
+    render, so even a misrouted upload cannot become a same-origin HTML
+    document.
+    """
+    suffix = Path(filename or "").suffix.lower()
+    # `Path().suffix` cannot contain a separator, but a caller could pass an
+    # already-crafted string; belt and braces.
+    if "/" in suffix or "\\" in suffix or len(suffix) > 8:
+        return DEFAULT_EXTENSION
+    return suffix if suffix in SAFE_EXTENSIONS else DEFAULT_EXTENSION
+
 
 class StorageBackend(ABC):
     @abstractmethod
@@ -27,9 +49,13 @@ class LocalStorage(StorageBackend):
         self.base.mkdir(parents=True, exist_ok=True)
 
     def upload_file(self, data: bytes, filename: str, content_type: str | None = None) -> str:
-        ext = Path(filename).suffix or ".bin"
-        key = f"{uuid.uuid4().hex}{ext}"
-        (self.base / key).write_bytes(data)
+        key = f"{uuid.uuid4().hex}{safe_extension(filename)}"
+        target = (self.base / key).resolve()
+        # Containment assertion: the key is generated, so this can only fail if
+        # the code above is changed to trust input again. Cheap tripwire.
+        if not str(target).startswith(str(self.base.resolve())):
+            raise ValueError("refusing to write outside the storage root")
+        target.write_bytes(data)
         return f"/media/{key}"
 
 
@@ -47,8 +73,7 @@ class S3Storage(StorageBackend):
         self.bucket = settings.S3_BUCKET
 
     def upload_file(self, data: bytes, filename: str, content_type: str | None = None) -> str:
-        ext = Path(filename).suffix or ".bin"
-        key = f"products/{uuid.uuid4().hex}{ext}"
+        key = f"products/{uuid.uuid4().hex}{safe_extension(filename)}"
         ct = content_type or mimetypes.guess_type(filename)[0] or "application/octet-stream"
         self.client.put_object(
             Bucket=self.bucket, Key=key, Body=data, ContentType=ct, ACL="public-read"

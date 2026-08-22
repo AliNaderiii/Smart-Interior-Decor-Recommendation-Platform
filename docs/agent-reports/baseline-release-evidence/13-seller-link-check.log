@@ -1,0 +1,10 @@
+link check failed for https://torob.com/: TLS/SSL connection has been closed (EOF) (_ssl.c:992)
+link check failed for https://www.digikala.com/: TLS/SSL connection has been closed (EOF) (_ssl.c:992)
+link check failed for https://www.digikala.com/main/home-and-kitchen/: TLS/SSL connection has been closed (EOF) (_ssl.c:992)
+checking 100 product links…
+  [DEAD] https://torob.com/
+  [DEAD] https://www.digikala.com/
+  [DEAD] https://www.digikala.com/main/home-and-kitchen/
+
+domains: {'torob.com': 1, 'www.digikala.com': 2}
+result : 0/100 links valid

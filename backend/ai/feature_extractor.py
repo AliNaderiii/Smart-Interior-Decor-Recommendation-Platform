@@ -9,18 +9,43 @@
       "patterns": ["solid", ...],
       "description_for_embedding": "a modern walnut coffee table ...",
       "confidence": 0.87,
+      "provider": "gemini",                  # which provider produced this
+      "model": "gemini-2.0-flash",
+      "prompt_version": "p2",                # ai.model_registry stamp
+      "taxonomy_version": "2.1",
+      "needs_review": False,                 # ai.extraction_review gate
+      "review_reasons": [],
     }
 
 Providers are selected via ``settings.AI_PROVIDER``:
-  * ``gemini`` — Google gemini-2.0-flash (REST, key from GEMINI_API_KEY)
+  * ``gemini`` — Google Gemini vision (REST, key from GEMINI_API_KEY)
   * ``openai`` — gpt-4o-mini vision (REST, key from OPENAI_API_KEY)
   * ``mock``   — deterministic heuristic extractor (offline dev / CI / tests)
 
-The prompt forces JSON-only output; responses are hardened against
-markdown fences and trailing text.
+Stage 04 hardening (Master Prompt 04):
+
+* **SSRF guard (closes IR-SEC-003 / risk D-03):** the Gemini provider
+  downloads the image server-side; every fetch (and every redirect hop) is now
+  validated by ``app.core.url_safety.validate_public_url(resolve=True)`` —
+  the same defence the seller-link checker already had.
+* **Version stamping:** provider, model, prompt version and taxonomy version
+  travel with the result (``ai.model_registry``).
+* **Review gate:** ``needs_review``/``review_reasons`` computed by
+  ``ai.extraction_review.review_decision``; the upload flow stores them in
+  ``extraction_raw``.
+* **No fabricated fallback in production:** if the provider fails, production
+  gets an *empty*, flagged result for human review — never keyword-guessed
+  features that look real. Outside production the deterministic keyword
+  fallback is kept for developer convenience but is explicitly labelled
+  ``provider="mock-fallback"`` and confidence-capped at 0.3 so it can never
+  pass the review gate.
+
+The prompt forces JSON-only output; responses are hardened against markdown
+fences and trailing text.
 """
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import re
@@ -29,13 +54,17 @@ from typing import Any
 
 import httpx
 
+from ai import taxonomy as tax
+from ai.extraction_review import FALLBACK_CONFIDENCE_CAP, review_decision
+from ai.model_registry import EXTRACTION_PROMPT_VERSION
 from app.core.config import settings
+from app.core.url_safety import UnsafeUrl, validate_public_url
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_STYLES = ["modern", "scandinavian", "industrial", "boho", "minimal", "classic"]
-ALLOWED_MATERIALS = ["wood", "metal", "fabric", "leather", "glass", "rattan"]
-ALLOWED_PATTERNS = ["solid", "geometric", "floral", "striped", "abstract", "persian"]
+ALLOWED_STYLES = tax.styles()
+ALLOWED_MATERIALS = tax.materials()
+ALLOWED_PATTERNS = tax.patterns()
 
 EXTRACTION_PROMPT = (
     "Analyze this furniture image. Return ONLY valid JSON, no markdown, no prose: "
@@ -48,6 +77,7 @@ EXTRACTION_PROMPT = (
 )
 
 _json_re = re.compile(r"\{.*\}", re.DOTALL)
+_hex_re = re.compile(r"#[0-9A-Fa-f]{6}")
 
 
 def _parse_json_strict(raw: str) -> dict[str, Any]:
@@ -62,15 +92,29 @@ def _parse_json_strict(raw: str) -> dict[str, Any]:
 
 
 def _sanitize(data: dict[str, Any]) -> dict[str, Any]:
-    """Clamp model output to the allowed taxonomy."""
-    styles = [s for s in data.get("style", []) if s in ALLOWED_STYLES]
-    materials = [m for m in data.get("material", []) if m in ALLOWED_MATERIALS]
-    patterns = [p for p in data.get("patterns", []) if p in ALLOWED_PATTERNS]
+    """Clamp model output to the allowed taxonomy — never guess.
+
+    Unknown taxonomy values are dropped and reported in
+    ``unknown_taxonomy_values`` (which forces human review) rather than being
+    mapped to a "closest" value: a hallucinated style is worse for
+    recommendations than a missing one, because a missing one is visible.
+    """
+    raw_styles = [s for s in data.get("style", []) if isinstance(s, str)]
+    raw_materials = [m for m in data.get("material", []) if isinstance(m, str)]
+    raw_patterns = [p for p in data.get("patterns", []) if isinstance(p, str)]
+    styles, unknown_s = tax.clamp_to_taxonomy(raw_styles, "style")
+    materials, unknown_m = tax.clamp_to_taxonomy(raw_materials, "material")
+    patterns, unknown_p = tax.clamp_to_taxonomy(raw_patterns, "pattern")
+    unknown = sorted(set(unknown_s + unknown_m + unknown_p))
+
     colors = [
         c for c in data.get("colors", [])
-        if isinstance(c, str) and re.fullmatch(r"#[0-9A-Fa-f]{6}", c)
+        if isinstance(c, str) and re.fullmatch(_hex_re, c)
     ]
-    conf = float(data.get("confidence", 0.5))
+    try:
+        conf = float(data.get("confidence", 0.5))
+    except (TypeError, ValueError):
+        conf = 0.0
     return {
         "colors": colors[:4],
         "style": styles[:2],
@@ -78,24 +122,52 @@ def _sanitize(data: dict[str, Any]) -> dict[str, Any]:
         "patterns": patterns[:1],
         "description_for_embedding": str(data.get("description_for_embedding", ""))[:500],
         "confidence": max(0.0, min(1.0, conf)),
+        "unknown_taxonomy_values": unknown,
     }
 
 
 class BaseProvider(ABC):
+    #: short name stamped into results and evidence
+    name = "base"
+
     @abstractmethod
     def extract(self, image_url: str) -> dict[str, Any]: ...
 
 
+def _fetch_image_bytes(url: str, timeout: float = 30.0) -> tuple[bytes, str]:
+    """Download ``url`` for the vision model, SSRF-guarded on every hop.
+
+    The pre-Stage-04 code called ``httpx.get(url, follow_redirects=True)``:
+    a public URL that 302s to ``http://169.254.169.254/...`` turned the
+    extractor into a cloud-metadata exfiltration primitive, exactly like the
+    seller-link checker before T-35. Same fix, same pattern: manual redirect
+    following with per-hop validation.
+    """
+    target = validate_public_url(url, resolve=True, field="image_url")
+    with httpx.Client(follow_redirects=False, timeout=timeout) as client:
+        for _ in range(5):
+            resp = client.get(target)
+            if resp.status_code in (301, 302, 303, 307, 308):
+                location = resp.headers.get("location", "")
+                if not location:
+                    raise UnsafeUrl("redirect without location")
+                nxt = str(httpx.URL(target).join(location))
+                target = validate_public_url(nxt, resolve=True, field="image_url redirect")
+                continue
+            resp.raise_for_status()
+            mime = resp.headers.get("content-type", "image/jpeg").split(";")[0]
+            return resp.content, mime
+    raise UnsafeUrl("too many redirects fetching image")
+
+
 class GeminiProvider(BaseProvider):
-    """gemini-2.0-flash via the Generative Language REST API."""
+    """Gemini vision via the Generative Language REST API."""
+
+    name = "gemini"
 
     def extract(self, image_url: str) -> dict[str, Any]:
-        img = httpx.get(image_url, timeout=30, follow_redirects=True)
-        img.raise_for_status()
-        import base64
-
-        b64 = base64.b64encode(img.content).decode()
-        mime = img.headers.get("content-type", "image/jpeg").split(";")[0]
+        data, mime = _fetch_image_bytes(image_url)
+        b64 = base64.b64encode(data).decode()
         resp = httpx.post(
             f"https://generativelanguage.googleapis.com/v1beta/models/"
             f"{settings.GEMINI_MODEL}:generateContent",
@@ -117,9 +189,17 @@ class GeminiProvider(BaseProvider):
 
 
 class OpenAIProvider(BaseProvider):
-    """gpt-4o-mini vision via the Chat Completions REST API."""
+    """gpt-4o-mini vision via the Chat Completions REST API.
+
+    The image URL is handed to OpenAI (their fetchers download it), so the
+    SSRF risk profile differs: the scheme/private-host check still runs to
+    keep stored URLs sane, but resolution is not ours to enforce.
+    """
+
+    name = "openai"
 
     def extract(self, image_url: str) -> dict[str, Any]:
+        validate_public_url(image_url, resolve=False, field="image_url")
         resp = httpx.post(
             "https://api.openai.com/v1/chat/completions",
             headers={"Authorization": f"Bearer {settings.OPENAI_API_KEY}"},
@@ -145,8 +225,13 @@ class MockProvider(BaseProvider):
     """Deterministic heuristic extractor for offline dev / CI.
 
     Infers tags from keywords in the image URL/filename — good enough to
-    exercise the full pipeline and the benchmark harness end-to-end.
+    exercise the full pipeline and the benchmark harness end-to-end. **It never
+    looks at pixels**, so any score produced with it is a harness baseline, not
+    a vision-model accuracy claim (every result is stamped provider=mock and
+    the benchmark reports it as MOCK).
     """
+
+    name = "mock"
 
     _style_hints = {
         "modern": "modern", "scandi": "scandinavian", "nordic": "scandinavian",
@@ -186,8 +271,26 @@ class MockProvider(BaseProvider):
         })
 
 
+def _empty_failed_extraction(image_url: str, error: Exception) -> dict[str, Any]:
+    """Production failure result: no features, honest error, forced review."""
+    return {
+        "colors": [],
+        "style": [],
+        "material": [],
+        "patterns": [],
+        "description_for_embedding": "",
+        "confidence": 0.0,
+        "unknown_taxonomy_values": [],
+        "provider": "failed",
+        "provider_error": f"{type(error).__name__}: {str(error)[:300]}",
+        "image_url": image_url,
+        "needs_review": True,
+        "review_reasons": ["provider_error", "low_confidence", "missing_style", "missing_material"],
+    }
+
+
 class FeatureExtractor:
-    """Facade — picks the provider from settings, with graceful fallback."""
+    """Facade — picks the provider from settings, with labelled fallback."""
 
     def __init__(self, provider: str | None = None) -> None:
         name = provider or settings.AI_PROVIDER
@@ -201,12 +304,41 @@ class FeatureExtractor:
             self.provider = MockProvider()
 
     def extract(self, image_url: str) -> dict[str, Any]:
-        """Extract features; on provider failure fall back to mock so the
-        admin pipeline never hard-crashes (result flagged low confidence)."""
+        """Extract features; on provider failure return a flagged result.
+
+        In production the failure result is empty (nothing fabricated);
+        elsewhere the deterministic keyword fallback keeps the dev pipeline
+        usable but is labelled ``mock-fallback`` and capped at 0.3 confidence
+        so the review gate always rejects it.
+        """
         try:
-            return self.provider.extract(image_url)
+            result = self.provider.extract(image_url)
         except Exception as exc:
-            logger.error("extraction failed via %s: %s", type(self.provider).__name__, exc)
+            logger.error(
+                "extraction failed via %s: %s", type(self.provider).__name__, exc
+            )
+            if settings.is_production:
+                return _empty_failed_extraction(image_url, exc)
             result = MockProvider().extract(image_url)
-            result["confidence"] = min(result["confidence"], 0.3)
-            return result
+            result["provider"] = "mock-fallback"
+            result["provider_error"] = f"{type(exc).__name__}: {str(exc)[:300]}"
+            result["confidence"] = min(result["confidence"], FALLBACK_CONFIDENCE_CAP)
+        else:
+            result.setdefault("provider", self.provider.name)
+            result.setdefault("model", _provider_model(self.provider.name))
+            result.setdefault("prompt_version", EXTRACTION_PROMPT_VERSION)
+            result.setdefault("taxonomy_version", tax.taxonomy_version())
+            result.setdefault("image_url", image_url)
+
+        decision = review_decision(result)
+        result["needs_review"] = decision["needs_review"]
+        result["review_reasons"] = decision["review_reasons"]
+        return result
+
+
+def _provider_model(name: str) -> str:
+    return {
+        "gemini": settings.GEMINI_MODEL,
+        "openai": settings.OPENAI_MODEL,
+        "mock": "filename-heuristic",
+    }.get(name, name)

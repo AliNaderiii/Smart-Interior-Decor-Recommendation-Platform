@@ -6,12 +6,15 @@
 cp .env.example .env
 # fill: SECRET_KEY (openssl rand -hex 32), FERNET_KEY, POSTGRES_PASSWORD,
 #       AI_PROVIDER + key, S3_* if using object storage
-docker-compose up --build
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-Services: `postgres` (ankane/pgvector), `redis`, `backend` (runs
-`alembic upgrade head` + idempotent seed on boot), `frontend` (nginx),
-`caddy` (TLS 1.3, ports 80/443). App: `https://<host>/`, API docs: `/docs`.
+Services: `postgres` (PostgreSQL 16 + pgvector), `redis` (Redis 7), `backend`
+(runs the migration and an idempotent product-only loader), `frontend` (nginx),
+`caddy` (TLS 1.3, ports 80/443). The dev overlay explicitly enables demo
+accounts; the base/production profile never passes a demo-seeding flag. App:
+`https://<host>/`; interactive API docs are disabled by the application in
+production.
 
 ## 1. Production checklist
 
@@ -29,7 +32,8 @@ Services: `postgres` (ankane/pgvector), `redis`, `backend` (runs
 - [ ] Validate real extraction quality: `python backend/scripts/evaluate_extraction.py --real --sample 10`
 - [ ] Run `python scripts/check_links.py --report docs/reports/links.json` after seeding real catalog
 - [ ] Enable CI if not yet active: `./scripts/enable_ci.sh` (needs a token with `workflow` scope)
-- [ ] Postgres volume on encrypted disk; scheduled `pg_dump` backups
+- [ ] Postgres volume on encrypted disk; schedule `scripts/backup.sh` and copy dumps off-site
+- [ ] Confirm `/api/v1/health/ready` is the load-balancer readiness probe; keep `/metrics` private
 
 ## 2. Deploy to a VPS / EC2
 
@@ -37,8 +41,8 @@ Services: `postgres` (ankane/pgvector), `redis`, `backend` (runs
 ssh user@server
 git clone <repo> && cd Smart-Interior-Decor-Recommendation-Platform
 cp .env.example .env && $EDITOR .env      # see checklist
-docker compose up --build -d
-docker compose logs -f backend            # wait for "Application startup complete"
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f backend            # wait for "Application startup complete"
 ```
 
 Point DNS A-record at the server; Caddy handles certificates automatically.
@@ -90,3 +94,116 @@ docker compose exec backend alembic revision --autogenerate -m "…"
 | No payment data | `payments` table stores authority/ref_id only |
 | JWT 15 min / 7 d + blacklist | `app/core/security.py`, `app/api/routes/auth.py` |
 | No secrets in repo | all via `.env`; `.env` gitignored; `.env.example` documented |
+
+## V3: from offline demo to production data
+
+The default Docker seed now loads `backend/seed_data/products_realistic_150.json`. It is realistic **sample structure**, not a live inventory feed.
+
+1. Validate the client's export against `datasets/products_realistic.json` and replace the committed/imported catalog through a controlled data release.
+2. Set `AI_PROVIDER=gemini` (or `openai`) and provide its key. Keep `EMBEDDING_BACKEND=hash` until CLIP vectors are generated on a networked machine:
+   ```bash
+   pip install torch sentence-transformers
+   python backend/scripts/seed_products.py --real-embeddings
+   ```
+3. Configure Arvan/Liara/AWS with `STORAGE_BACKEND=s3` and `S3_*`; use licensed product images and a CDN base URL.
+4. Set `PAYMENT_PROVIDER=zarinpal`, the merchant ID and HTTPS callback. Card data is never stored; only gateway authority/reference IDs are persisted.
+5. Set `EMAIL_PROVIDER=resend`, `RESEND_API_KEY` and a verified `EMAIL_FROM` domain.
+6. Generate strong `SECRET_KEY` and `FERNET_KEY`, set production origins/cookies, and store all values in the platform secret manager.
+7. Run the loader and checks:
+   ```bash
+   python backend/scripts/load_realistic_products.py --realistic --expand-to 150 --clear --from-json
+   python scripts/check_links.py
+   ```
+
+Without keys, the supported offline path remains mock AI + hash embeddings + local storage + mock payment/email. See `.env.example`, `.env.example.v2`, and `docs/CLIENT_DATASETS_REQUEST.md`.
+
+## 8. Stage 07 production profiles
+
+Use the profiles deliberately; do not use the development overlay for a
+production deployment:
+
+```bash
+# Local development: host ports, mock providers and explicit demo accounts.
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+
+# Production: fail-fast settings, JSON logs, resource limits and daily audit pruning.
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up --build -d
+
+# Postgres/pgvector + real Redis test profile.
+docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm backend
+```
+
+The base backend command only runs the idempotent realistic **product** loader
+when the product table is empty. It does not pass `--seed-demo-accounts`, and
+`APP_ENV=production` rejects `SEED_DEMO_ACCOUNTS=true` as a boot-time error.
+The dev-only opt-in is isolated in `docker-compose.dev.yml`.
+
+Images are version-pinned in the compose and Dockerfiles: PostgreSQL 16 with
+pgvector 0.6.2, Redis 7.4, Caddy 2.8, Python 3.12.9, Node 22.14, and nginx
+1.27.4. Digest pinning remains an operator hardening step; record resolved
+image digests in the release notes before a high-assurance production rollout.
+Python images install `backend/requirements.lock.txt` and run the API as the
+non-root `appuser`; the frontend runtime contains only the built static bundle.
+
+## 9. Health, readiness and observability
+
+- `GET /api/v1/health` is liveness and does not prove dependencies are healthy.
+- `GET /api/v1/health/ready` is readiness and requires PostgreSQL `SELECT 1`
+  plus a shared Redis `PING`. Configure the orchestrator/LB to use it and to
+  stop routing on `503`.
+- `GET /metrics` is a Prometheus text endpoint. It contains bounded request
+  counters, latency histograms, in-flight requests, `redis_up`, and `app_info`;
+  it does not include emails, tokens, product ids or request ids. Restrict it
+  to the monitoring network at Caddy/firewall level.
+- Set `LOG_FORMAT=json` in production. Each JSON line has a timestamp, level,
+  logger, request id and event fields; secrets, bearer tokens, JWTs, PANs and
+  email addresses are redacted at record creation and formatter output.
+- The API accepts a validated `X-Request-ID` and echoes it. Invalid or overly
+  long values are replaced, preventing header injection while preserving
+  cross-service correlation.
+
+## 10. Migration and rollback checks
+
+A new deployment must start from an empty PostgreSQL 16 + pgvector database:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.test.yml run --rm backend \
+  sh -c 'alembic upgrade head && alembic downgrade base && alembic upgrade head'
+```
+
+Revision `0003` uses Alembic batch mode, so the same migration path works on
+SQLite and PostgreSQL. The CI workflow runs the empty-database upgrade and the
+upgrade → downgrade base → upgrade round trip on every PR/push once activated.
+For a code-only rollback, redeploy the previous immutable image tag. For a
+schema/data rollback, stop traffic, take a fresh dump, use the reversible
+Alembic downgrade only when the release notes permit it, or follow
+`docs/DISASTER_RECOVERY.md` for restore.
+
+## 11. Backups and recovery objectives
+
+Run `scripts/backup.sh` daily at 02:15 UTC (or use an equivalent managed
+PostgreSQL backup job), retain at least 14 dumps, and copy each dump to an
+independent/off-site bucket. Redis is intentionally not restored: it is cache
+and short-lived authentication throttle/blacklist state, so losing it logs
+users out and resets limits rather than resurrecting stale credentials.
+
+The documented single-region target is **RTO ≤ 60 minutes** and **RPO ≤ 24
+hours** with daily logical dumps. Managed PostgreSQL PITR can improve the RPO
+to minutes. The restore and release rollback runbooks are in
+`docs/DISASTER_RECOVERY.md` and `docs/ROLLBACK_AND_VERSIONING.md`; perform a
+quarterly restore drill against a real dump and record the measured RTO.
+
+## 12. CI activation and evidence boundary
+
+The complete workflow is versioned at `ci/github-ci.yml`, but this checkout's
+GitHub App cannot create or update `.github/workflows/ci.yml`. A maintainer with
+workflow-file permission must run:
+
+```bash
+cp .env.example .env                 # only for local compose validation
+./scripts/enable_ci.sh
+```
+
+Then confirm a real GitHub Actions run and branch-protection checks in the
+Actions UI. Until that happens, CI is **BLOCKED**, not active; local evidence
+in `docs/agent-reports/infra-evidence/` does not substitute for a GitHub run.

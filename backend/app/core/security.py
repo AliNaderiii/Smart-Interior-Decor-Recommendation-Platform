@@ -1,6 +1,14 @@
 """Security primitives: bcrypt password hashing, JWT tokens, Fernet at-rest
 encryption abstraction (MVP KMS — documented path to cloud KMS in
 docs/ARCHITECTURE.md).
+
+Stage 07 (IR-SEC-002): the JWT library is **PyJWT** (``pyjwt[crypto]``), not
+python-jose. python-jose's transitive ``ecdsa`` dependency carried the
+unfixed PYSEC-2026-1325 advisory; PyJWT performs the same HS256/384/512
+operations on top of ``cryptography`` and removes that code path entirely.
+``JWTError`` is re-exported as an alias of PyJWT's base ``InvalidTokenError``
+so the two call sites (``app/api/deps.py``, ``app/api/routes/auth.py``) keep
+their ``except JWTError`` semantics unchanged.
 """
 from __future__ import annotations
 
@@ -8,8 +16,9 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Literal
 
+import jwt
 from cryptography.fernet import Fernet
-from jose import JWTError, jwt
+from jwt.exceptions import InvalidTokenError as JWTError
 from passlib.context import CryptContext
 
 from app.core.config import settings
@@ -62,7 +71,12 @@ def create_token(
 
 
 def decode_token(token: str, expected_type: str | None = None) -> dict[str, Any]:
-    """Decode and validate a JWT. Raises ``JWTError`` on any problem."""
+    """Decode and validate a JWT. Raises ``JWTError`` on any problem.
+
+    PyJWT 2.x requires the ``algorithms`` argument (no algorithm confusion —
+    it defaults to none) and rejects tokens whose ``alg`` is not in the
+    allowlist, which config.py pins to the HMAC family (Stage 03, T-05).
+    """
     payload = jwt.decode(
         token, settings.SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
     )

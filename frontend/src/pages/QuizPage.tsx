@@ -8,9 +8,9 @@ import {
   BUDGET_MAX,
   BUDGET_MIN,
   MATERIALS,
-  PALETTE_PRESETS,
   STYLES,
 } from "@/lib/constants";
+import questionnaire from "@/assets/questionnaire.json";
 import { Button, Card, Input } from "@/components/ui";
 import { BudgetHistogram } from "@/components/BudgetHistogram";
 import { celebrate } from "@/lib/celebrate";
@@ -20,7 +20,14 @@ import { spring } from "@/lib/motion";
 import clsx from "clsx";
 import { OptimizedImage } from "@/components/OptimizedImage";
 
-const STEP_TITLES = ["Style", "Color Palette", "Room Dimensions", "Budget", "Materials"];
+type ColorPalette = { id: string; label_fa: string; colors: string[]; mood: string };
+type BudgetRange = { id: string; label_fa: string; min: number; max: number; color: string };
+type DatasetStep = { id: string; title_fa: string; help_text_fa?: string; options?: unknown[]; ranges?: unknown[] };
+const DATASET_STEPS = questionnaire.steps as unknown as DatasetStep[];
+const STEP_TITLES = DATASET_STEPS.map((item) => item.title_fa);
+const COLOR_PALETTES = (DATASET_STEPS.find((item) => item.id === "color_palette")?.options ?? []) as ColorPalette[];
+const DIMENSION_HELP = DATASET_STEPS.find((item) => item.id === "room_dimensions")?.help_text_fa;
+const BUDGET_RANGES = (DATASET_STEPS.find((item) => item.id === "budget")?.ranges ?? []) as BudgetRange[];
 
 export default function QuizPage() {
   const quiz = useQuizStore();
@@ -84,9 +91,9 @@ export default function QuizPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="h1 text-[var(--color-ink)]">Design your living room</h1>
-      <p className="mt-1 text-sm text-[var(--color-muted)]">
-        Step {step + 1} of 5 — {STEP_TITLES[step]}
+      <h1 className="h1 text-[var(--color-ink)]">طراحی نشیمن شما</h1>
+      <p className="mt-1 text-sm text-[var(--color-muted)]" dir="rtl">
+        مرحله {new Intl.NumberFormat("fa-IR").format(step + 1)} از ۵ — {STEP_TITLES[step]}
       </p>
 
       {/* Stepper */}
@@ -158,8 +165,8 @@ export default function QuizPage() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
                     <div className="absolute inset-x-0 bottom-0 flex items-end justify-between p-4">
                       <div>
-                        <span className="block text-base font-semibold text-white">{s.label}</span>
-                        <span className="block text-xs text-white/70">{s.fa}</span>
+                        <span className="block text-base font-semibold text-white">{s.icon} {s.fa}</span>
+                        <span className="block text-xs text-white/70">{s.label}</span>
                       </div>
                     </div>
                     <AnimatePresence>
@@ -195,24 +202,30 @@ export default function QuizPage() {
 
         {step === 1 && (
           <div>
-            <p className="mb-5 text-sm text-[var(--color-muted)]">Choose up to 5 colours for your palette.</p>
-            <div className="flex flex-wrap gap-3">
-              {PALETTE_PRESETS.map((hex) => {
-                const active = quiz.color_palette.includes(hex);
+            <p className="mb-5 text-sm text-[var(--color-muted)]" dir="rtl">پالت رنگی نزدیک به حس دلخواهت را انتخاب کن.</p>
+            <div className="grid gap-3 sm:grid-cols-2" dir="rtl">
+              {COLOR_PALETTES.map((palette) => {
+                const active = palette.colors.every((hex) => quiz.color_palette.includes(hex));
                 return (
                   <button
-                    key={hex}
+                    key={palette.id}
                     type="button"
-                    onClick={() => quiz.toggleColor(hex)}
+                    onClick={() => palette.colors.forEach((hex) => {
+                      if (!active && !quiz.color_palette.includes(hex)) quiz.toggleColor(hex);
+                      if (active) quiz.toggleColor(hex);
+                    })}
                     aria-pressed={active}
-                    aria-label={`Color ${hex}`}
                     className={clsx(
-                      "h-12 w-12 rounded-full transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-2",
-                      "ring-1 ring-inset ring-black/10 hover:scale-105",
-                      active && "scale-110 ring-2 ring-[var(--color-accent)] ring-offset-2",
+                      "rounded-2xl border p-4 text-right transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]",
+                      active ? "border-[var(--color-accent)] bg-[var(--color-accent)]/5" : "border-[var(--color-line)]",
                     )}
-                    style={{ backgroundColor: hex }}
-                  />
+                  >
+                    <span className="font-semibold">{palette.label_fa}</span>
+                    <span className="mr-2 text-xs text-[var(--color-muted)]">{palette.mood}</span>
+                    <span className="mt-3 flex gap-2">
+                      {palette.colors.map((hex) => <span key={hex} className="h-12 w-12 rounded-full ring-1 ring-inset ring-black/10" style={{ backgroundColor: hex }} />)}
+                    </span>
+                  </button>
                 );
               })}
             </div>
@@ -252,19 +265,30 @@ export default function QuizPage() {
               />
             </div>
             <p className="text-sm text-[var(--color-muted)] sm:col-span-2">
-              ≈ {((quiz.room_width_cm * quiz.room_length_cm) / 10000).toFixed(1)} m² — we use this in the 2D floorplan preview.
+              ≈ {((quiz.room_width_cm * quiz.room_length_cm) / 10000).toFixed(1)} m² — {DIMENSION_HELP}
             </p>
           </div>
         )}
 
         {step === 3 && (
-          <BudgetHistogram
-            min={BUDGET_MIN}
-            max={BUDGET_MAX}
-            valueMin={quiz.budget_min_toman}
-            valueMax={quiz.budget_max_toman}
-            onChange={(lo, hi) => quiz.setBudget(lo, hi)}
-          />
+          <div>
+            <BudgetHistogram
+              min={BUDGET_MIN}
+              max={BUDGET_MAX}
+              valueMin={quiz.budget_min_toman}
+              valueMax={quiz.budget_max_toman}
+              onChange={(lo, hi) => quiz.setBudget(lo, hi)}
+            />
+            <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4" dir="rtl">
+              {BUDGET_RANGES.map((range) => (
+                <button key={range.id} type="button" onClick={() => quiz.setBudget(range.min, range.max)}
+                        className="rounded-xl border border-[var(--color-line)] p-2 text-xs hover:border-[var(--color-accent)]">
+                  <span className="mx-auto mb-1 block h-2 w-8 rounded-full" style={{ backgroundColor: range.color }} />
+                  {range.label_fa}
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
         {step === 4 && (
@@ -286,7 +310,8 @@ export default function QuizPage() {
                         : "border-[var(--color-line)] text-[var(--color-muted)] hover:border-[var(--color-faint)]",
                     )}
                   >
-                    {m.label} <span className="text-xs text-[var(--color-muted)]">({m.fa})</span>
+                    <span className="text-lg" aria-hidden="true">{m.icon}</span> {m.fa}
+                    <span className="block text-xs text-[var(--color-muted)]">{m.subtypes.join("، ")}</span>
                   </button>
                 );
               })}

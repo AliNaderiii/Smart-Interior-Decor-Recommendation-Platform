@@ -1,8 +1,11 @@
+# Base stack. Use docker-compose.dev.yml for local demo accounts and host ports,
+# docker-compose.prod.yml for production policy/resource overrides, or
+# docker-compose.test.yml for the real-Postgres/real-Redis test profile.
 version: "3.9"
 
 services:
   postgres:
-    image: ankane/pgvector:latest
+    image: ankane/pgvector:v0.6.2-pg16
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-decor}
@@ -11,13 +14,13 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-decor}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-decor} -d ${POSTGRES_DB:-decor}"]
       interval: 5s
       timeout: 5s
       retries: 10
 
   redis:
-    image: redis:7-alpine
+    image: redis:7.4-alpine
     restart: unless-stopped
     command: ["redis-server", "--appendonly", "yes"]
     volumes:
@@ -35,17 +38,27 @@ services:
     restart: unless-stopped
     env_file: .env
     environment:
+      APP_ENV: ${APP_ENV:-development}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-decor}:${POSTGRES_PASSWORD:-decor}@postgres:5432/${POSTGRES_DB:-decor}
       REDIS_URL: redis://redis:6379/0
+      LOG_FORMAT: ${LOG_FORMAT:-text}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+    # Production-safe catalog loading: --from-json is deterministic product
+    # data only, --if-empty is idempotent, and no demo-account flag is present.
     command: >
       sh -c "alembic upgrade head &&
-             python scripts/seed_products.py --if-empty --from-json &&
-             uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --no-server-header --proxy-headers"
+             python scripts/load_realistic_products.py --realistic --expand-to 150 --if-empty --from-json &&
+             exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --no-server-header --proxy-headers"
 
   frontend:
     build:
@@ -53,10 +66,11 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
   caddy:
-    image: caddy:2-alpine
+    image: caddy:2.8-alpine
     restart: unless-stopped
     ports:
       - "80:80"
@@ -66,8 +80,10 @@ services:
       - caddydata:/data
       - caddyconfig:/config
     depends_on:
-      - backend
-      - frontend
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
 
 volumes:
   pgdata:

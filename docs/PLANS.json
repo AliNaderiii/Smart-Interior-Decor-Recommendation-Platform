@@ -1,0 +1,151 @@
+{
+  "plans_version": "2.0",
+  "inspired_by": ["Havenly", "Decorilla", "Modsy Pricing Tiers"],
+  "currency": "تومان",
+  "currency_format": "fa-IR",
+  "homeowner_plans": [
+    {
+      "id": "homeowner_free",
+      "name_fa": "رایگان",
+      "name_en": "Free",
+      "price_monthly": 0,
+      "price_yearly": 0,
+      "features": [
+        "1 پیشنهاد برای هر دسته",
+        "بدون مودبورد",
+        "بدون پلان 2 بعدی",
+        "لینک فروشنده با تاخیر 3 روزه"
+      ],
+      "limits": {
+        "recommendations_per_category": 1,
+        "moodboards": 0,
+        "floorplans": 0,
+        "projects": 1
+      },
+      "cta_fa": "شروع رایگان",
+      "popular": false
+    },
+    {
+      "id": "homeowner_premium",
+      "name_fa": "پریمیوم",
+      "name_en": "Premium",
+      "price_monthly": 99000,
+      "price_yearly": 990000,
+      "yearly_discount": "17% تخفیف",
+      "features": [
+        "5 پیشنهاد برای هر دسته با توضیح 'چرا این؟'",
+        "3 مودبورد قابل ویرایش با Drag & Drop",
+        "پلان 2 بعدی با تشخیص برخورد و فاصله راهرو 76cm",
+        "لیست خرید با قیمت لحظه‌ای و لینک مستقیم",
+        "ذخیره نامحدود",
+        "پشتیبانی چت"
+      ],
+      "limits": {
+        "recommendations_per_category": 5,
+        "moodboards": 3,
+        "floorplans": 3,
+        "projects": 10
+      },
+      "cta_fa": "شروع پریمیوم - 7 روز تست رایگان",
+      "popular": true,
+      "badge": "محبوب‌ترین"
+    },
+    {
+      "id": "homeowner_pro",
+      "name_fa": "حرفه‌ای",
+      "name_en": "Pro",
+      "price_monthly": 199000,
+      "price_yearly": 1990000,
+      "yearly_discount": "17% تخفیف",
+      "features": [
+        "همه چیز پریمیوم +",
+        "10 پیشنهاد برای هر دسته",
+        "مودبورد نامحدود با حالت Present",
+        "خروجی PNG پلان و مودبورد",
+        "فیدبک 👍/👎 که پیشنهاد بعدی را هوشمند می‌کند",
+        "مشاوره 30 دقیقه با طراح"
+      ],
+      "limits": {
+        "recommendations_per_category": 10,
+        "moodboards": -1,
+        "floorplans": -1,
+        "projects": -1
+      },
+      "cta_fa": "شروع حرفه‌ای",
+      "popular": false
+    }
+  ],
+  "designer_plans": [
+    {
+      "id": "designer_free",
+      "name_fa": "طراح - رایگان",
+      "name_en": "Designer Free",
+      "price_monthly": 0,
+      "features": [
+        "2 پروژه",
+        "پرسشنامه به نمایندگی از مشتری",
+        "اشتراک لینکی"
+      ],
+      "limits": {
+        "projects": 2,
+        "clients_per_project": 1
+      },
+      "cta_fa": "شروع به عنوان طراح"
+    },
+    {
+      "id": "designer_studio",
+      "name_fa": "استودیو",
+      "name_en": "Studio",
+      "price_monthly": 299000,
+      "price_yearly": 2990000,
+      "features": [
+        "20 پروژه",
+        "داشبورد Linear-like",
+        "اشتراک لینکی + ارسال ایمیل با Resend",
+        "مودبورد با کامنت مشتری",
+        "مدیریت اشتراک مشتری"
+      ],
+      "limits": {
+        "projects": 20
+      },
+      "cta_fa": "شروع استودیو",
+      "popular": true,
+      "badge": "برای فریلنسرها"
+    },
+    {
+      "id": "designer_agency",
+      "name_fa": "آژانس",
+      "name_en": "Agency",
+      "price_monthly": 699000,
+      "price_yearly": 6990000,
+      "features": [
+        "پروژه نامحدود",
+        "تیم 5 نفره",
+        "قالب پیشنهاد آماده",
+        "API دسترسی",
+        "پشتیبانی اولویت‌دار"
+      ],
+      "limits": {
+        "projects": -1,
+        "team_members": 5
+      },
+      "cta_fa": "شروع آژانس",
+      "popular": false
+    }
+  ],
+  "paywall_logic": {
+    "inspired_by": "Havenly soft paywall",
+    "homeowner_free": {
+      "recommendations": "فقط 1 محصول اول هر دسته کامل، بقیه Blur 40% + کارت 'با پریمیوم 4 پیشنهاد بیشتر ببین'",
+      "moodboard": "نمایش صفحه Paywall با 3 مودبورد نمونه از Havenly",
+      "floorplan": "نمایش با واترمارک",
+      "shopping_list": "فقط 2 لینک اول"
+    }
+  },
+  "payment_providers": {
+    "primary": "zarinpal",
+    "sandbox": true,
+    "production_note": "برای Production کلید Merchant ID واقعی زرین‌پال نیاز است. الان Sandbox است و هیچ کارتی ذخیره نمی‌شود",
+    "no_card_storage": true
+  }
+}

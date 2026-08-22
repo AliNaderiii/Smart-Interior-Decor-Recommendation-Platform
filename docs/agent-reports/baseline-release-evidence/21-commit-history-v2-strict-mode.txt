@@ -1,0 +1,32 @@
+Commit history of v2-strict-mode (authoritative branch) — read via GitHub API
+because the sandbox workspace is a depth-1 shallow clone.
+Captured: 2026-08-21T13:32:57Z (UTC)
+
+$ gh api 'repos/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/commits?sha=v2-strict-mode&per_page=100' --paginate
+
+f97bfad  2026-08-21T13:19:35Z  Ali Naderi  Merge pull request #4 from AliNaderiii/chore/add-agent-master-prompts
+11e5a00  2026-08-21T13:14:02Z  Ali Naderi  chore: add agent master prompt execution pack
+ab7fa21  2026-08-20T18:56:56Z  arena-ai-coding-agent[bot]  Merge pull request #3 from AliNaderiii/arena/01a02073-smart-interior-decor-recommend
+efadc3b  2026-08-20T18:56:43Z  AliNaderiii  Merge remote-tracking branch 'origin/v2-strict-mode' into arena/01a02073-smart-interior-decor-recommend
+f7447d4  2026-08-20T18:42:24Z  AliNaderiii  feat(data): integrate realistic Persian datasets
+794b721  2026-08-20T18:42:17Z  AliNaderiii  docs(data): audit mock catalog before V3 integration
+2ab0ca6  2026-08-20T18:25:32Z  Ali Naderi  feat(data): add 6 realistic datasets (products fa, taxonomy, questionnaire, plans, keys, design) + V3 integration prompt
+939e05c  2026-08-20T18:25:32Z  Ali Naderi  feat(data): add 6 realistic datasets (products fa, taxonomy, questionnaire, plans, keys, design) + V3 integration prompt
+0998ba4  2026-08-20T08:03:29Z  Ali Naderi  Merge pull request #2 from AliNaderiii/v2-strict-mode
+9166f7f  2026-08-20T07:59:35Z  Ali Naderi  Merge pull request #1 from AliNaderiii/arena/01a01dc4-smart-interior-decor-recommend
+dd2c34d  2026-08-20T07:46:59Z  AliNaderiii  feat(v2): Phase 5 polish, a11y & final reports
+87501f5  2026-08-20T07:40:03Z  AliNaderiii  feat(v2): Phase 4 dead keys — 0 DEAD, executable click audit
+7bec5e3  2026-08-20T07:33:34Z  AliNaderiii  feat(v2): Phase 3 minimal beautiful UI — all pages rebuilt
+c5f17e1  2026-08-20T07:15:58Z  AliNaderiii  feat(v2): Phase 3 foundation — design system, tokens, motion, palette, feedback
+c3170a0  2026-08-20T06:51:52Z  AliNaderiii  fix(v2): OptimizedImage — srcset was emitting identical URLs, LCP image faded in
+734140d  2026-08-20T06:49:07Z  AliNaderiii  perf(v2): Phase 2 — 117KB initial JS, HNSW recall fix, cache stampede fix
+088255c  2026-08-20T06:27:56Z  Arena Agent  docs(v2): Phase 1 re-probe results — all OWASP FAILs verified fixed
+ebfec13  2026-08-20T06:26:53Z  Arena Agent  feat(v2): Phase 1 security hardening — fortress mode (OWASP)
+7b16e4f  2026-08-20T06:18:13Z  Arena Agent  feat(v2): Phase 0B brutal audit — dead keys script, live OWASP probes, perf report
+7a2e7fe  2026-08-20T06:06:21Z  Arena Agent  feat(v2): Phase 0A research - 12 platforms
+61d13e9  2026-08-20T05:57:42Z  Ali Naderi  chore: add V2 strict mode master prompts and audit guide
+a847ad5  2026-08-19T21:32:15Z  AliNaderiii  fix(platform): resolve PM P0/P1 review — Postgres parity proven, rate limiting, real-embedding tooling
+41af766  2026-08-19T21:08:09Z  AliNaderiii  docs: point CI references at ci/github-ci.yml relocation
+8fb4a39  2026-08-19T21:07:46Z  AliNaderiii  feat(platform): three portals, docs, CI, DevOps — full MVP
+faba32b  2026-08-19T20:51:53Z  AliNaderiii  feat(backend): FastAPI + pgvector recommendation engine, JWT auth, 43 passing tests
+758ba35  2026-08-19T20:37:05Z  arena-ai-coding-agent[bot]  Initial commit

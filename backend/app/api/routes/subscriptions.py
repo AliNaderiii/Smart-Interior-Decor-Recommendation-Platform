@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -20,8 +20,14 @@ router = APIRouter(tags=["subscriptions"])
 
 
 class VerifyIn(BaseModel):
-    authority: str
-    status: str = "OK"
+    # Stage 03 (T-17/T-23): unbounded strings on a payment callback body reach
+    # the driver and, on PostgreSQL, produce a 500 rather than a 422. The
+    # gateway's authority is a short opaque token; bound it and reject anything
+    # the client invented.
+    model_config = ConfigDict(extra="forbid")
+
+    authority: str = Field(min_length=1, max_length=128)
+    status: str = Field(default="OK", max_length=32)
 
 
 @router.get("/subscriptions/me")

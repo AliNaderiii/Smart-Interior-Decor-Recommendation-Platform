@@ -1,0 +1,58 @@
+== DB-level pgvector benchmark (scripts/bench_pgvector.py) ==
+Catalog sizes are EXACT: 1,000 rows, then 11,000 rows (1,000 + 10,000 synthetic).
+Deterministic synthetic catalog: scripts/seed_catalog_scale.py (hash embeddings, PG-only).
+
+$ DATABASE_URL=postgresql+psycopg://postgres:@/ai_test?host=/tmp/pgdata-ai /tmp/ai-venv/bin/python scripts/bench_pgvector.py --sizes 1000 --json bench-pgvector-1000.json
+
+===== catalog size 1000 =====
+catalog_size: 1000
+rows_total: 1000
+rows_verified: 860
+plan:
+plan_uses_hnsw: False
+plan_uses_seq_scan: False
+cold_p50_ms: 1.0
+cold_p95_ms: 1.7
+cold_max_ms: 2.0
+cold_mean_rows_per_query: 100.0
+warm_p50_ms: 0.9
+warm_p95_ms: 0.9
+warm_max_ms: 1.1
+warm_mean_rows_per_query: 100.0
+exact_candidates_sofa: 100
+ann_candidates_sofa: 100
+recall_at_limit_sofa: 1.0
+no_result_ms: 0.6
+hnsw_probe: {'ef40': {'rows_returned': 100, 'latency_ms': 4.6}, 'ef400': {'rows_returned': 100, 'latency_ms': 3.9}}
+hnsw_probe_plan_uses_index: False
+hnsw_probe_plan: Limit  (cost=935.72..935.97 rows=100 width=26) (actual time=3.464..3.474 rows=100 loops=1)
+
+json written: ../docs/agent-reports/ai-recommender-evidence/bench-pgvector-1000.json
+total products: 11000 (ANALYZE run)
+
+$ ... --sizes 10000 --json bench-pgvector-10000.json (11,000 rows total)
+
+===== catalog size 10000 =====
+catalog_size: 10000
+rows_total: 11000
+rows_verified: 9388
+plan:
+plan_uses_hnsw: False
+plan_uses_seq_scan: False
+cold_p50_ms: 6.3
+cold_p95_ms: 7.1
+cold_max_ms: 8.0
+cold_mean_rows_per_query: 100.0
+warm_p50_ms: 6.2
+warm_p95_ms: 6.7
+warm_max_ms: 7.9
+warm_mean_rows_per_query: 100.0
+exact_candidates_sofa: 100
+ann_candidates_sofa: 100
+recall_at_limit_sofa: 1.0
+no_result_ms: 0.8
+hnsw_probe: {'ef40': {'rows_returned': 40, 'latency_ms': 1.9}, 'ef400': {'rows_returned': 100, 'latency_ms': 5.0}}
+hnsw_probe_plan_uses_index: True
+hnsw_probe_plan: Limit  (cost=108.60..142.10 rows=100 width=26) (actual time=2.798..3.248 rows=100 loops=1)
+
+json written: ../docs/agent-reports/ai-recommender-evidence/bench-pgvector-10000.json

@@ -11,10 +11,9 @@ CATEGORIES = [
     "coffee_table",
     "rug",
     "lighting",
-    "armchair",
-    "tv_stand",
-    "bookshelf",
-    "curtain",
+    "chair",
+    "storage",
+    "decor",
 ]
 
 STYLES = ["modern", "scandinavian", "industrial", "boho", "minimal", "classic"]

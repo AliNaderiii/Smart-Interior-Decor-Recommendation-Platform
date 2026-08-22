@@ -1,0 +1,47 @@
+# ============================================================================
+# DEVELOPMENT OVERLAY — docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# ============================================================================
+# Everything here is explicitly development-shaped and safe:
+#   * SEED_DEMO_ACCOUNTS=true recreates the documented demo logins
+#     (admin@smartdecor.dev / Admin123! etc.) — the Stage 03 gate guarantees
+#     they can never be created under APP_ENV=production, even with this flag.
+#   * Mock providers keep the stack fully offline: AI_PROVIDER=mock,
+#     EMBEDDING_BACKEND=hash, PAYMENT_PROVIDER=mock, EMAIL_PROVIDER=mock,
+#     STORAGE_BACKEND=local.
+#   * The 150-row realistic catalog is loaded on backend start when the
+#     products table is empty (--if-empty).
+# ============================================================================
+
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  backend:
+    environment:
+      APP_ENV: development
+      SEED_DEMO_ACCOUNTS: "true"
+      SECRET_KEY: dev-only-secret-change-me
+      COOKIE_SECURE: "false"
+      STORAGE_BACKEND: local
+      AI_PROVIDER: mock
+      EMBEDDING_BACKEND: hash
+      PAYMENT_PROVIDER: mock
+      EMAIL_PROVIDER: mock
+      LOG_FORMAT: text
+      FRONTEND_ORIGIN: http://localhost:5173
+    ports:
+      - "8000:8000"
+    # Dev only: seed the catalog (idempotent) before serving.
+    command: >
+      sh -c "alembic upgrade head &&
+             python scripts/load_realistic_products.py --realistic --expand-to 150 --if-empty &&
+             exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2 --no-server-header --proxy-headers"
+
+  frontend:
+    ports:
+      - "5173:80"

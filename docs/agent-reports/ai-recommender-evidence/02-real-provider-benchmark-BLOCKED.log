@@ -1,0 +1,17 @@
+== REAL provider extraction benchmark — BLOCKED (no credentials in sandbox) ==
+$ env | grep -cE "^(GEMINI_API_KEY|OPENAI_API_KEY)="
+0
+
+$ AI_PROVIDER=gemini GEMINI_API_KEY= /tmp/ai-venv/bin/python scripts/evaluate_extraction.py --real
+ERROR: --real requires AI_PROVIDER=gemini|openai and the matching API key in the environment.
+Blocked command was: AI_PROVIDER=gemini GEMINI_API_KEY=<empty> OPENAI_API_KEY=<empty> python scripts/evaluate_extraction.py --real
+exit=0
+
+$ AI_PROVIDER=openai OPENAI_API_KEY= /tmp/ai-venv/bin/python scripts/evaluate_extraction.py --real
+ERROR: --real requires AI_PROVIDER=gemini|openai and the matching API key in the environment.
+Blocked command was: AI_PROVIDER=openai GEMINI_API_KEY=<empty> OPENAI_API_KEY=<empty> python scripts/evaluate_extraction.py --real
+exit=0
+
+Unblock: provision GEMINI_API_KEY (staging provider of record per ci/github-ci.yml),
+document authorization per docs/ai/privacy-cost-assessment.md, then rerun the command above.
+A REAL run also needs actual pixels: pass --images-dir DIR with {id:02d}-*.jpg (see script docstring).

@@ -1,0 +1,478 @@
+/tmp/infra-venv/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+  from starlette.testclient import TestClient as TestClient  # noqa
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 200 OK"
+ERROR:app.core.security_headers:unhandled error while serving /api/v1/__probe/boom
+Traceback (most recent call last):
+  File "/home/user/Smart-Interior-Decor-Recommendation-Platform/backend/app/core/security_headers.py", line 159, in dispatch
+    response = await call_next(request)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/infra-venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 168, in call_next
+    raise app_exc from app_exc.__cause__ or app_exc.__context__
+  File "/tmp/infra-venv/lib/python3.11/site-packages/starlette/middleware/base.py", line 144, in coro
+    await self.app(scope, receive_or_disconnect, send_no_error)
+  File "/tmp/infra-venv/lib/python3.11/site-packages/starlette/middleware/cors.py", line 88, in __call__
+    await self.app(scope, receive, send)
+  File "/tmp/infra-venv/lib/python3.11/site-packages/starlette/middleware/exceptions.py", line 63, in __call__
+    await wrap_app_handling_exceptions(self.app, conn)(scope, receive, send)
+  File "/tmp/infra-venv/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/tmp/infra-venv/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/tmp/infra-venv/lib/python3.11/site-packages/fastapi/middleware/asyncexitstack.py", line 18, in __call__
+    await self.app(scope, receive, send)
+  File "/tmp/infra-venv/lib/python3.11/site-packages/starlette/routing.py", line 670, in __call__
+    await self.middleware_stack(scope, receive, send)
+  File "/tmp/infra-venv/lib/python3.11/site-packages/fastapi/routing.py", line 2734, in app
+    await route.handle(scope, receive, send)
+  File "/tmp/infra-venv/lib/python3.11/site-packages/fastapi/routing.py", line 1281, in handle
+    await super().handle(scope, receive, send)
+  File "/tmp/infra-venv/lib/python3.11/site-packages/starlette/routing.py", line 280, in handle
+    await self.app(scope, receive, send)
+  File "/tmp/infra-venv/lib/python3.11/site-packages/fastapi/routing.py", line 158, in app
+    await wrap_app_handling_exceptions(app, request)(scope, receive, send)
+  File "/tmp/infra-venv/lib/python3.11/site-packages/starlette/_exception_handler.py", line 53, in wrapped_app
+    raise exc
+  File "/tmp/infra-venv/lib/python3.11/site-packages/starlette/_exception_handler.py", line 42, in wrapped_app
+    await app(scope, receive, sender)
+  File "/tmp/infra-venv/lib/python3.11/site-packages/fastapi/routing.py", line 144, in app
+    response = await f(request)
+               ^^^^^^^^^^^^^^^^
+  File "/tmp/infra-venv/lib/python3.11/site-packages/fastapi/routing.py", line 706, in app
+    raw_response = await run_endpoint_function(
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/infra-venv/lib/python3.11/site-packages/fastapi/routing.py", line 354, in run_endpoint_function
+    return await run_in_threadpool(dependant.call, **values)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/infra-venv/lib/python3.11/site-packages/starlette/concurrency.py", line 34, in run_in_threadpool
+    return await anyio.to_thread.run_sync(func)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/infra-venv/lib/python3.11/site-packages/anyio/to_thread.py", line 65, in run_sync
+    return await get_async_backend().run_sync_in_worker_thread(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/tmp/infra-venv/lib/python3.11/site-packages/anyio/_backends/_asyncio.py", line 2641, in run_sync_in_worker_thread
+    return await future
+           ^^^^^^^^^^^^
+  File "/tmp/infra-venv/lib/python3.11/site-packages/anyio/_backends/_asyncio.py", line 1033, in run
+    result = context.run(func, *args)
+             ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/user/Smart-Interior-Decor-Recommendation-Platform/docs/security/probes/probe_api_security.py", line 100, in _boom
+    raise RuntimeError("probe-triggered unhandled error")
+RuntimeError: probe-triggered unhandled error
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/__probe/boom "HTTP/1.1 500 Internal Server Error"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 422 Unprocessable Entity"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: OPTIONS http://testserver/api/v1/auth/login "HTTP/1.1 400 Bad Request"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products "HTTP/1.1 422 Unprocessable Entity"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products "HTTP/1.1 201 Created"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products "HTTP/1.1 422 Unprocessable Entity"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products "HTTP/1.1 422 Unprocessable Entity"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products "HTTP/1.1 422 Unprocessable Entity"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 415 Unsupported Media Type"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 415 Unsupported Media Type"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 415 Unsupported Media Type"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 415 Unsupported Media Type"
+WARNING:app.core.uploads:rejected upload: UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x7f47049146d0>
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 415 Unsupported Media Type"
+WARNING:app.core.uploads:rejected upload: UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x7f4704160720>
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 415 Unsupported Media Type"
+WARNING:app.core.uploads:rejected upload: UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x7f470414bdd0>
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 415 Unsupported Media Type"
+WARNING:app.core.uploads:rejected upload: UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x7f4704161260>
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 415 Unsupported Media Type"
+WARNING:app.core.uploads:rejected upload: UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x7f4704161850>
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 415 Unsupported Media Type"
+WARNING:app.core.uploads:rejected upload: UnidentifiedImageError: cannot identify image file <_io.BytesIO object at 0x7f4704161c10>
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 415 Unsupported Media Type"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/products/upload "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 201 Created"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/projects "HTTP/1.1 201 Created"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/quiz "HTTP/1.1 201 Created"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/projects/ee775afe212d45fab34a4247b0866f1b/share "HTTP/1.1 201 Created"
+INFO:app.services.recommender:recommend cold compute key=[REDACTED] took=39ms
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/mdXvgSCRpgBUyRjHeplPL68xR1DG8sEWktvQ7cmhA2M "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/share/zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz "HTTP/1.1 404 Not Found"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 201 Created"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 201 Created"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 201 Created"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+WARNING:app.core.brute_force:brute-force lockout engaged for account=l***@probe.example.com#201bfdee ip=testclient after 5 attempts
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 201 Created"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/moodboards "HTTP/1.1 403 Forbidden"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/moodboards "HTTP/1.1 201 Created"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/logout "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/refresh "HTTP/1.1 401 Unauthorized"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 201 Created"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 201 Created"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/moodboards "HTTP/1.1 201 Created"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/moodboards/1071067bbb4f40f29a2fb9e8f3029f11 "HTTP/1.1 404 Not Found"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: DELETE http://testserver/api/v1/moodboards/1071067bbb4f40f29a2fb9e8f3029f11 "HTTP/1.1 404 Not Found"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/admin/users "HTTP/1.1 403 Forbidden"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: GET http://testserver/api/v1/projects "HTTP/1.1 403 Forbidden"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: PATCH http://testserver/api/v1/admin/users/0a97b6a565bf4b3e8e9e4c4c14cb1a10 "HTTP/1.1 403 Forbidden"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: PATCH http://testserver/api/v1/admin/users/fb903426a19c4ddcbbb247ce16a36b42 "HTTP/1.1 409 Conflict"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: PATCH http://testserver/api/v1/admin/users/0a97b6a565bf4b3e8e9e4c4c14cb1a10 "HTTP/1.1 422 Unprocessable Entity"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: PATCH http://testserver/api/v1/admin/users/7484d3c511394062bafdb5b6243e307b "HTTP/1.1 200 OK"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 201 Created"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/feedback "HTTP/1.1 201 Created"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/moodboards "HTTP/1.1 201 Created"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: DELETE http://testserver/api/v1/users/me "HTTP/1.1 200 OK"
+DEBUG:asyncio:Using selector: EpollSelector
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+DEBUG:asyncio:Using selector: EpollSelector
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+DEBUG:asyncio:Using selector: EpollSelector
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+DEBUG:asyncio:Using selector: EpollSelector
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+DEBUG:asyncio:Using selector: EpollSelector
+WARNING:app.core.brute_force:brute-force lockout engaged for account=l***@probe.example.com#3d63cbb9 ip=testclient after 5 attempts
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 429 Too Many Requests"
+DEBUG:asyncio:Using selector: EpollSelector
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 429 Too Many Requests"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/register "HTTP/1.1 201 Created"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+WARNING:app.core.rate_limit:rate limiter unavailable (probe: redis is down) for key=[REDACTED]; failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+WARNING:app.core.rate_limit:rate limiter unavailable (probe: redis is down) for key=[REDACTED]; failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+WARNING:app.core.rate_limit:rate limiter unavailable (probe: redis is down) for key=[REDACTED]; failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+WARNING:app.core.rate_limit:rate limiter unavailable (probe: redis is down) for key=[REDACTED]; failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+WARNING:app.core.rate_limit:rate limiter unavailable (probe: redis is down) for key=[REDACTED]; failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+WARNING:app.core.rate_limit:rate limiter unavailable (probe: redis is down) for key=[REDACTED]; failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+WARNING:app.core.rate_limit:rate limiter unavailable (probe: redis is down) for key=[REDACTED]; failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+WARNING:app.core.rate_limit:rate limiter unavailable (probe: redis is down) for key=[REDACTED]; failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+WARNING:app.core.brute_force:brute-force store unavailable (probe: redis is down); failing open (APP_ENV=test)
+INFO:app.access:http_request
+INFO:httpx:HTTP Request: POST http://testserver/api/v1/auth/login "HTTP/1.1 401 Unauthorized"
+==============================================================================
+STAGE 03 API SECURITY PROBE — STAGE07-PG-REDIS
+redis: redis://127.0.0.1:6399/15
+db   : postgresql+psycopg://postgres@/postgres?host=/tmp/pgdata-infra
+==============================================================================
+[SECURE  ] H-01 Security headers on an unhandled 500
+           expected: all 5 core headers present on the 500 response
+           observed: status=500 missing=none
+[SECURE  ] H-02 500 response body must not leak a stack trace / exception type
+           expected: generic JSON envelope, no traceback, no exception class name
+           observed: body[:160]='{"success":false,"data":null,"error":"Internal server error"}'
+[SECURE  ] H-03 422 validation envelope must not reflect submitted values
+           expected: field name + message only
+           observed: status=422 reflects_input=False body[:200]='{"success":false,"data":null,"error":"Validation failed","details":[{"field":"email","type":"value_error","message":"value is not a valid email address: An email address must have an @-sign."},{"field'
+[SECURE  ] C-01 CORS must reject an unknown origin
+           expected: no access-control-allow-origin for https://evil.example
+           observed: acao=None
+[SECURE  ] C-02 Production CORS allowlist must not contain localhost origins
+           expected: ['https://app.example.com']
+           observed: ['https://app.example.com']
+[SECURE  ] X-01 javascript: URL in seller_link must be rejected
+           expected: 422
+           observed: status=422 stored_verbatim=False
+[SECURE  ] X-02 Admin-supplied product free text must be HTML-stripped
+           expected: no markup persisted
+           observed: status=201 markup_persisted=False title='Sofa'
+[SECURE  ] V-01 Unknown fields on ProductIn must be rejected (mass assignment)
+           expected: 422 extra_forbidden
+           observed: status=422
+[SECURE  ] V-02 Oversized product title must be a 422, never a 500
+           expected: 422
+           observed: status=422
+[SECURE  ] V-03 Product category must be validated against the taxonomy
+           expected: 422
+           observed: status=422
+[SECURE  ] U-01 Non-image upload (text/html) must be rejected
+           expected: 415 or 422
+           observed: status=415 served_content_type=''
+[SECURE  ] U-02 SVG upload (scriptable image) must be rejected
+           expected: 415 or 422
+           observed: status=415
+[SECURE  ] U-03 Content-type spoofing must be caught by magic-byte sniffing
+           expected: 415 or 422
+           observed: status=415
+[SECURE  ] U-04 Path-traversal filename must not escape the storage root
+           expected: rejected, or stored under a generated name inside the storage dir
+           observed: status=415 escaped=False
+[SECURE  ] U-05 Upload endpoint must be rate limited
+           expected: at least one 429 within 12 rapid uploads
+           observed: status_codes=[415, 415, 415, 415, 415, 415, 429, 429, 429, 429, 429, 429]
+[SECURE  ] X-03 AI-generated text must be HTML-stripped before persistence
+           expected: no markup in the stored title/description
+           observed: markup_persisted=False status=429 (upload rejected before extraction)
+[SECURE  ] R-01 Public share endpoint must be rate limited
+           expected: at least one 429 within 40 rapid reads
+           observed: distinct_status=[200, 429]
+[SECURE  ] R-02 Unknown share token must not leak whether it ever existed
+           expected: 404 with a generic message
+           observed: status=404 body='{"success":false,"data":null,"error":"Share link not found"}'
+[SECURE  ] R-03 Registration flooding must be throttled with Retry-After
+           expected: 429 + Retry-After header
+           observed: status_codes=[201, 201, 201, 429, 429, 429] retry_after='59'
+[SECURE  ] R-04 Wrong-password lockout must engage and carry Retry-After
+           expected: 401 x4 then 429 + Retry-After
+           observed: status_codes=[401, 401, 401, 401, 429, 429, 429] retry_after='900'
+[SECURE  ] K-01 Auth cookies must be HttpOnly + SameSite
+           expected: HttpOnly and SameSite on the access cookie
+           observed: set-cookie='access_token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwMDBjOWMzYWU4ODY0ZTJlOWQ1MzAyMWRlODE0MGQwNyIsInR5cGUiOiJhY2'
+[SECURE  ] K-02 Cookie-authenticated state change requires the CSRF header
+           expected: 403 without X-CSRF-Token, 201 with it
+           observed: without=403 with=201
+[SECURE  ] K-03 Refresh token must be revoked after logout (replay blocked)
+           expected: 401 on refresh after logout
+           observed: logout=200 refresh_replay=401
+[SECURE  ] A-01 Cross-tenant moodboard read must 404
+           expected: 404
+           observed: status=404
+[SECURE  ] A-02 Cross-tenant moodboard delete must 404
+           expected: 404
+           observed: status=404
+[SECURE  ] A-03 Homeowner must not reach admin endpoints
+           expected: 403
+           observed: status=403
+[SECURE  ] A-04 Homeowner must not reach designer endpoints
+           expected: 403
+           observed: status=403
+[SECURE  ] A-05 Self privilege escalation via admin route must fail
+           expected: 403
+           observed: status=403
+[SECURE  ] A-06 Admin must not be able to demote itself (lockout / audit gap)
+           expected: 409 or 422
+           observed: status=409
+[SECURE  ] V-04 Unknown fields on the admin user patch must be rejected
+           expected: 422
+           observed: status=422
+[SECURE  ] L-01 Admin role change must be written to the audit log
+           expected: role_change present
+           observed: new_actions=none
+[SECURE  ] G-01 GDPR delete must remove per-user feedback rows
+           expected: 0 rows left
+           observed: status=200 product_feedback_rows_left=0
+[SECURE  ] G-02 GDPR delete must pseudonymise/clear the user's audit rows
+           expected: 0 rows still bound to the deleted user id
+           observed: audit_rows_still_bound=0
+[SECURE  ] G-03 GDPR delete must itself be audited
+           expected: >=1 user_delete audit row
+           observed: user_delete_rows=11
+[SECURE  ] P-01 Logs must not contain raw account identifiers (personal data)
+           expected: email addresses masked or hashed
+           observed: raw_email_in_logs=False
+[SECURE  ] T-01 Login timing must not disclose whether an account exists
+           expected: ratio between 0.5x and 2x
+           observed: known=269.8ms unknown=269.8ms ratio=1.0x
+[SECURE  ] D-01 Brute-force control behaviour when Redis is unavailable
+           expected: production: fail closed (503). dev/test: documented fail-open
+           observed: APP_ENV=test status_codes=[401, 401, 401, 401, 401, 401, 401, 401]
+
+==============================================================================
+SUMMARY STAGE07-PG-REDIS: 37 checks, 37 secure, 0 INSECURE
+==============================================================================

@@ -254,7 +254,7 @@ export default function DesignerDashboardPage() {
                   {p.quiz_count} quiz{p.quiz_count === 1 ? "" : "zes"}
                 </span>
                 <span className="w-24 text-right text-xs text-[var(--color-faint)] tabular-nums">
-                  {new Date(p.created_at).toLocaleDateString()}
+                  {new Date(p.created_at).toLocaleDateString("fa-IR")}
                 </span>
                 <span
                   aria-hidden="true"

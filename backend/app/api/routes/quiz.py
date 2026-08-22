@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from ai.embedding_service import get_embedding, quiz_to_text
 from app.api.deps import get_current_user
+from app.core.datasets import recommendation_limit
 from app.core.rate_limit import enforce_rate_limit
 from app.db.session import get_db
 from app.models.quiz import StyleQuiz
@@ -116,10 +117,11 @@ def recommend_endpoint(
     sub = user.subscription
     is_pro = bool(sub and sub.is_active)
     if not is_pro:
+        visible_limit = recommendation_limit("homeowner_free")
         for cat, items in result["categories"].items():
             teasers = []
             for i, item in enumerate(items):
-                if i == 0:
+                if i < visible_limit:
                     teasers.append(item)
                 else:
                     teasers.append({

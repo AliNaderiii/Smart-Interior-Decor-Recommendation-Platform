@@ -15,10 +15,11 @@ Embedding strategy (see docs/ARCHITECTURE.md ADR-004):
     `--real-embeddings`, commit `seed_data/embeddings_real.json`, then any
     offline deploy can seed with `--from-json`.
 
-Also creates default accounts:
-    admin@smartdecor.dev    / Admin123! (admin)
-    designer@smartdecor.dev / Design123! (designer)
-    demo@smartdecor.dev     / Demo1234! (homeowner)
+Demo accounts (Stage 03 / IR-001):
+    This script no longer creates default logins unconditionally. Demo accounts
+    are created only when ``SEED_DEMO_ACCOUNTS=true`` **and** ``APP_ENV`` is not
+    ``production``; the gate and the credential list live in
+    ``app.core.demo_seed``. See docs/security/DEMO_ACCOUNTS.md.
 """
 from __future__ import annotations
 
@@ -31,9 +32,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from sqlalchemy import func, select  # noqa: E402
 
 from ai.embedding_service import get_embedding, product_to_text  # noqa: E402
-from app.core.security import hash_password  # noqa: E402
+from app.core.demo_seed import ensure_demo_accounts  # noqa: E402
 from app.db.session import SessionLocal, engine  # noqa: E402
-from app.models import Base, Product, Subscription, User  # noqa: E402
+from app.models import Base, Product  # noqa: E402
 
 random.seed(42)
 
@@ -92,6 +93,13 @@ CATEGORY_DEFS = {
     "tv_stand": {"price": (6_000_000, 40_000_000), "size": ((140, 220), (35, 50), (45, 65)), "fa": "میز تلویزیون"},
     "bookshelf": {"price": (5_000_000, 35_000_000), "size": ((60, 120), (25, 40), (150, 220)), "fa": "کتابخانه"},
     "curtain": {"price": (2_000_000, 18_000_000), "size": ((140, 300), (1, 2), (240, 280)), "fa": "پرده"},
+}
+
+CATEGORY_ALIASES = {
+    "armchair": "chair",
+    "tv_stand": "storage",
+    "bookshelf": "storage",
+    "curtain": "decor",
 }
 
 MATERIAL_WORDS = {
@@ -163,7 +171,7 @@ def build_products(real_from_json: bool = False) -> list[Product]:
         product = Product(
             title=title,
             title_fa=f"{CATEGORY_DEFS[category]['fa']} {style}",
-            category=category,
+            category=CATEGORY_ALIASES.get(category, category),
             room_type="living_room",
             price_toman=price,
             image_url=UNSPLASH.format(pid=PHOTO_IDS[i % len(PHOTO_IDS)]),
@@ -223,30 +231,46 @@ def seed(if_empty: bool = False, real_embeddings: bool = False, from_json: bool 
             if real_embeddings:
                 _export_real_embeddings(products)
 
-        defaults = [
-            ("admin@smartdecor.dev", "Admin123!", "admin", "Platform Admin"),
-            ("designer@smartdecor.dev", "Design123!", "designer", "Sara Designer"),
-            ("demo@smartdecor.dev", "Demo1234!", "homeowner", "Demo Homeowner"),
-        ]
-        for email, password, role, name in defaults:
-            if not db.scalar(select(User).where(User.email == email)):
-                user = User(
-                    email=email,
-                    hashed_password=hash_password(password),
-                    role=role,
-                    full_name=name,
-                )
-                user.subscription = Subscription(plan="free", is_active=False)
-                db.add(user)
+        defaults_created = ensure_demo_accounts(db)
         db.commit()
-        print("default accounts ready (see scripts/seed_products.py docstring)")
+        if defaults_created:
+            print(
+                "DEVELOPMENT ONLY: demo accounts created "
+                f"({', '.join(defaults_created)}) — see docs/security/DEMO_ACCOUNTS.md"
+            )
+        else:
+            print(
+                "demo accounts not created (production, or SEED_DEMO_ACCOUNTS "
+                "is false — this is the safe default)"
+            )
     finally:
         db.close()
 
 
 if __name__ == "__main__":
-    seed(
-        if_empty="--if-empty" in sys.argv,
-        real_embeddings="--real-embeddings" in sys.argv,
-        from_json="--from-json" in sys.argv,
-    )
+    if "--seed-demo-accounts" in sys.argv:
+        # DEV ONLY. enable_for_this_process() raises under APP_ENV=production,
+        # so a deploy script cannot quietly get demo logins.
+        from app.core.demo_seed import enable_for_this_process
+
+        enable_for_this_process(reason="--seed-demo-accounts")
+    if "--realistic" in sys.argv:
+        # Backward-compatible entrypoint for deploy scripts that still call
+        # seed_products.py. The dedicated loader owns realistic data mapping.
+        from scripts.load_realistic_products import load
+
+        expand_to = 150
+        if "--expand-to" in sys.argv:
+            expand_to = int(sys.argv[sys.argv.index("--expand-to") + 1])
+        load(
+            if_empty="--if-empty" in sys.argv,
+            clear="--clear" in sys.argv,
+            expand_to=expand_to,
+            from_json="--from-json" in sys.argv,
+        )
+    else:
+        seed(
+            if_empty="--if-empty" in sys.argv,
+            real_embeddings="--real-embeddings" in sys.argv,
+            from_json="--from-json" in sys.argv,
+        )

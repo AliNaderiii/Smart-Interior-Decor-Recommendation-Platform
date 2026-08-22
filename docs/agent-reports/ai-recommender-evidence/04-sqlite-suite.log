@@ -1,0 +1,4 @@
+== SQLite + fakeredis full suite ==
+$ cd backend && /tmp/ai-venv/bin/python -m pytest tests/ --ignore=tests/test_pgvector_real.py -p no:warnings --tb=no
+463 passed, 13 skipped in 84.63s (0:01:24)
+exit=0

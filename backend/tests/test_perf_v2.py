@@ -12,7 +12,6 @@ import time
 from app.core.config import settings
 from app.services.recommender import quiz_cache_key
 
-
 QUIZ = {
     "styles": ["scandinavian"],
     "color_palette": ["#FFFFFF"],

@@ -13,7 +13,10 @@ Usage:
 All rows are prefixed `perf-` and are safe to delete:
     DELETE FROM products WHERE id LIKE 'perf-%';
 """
-import os, random, sys
+import os
+import random
+import sys
+
 sys.path.insert(0, os.getcwd())
 from sqlalchemy import create_engine, text
 

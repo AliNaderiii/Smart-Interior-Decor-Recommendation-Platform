@@ -1,17 +1,19 @@
 """Moodboard CRUD — items stored as JSONB layout {product_id,x,y,w,h}."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.db.session import get_db
+from app.models import audit_log as actions
 from app.models.moodboard import Moodboard
 from app.models.product import Product
 from app.models.user import User
 from app.schemas.common import ok
 from app.schemas.moodboard import MoodboardIn, MoodboardOut, MoodboardUpdate
+from app.services import audit
 
 router = APIRouter(prefix="/moodboards", tags=["moodboards"])
 
@@ -77,8 +79,18 @@ def update_moodboard(
 
 
 @router.delete("/{moodboard_id}")
-def delete_moodboard(moodboard_id: str, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def delete_moodboard(
+    moodboard_id: str,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
     board = _owned(db, moodboard_id, user)
     db.delete(board)
     db.commit()
+    # A09: destructive actions need a trail, including the tenant's own.
+    audit.record(
+        db, actions.ACTION_MOODBOARD_DELETE, user_id=user.id,
+        detail=f"moodboard={moodboard_id}", request=request,
+    )
     return ok({"message": "deleted"})

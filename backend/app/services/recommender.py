@@ -7,6 +7,29 @@ Stage B — Semantic candidate retrieval: pgvector cosine distance
 Stage C — Weighted scoring with full explainability:
           final = 0.30*style + 0.30*color + 0.20*budget + 0.15*material + 0.05*pattern
 
+Stage D — Bounded feedback re-rank (heuristic, NOT a trained model) and
+          diversity/duplicate suppression before the final cut.
+
+Stage 04 audit (Master Prompt 04):
+
+* **Weights are versioned configuration, not code.** They live in
+  ``ai/recommender_config.json`` with an explicit ``weights_source`` record
+  (heuristic per ADR-005 — *not* learned from data) and are validated at
+  import (sum to 1, expected keys, sane ranges).
+* **Deterministic tie-breaking.** Every sort (SQL, Stage B, Stage C, feedback
+  re-rank) breaks ties on the stable product id, so identical inputs produce
+  byte-identical result orders across processes and restarts.
+* **No-result / few-result behaviour is explicit.** Categories with no
+  surviving candidates are reported in ``meta.empty_categories``; the engine
+  never pads results past the hard budget/category/verified filters.
+* **Diversity + duplicate suppression.** Near-duplicate items (identical
+  normalized title or embedding cosine ≥ 0.995) are suppressed and a single
+  style cannot monopolise the final cut (``diversity.max_per_style``).
+* **Explanation fidelity.** Every displayed component is computed in the same
+  function as the score it feeds; the payload carries
+  ``meta.weights_version`` so a displayed breakdown can always be audited
+  against the weights that produced it.
+
 Results are cached in Redis under
 ``rec:{user_id}:{sha256(quiz-payload)}`` TTL 3600s — see ``quiz_cache_key``
 for why the user id is part of the key.
@@ -14,9 +37,12 @@ for why the user id is part of the key.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
+import re
 import threading
 import time
+from pathlib import Path
 from typing import Any
 
 import orjson
@@ -24,6 +50,8 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from ai.embedding_service import cosine_similarity, get_embedding, quiz_to_text
+from ai.model_registry import AI_STACK_VERSION, RECOMMENDER_CONFIG_VERSION
+from ai.taxonomy import taxonomy_version
 from app.core.config import settings
 from app.core.redis_client import get_redis
 from app.models.feedback import ProductFeedback
@@ -31,16 +59,58 @@ from app.models.product import CATEGORIES, Product
 
 logger = logging.getLogger(__name__)
 
-WEIGHTS = {
-    "style": 0.30,
-    "color": 0.30,
-    "budget": 0.20,
-    "material": 0.15,
-    "pattern": 0.05,
-}
+# ---------------------------------------------------------------------------
+# Versioned recommender configuration (weights + knobs)
+# ---------------------------------------------------------------------------
+CONFIG_PATH = Path(__file__).resolve().parents[2] / "ai" / "recommender_config.json"
 
-CANDIDATE_LIMIT = 100
-MIN_RESULTS, MAX_RESULTS = 3, 5
+_EXPECTED_WEIGHT_KEYS = {"style", "color", "budget", "material", "pattern"}
+
+
+def load_recommender_config(path: Path = CONFIG_PATH) -> dict[str, Any]:
+    """Load and validate ``ai/recommender_config.json``.
+
+    Fail-fast on purpose: a recommender with weights that do not sum to 1 or
+    knobs out of range must refuse to start rather than rank products with
+    broken math. The version in the file must match the registry constant so
+    a stale config cannot ship under a new version label.
+    """
+    try:
+        cfg = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise RuntimeError(f"recommender config unreadable at {path}: {exc}") from exc
+    problems: list[str] = []
+    if cfg.get("config_version") != RECOMMENDER_CONFIG_VERSION:
+        problems.append(
+            f"config_version {cfg.get('config_version')!r} != registry "
+            f"{RECOMMENDER_CONFIG_VERSION!r}"
+        )
+    weights = cfg.get("weights", {})
+    if set(weights) != _EXPECTED_WEIGHT_KEYS:
+        problems.append(f"weights keys {sorted(weights)} != {sorted(_EXPECTED_WEIGHT_KEYS)}")
+    else:
+        total = sum(weights.values())
+        if abs(total - 1.0) > 1e-9:
+            problems.append(f"weights sum to {total}, expected 1.0")
+        if any(w < 0 or w > 1 for w in weights.values()):
+            problems.append("weights must be within [0, 1]")
+    if problems:
+        raise RuntimeError("invalid recommender config: " + "; ".join(problems))
+    return cfg
+
+
+CONFIG = load_recommender_config()
+WEIGHTS: dict[str, float] = CONFIG["weights"]
+CANDIDATE_LIMIT: int = CONFIG["stage_b"]["candidate_limit"]
+MIN_RESULTS: int = CONFIG["results"]["min_results"]
+MAX_RESULTS: int = CONFIG["results"]["max_results"]
+
+FEEDBACK_BOOST: float = CONFIG["feedback_rerank"]["boost"]
+FEEDBACK_PENALTY: float = CONFIG["feedback_rerank"]["penalty"]
+
+_DUP_EMBEDDING_COSINE: float = CONFIG["diversity"]["duplicate_embedding_cosine"]
+_MAX_PER_STYLE: int = CONFIG["diversity"]["max_per_style"]
+_DUP_NORMALIZED_TITLE: bool = CONFIG["diversity"]["duplicate_title_normalized"]
 
 
 # ---------------------------------------------------------------------------
@@ -136,6 +206,7 @@ def _stage_a_hard_filter(
             Product.price_toman >= lo,
             Product.price_toman <= hi,
         )
+        .order_by(Product.id)  # deterministic pool order before Stage B
     )
     return list(db.scalars(stmt))
 
@@ -148,14 +219,14 @@ def _stage_b_semantic(
     On Postgres this would use ``ORDER BY style_embedding <=> :emb LIMIT 100``
     at the SQL level (see ``_stage_ab_postgres``); here we score the already
     hard-filtered set, which is exactly equivalent for per-category pools
-    under the candidate limit.
+    under the candidate limit. Ties break on the stable product id.
     """
     scored = []
     for p in candidates:
         emb = p.style_embedding
         sim = cosine_similarity(list(emb), user_emb) if emb is not None else 0.0
         scored.append((p, max(0.0, min(1.0, (sim + 1) / 2))))  # map [-1,1] -> [0,1]
-    scored.sort(key=lambda t: t[1], reverse=True)
+    scored.sort(key=lambda t: (-t[1], t[0].id))
     return scored[:CANDIDATE_LIMIT]
 
 
@@ -172,6 +243,9 @@ def _stage_ab_postgres(
     fewer than ``CANDIDATE_LIMIT`` candidates to score (measured: 14/100 at
     20.7k rows). Raising ef_search for the duration of the transaction
     restores full recall while keeping the index scan cheaper than a seq scan.
+
+    ``hnsw.ef_search`` comes from the versioned recommender config; ties break
+    on the stable product id so the plan and the pagination are deterministic.
     """
     db.execute(text(f"SET LOCAL hnsw.ef_search = {int(settings.HNSW_EF_SEARCH)}"))
     dist = Product.style_embedding.cosine_distance(user_emb)
@@ -185,7 +259,7 @@ def _stage_ab_postgres(
             Product.price_toman <= hi,
             Product.style_embedding.isnot(None),
         )
-        .order_by(dist)
+        .order_by(dist, Product.id)
         .limit(CANDIDATE_LIMIT)
     )
     rows = db.execute(stmt).all()
@@ -257,7 +331,7 @@ def _product_payload(p: Product) -> dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
-# Feedback re-ranking (V2 Phase 3)
+# Feedback re-ranking (V2 Phase 3) — bounded heuristic, NOT a trained model
 # ---------------------------------------------------------------------------
 # RESEARCH_V2 §2 (Havenly): feedback must visibly change the next result set,
 # otherwise the thumbs are decorative. We apply a bounded post-score adjustment
@@ -269,8 +343,7 @@ def _product_payload(p: Product) -> dict[str, Any]:
 # The penalty is larger than the boost because "no" is a stronger, more
 # reliable signal than "yes" — a user who dislikes a sofa really does not want
 # to keep seeing it, whereas a like is often mild interest.
-FEEDBACK_BOOST = 0.12
-FEEDBACK_PENALTY = 0.35
+# See docs/ai/feedback-events.md for the (designed, not yet built) event model.
 
 
 def load_feedback(db: Session, user_id: str | None) -> dict[str, int]:
@@ -305,8 +378,71 @@ def apply_feedback(
         else:
             row["final_score"] = max(0.0, row["final_score"] - FEEDBACK_PENALTY)
             row["feedback"] = -1
-    ranked.sort(key=lambda r: r["final_score"], reverse=True)
+    ranked.sort(key=lambda r: (-r["final_score"], r["id"]))
     return ranked
+
+
+# ---------------------------------------------------------------------------
+# Diversity & duplicate suppression (Stage 04)
+# ---------------------------------------------------------------------------
+_title_noise_re = re.compile(r"[^a-z0-9\u0600-\u06FF]+")
+
+_DUPLICATE_NOTICE_LIMIT = 3  # how many suppressed rows get logged per category
+
+
+def _normalize_title(title: str) -> str:
+    return _title_noise_re.sub(" ", (title or "").lower()).strip()
+
+
+def diversify(ranked: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Duplicate suppression + style cap over an already-sorted list.
+
+    Applied after scoring and feedback, before truncation:
+
+    * a row whose normalized title equals an already-kept row's, or whose
+      embedding cosine similarity to a kept row is >= the configured
+      threshold, is a duplicate listing and is dropped;
+    * once ``max_per_style`` rows share the same styles tuple, further rows
+      with that tuple are skipped so one look does not monopolise the cut.
+
+    The list is never reordered here — diversity only decides *membership*,
+    ranking stays score-driven and deterministic.
+    """
+    kept: list[dict[str, Any]] = []
+    kept_titles: set[str] = set()
+    kept_embs: list[list[float]] = []
+    style_counts: dict[tuple, int] = {}
+    suppressed = 0
+    for row in ranked:
+        if len(kept) >= MAX_RESULTS:
+            break
+        if _DUP_NORMALIZED_TITLE:
+            norm = _normalize_title(str(row.get("title", "")))
+            if norm and norm in kept_titles:
+                suppressed += 1
+                continue
+        emb = row.get("_emb") or []
+        if emb and any(
+            (ke and cosine_similarity(emb, ke) >= _DUP_EMBEDDING_COSINE)
+            for ke in kept_embs
+        ):
+            suppressed += 1
+            continue
+        style_key = tuple(sorted(row.get("styles") or []))
+        if style_counts.get(style_key, 0) >= _MAX_PER_STYLE:
+            suppressed += 1
+            continue
+        kept.append(row)
+        if _DUP_NORMALIZED_TITLE:
+            norm = _normalize_title(str(row.get("title", "")))
+            if norm:
+                kept_titles.add(norm)
+        if emb:
+            kept_embs.append(emb)
+        style_counts[style_key] = style_counts.get(style_key, 0) + 1
+    if suppressed:
+        logger.debug("diversity suppressed %d candidate(s) in one category", suppressed)
+    return kept
 
 
 # ---------------------------------------------------------------------------
@@ -443,6 +579,7 @@ def _compute(
     hi = int(quiz.get("budget_max_toman", 10**9))
 
     result_categories: dict[str, list[dict[str, Any]]] = {}
+    empty_categories: list[str] = []
     for category in categories:
         if settings.is_postgres:
             scored_pairs = _stage_ab_postgres(db, category, lo, hi, user_emb)
@@ -453,13 +590,38 @@ def _compute(
         ranked = []
         for product, style_sim in scored_pairs:
             score = calculate_score(product, quiz, style_sim)
-            ranked.append({**_product_payload(product), **score})
-        ranked.sort(key=lambda r: r["final_score"], reverse=True)
+            ranked.append({
+                **_product_payload(product),
+                **score,
+                # private key: used by diversify(), stripped before output
+                "_emb": list(product.style_embedding) if product.style_embedding is not None else [],
+            })
+        ranked.sort(key=lambda r: (-r["final_score"], r["id"]))
         # Stage D: personal feedback. Applied AFTER scoring so the explainable
         # breakdown still reflects the objective match, with the personal
         # adjustment visible as a separate `feedback` field.
         ranked = apply_feedback(ranked, feedback or {})
+        ranked = diversify(ranked)
         if ranked:
-            result_categories[category] = ranked[:MAX_RESULTS]
+            result_categories[category] = [
+                {k: v for k, v in row.items() if not k.startswith("_")}
+                for row in ranked[:MAX_RESULTS]
+            ]
+        else:
+            empty_categories.append(category)
 
-    return {"categories": result_categories, "cached": False}
+    return {
+        "categories": result_categories,
+        "cached": False,
+        "meta": {
+            "recommender_version": AI_STACK_VERSION,
+            "weights_version": CONFIG["config_version"],
+            "weights": dict(WEIGHTS),
+            "embedding_backend": settings.EMBEDDING_BACKEND,
+            "taxonomy_version": taxonomy_version(),
+            "categories_queried": list(categories),
+            "empty_categories": empty_categories,
+            "budget_min_toman": lo,
+            "budget_max_toman": hi,
+        },
+    }

@@ -1,0 +1,52 @@
+
+> frontend@0.0.0 build
+> tsc -b && vite build
+
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vite.config.ts:10:32). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+vite v8.2.1 building client environment for production...
+transforming...
+✓ 702 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                           0.95 kB │ gzip:  0.48 kB
+dist/assets/vazirmatn-arabic-400-normal-DMZFCm7K.woff2   21.08 kB
+dist/assets/vazirmatn-arabic-700-normal-Dge_DOjm.woff2   21.72 kB
+dist/assets/inter-latin-wght-normal-Dx4kXJAl.woff2       48.25 kB
+dist/assets/inter-latin-ext-wght-normal-DO1Apj_S.woff2   85.06 kB
+dist/assets/index-D-A9wB8x.css                           61.63 kB │ gzip: 11.11 kB
+dist/assets/moodboardStore-BewE7V6E.js                    0.22 kB │ gzip:  0.17 kB
+dist/assets/use-reduced-motion-W3NX7ACI.js                0.24 kB │ gzip:  0.20 kB
+dist/assets/motion-CDwZ44n0.js                            0.33 kB │ gzip:  0.22 kB
+dist/assets/rolldown-runtime-CbXtAM7H.js                  0.58 kB │ gzip:  0.36 kB
+dist/assets/quizStore-DpchdzEU.js                         0.77 kB │ gzip:  0.42 kB
+dist/assets/projectStatus-CIBtRnSn.js                     0.90 kB │ gzip:  0.51 kB
+dist/assets/states-CwzEU1T5.js                            2.09 kB │ gzip:  0.82 kB
+dist/assets/ShortcutsDialog-CpZd51-j.js                   2.25 kB │ gzip:  1.05 kB
+dist/assets/SubscriptionsPage-puBQJ_i5.js                 2.44 kB │ gzip:  0.92 kB
+dist/assets/UsersPage-DDy2Y16a.js                         3.02 kB │ gzip:  1.10 kB
+dist/assets/PresentMode-DdwaM9Na.js                       3.15 kB │ gzip:  1.36 kB
+dist/assets/SharePage-Br7dmyNq.js                         3.22 kB │ gzip:  1.26 kB
+dist/assets/RegisterPage-Co6LC-0z.js                      3.53 kB │ gzip:  1.29 kB
+dist/assets/MoodboardsPage-DLRJWdcJ.js                    4.26 kB │ gzip:  1.67 kB
+dist/assets/ProjectPage-1jdsIA4w.js                       5.82 kB │ gzip:  2.23 kB
+dist/assets/DashboardPage-CKlxMhur.js                     6.94 kB │ gzip:  2.51 kB
+dist/assets/UpgradePage-mYiFzdgk.js                       7.26 kB │ gzip:  3.07 kB
+dist/assets/ShoppingListPage-DPzFURgJ.js                  7.38 kB │ gzip:  2.65 kB
+dist/assets/MoodboardEditorPage-CVnXnWSI.js               7.75 kB │ gzip:  2.97 kB
+dist/assets/FloorplanPage-CKyTX_OC.js                    10.35 kB │ gzip:  3.85 kB
+dist/assets/confetti.module-D2OR7shl.js                  10.57 kB │ gzip:  4.20 kB
+dist/assets/QuizPage-BVCk9W7P.js                         12.86 kB │ gzip:  4.28 kB
+dist/assets/ProductsPage-C0-mInri.js                     15.05 kB │ gzip:  4.59 kB
+dist/assets/dist-BoCXEzRY.js                             16.16 kB │ gzip:  5.55 kB
+dist/assets/CommandPaletteOverlay-B7Vldvwq.js            34.50 kB │ gzip: 12.47 kB
+dist/assets/RecommendationsPage-BUk4_OYB.js              47.49 kB │ gzip: 16.78 kB
+dist/assets/query-Ctn2HzOU.js                            49.67 kB │ gzip: 15.12 kB
+dist/assets/BoardGrid-BZpYTqek.js                        64.89 kB │ gzip: 17.75 kB
+dist/assets/proxy-B7xT4H3N.js                           125.30 kB │ gzip: 40.75 kB
+dist/assets/index-O1yKTpfJ.js                           131.94 kB │ gzip: 41.26 kB
+dist/assets/html2canvas-BxJQVYMI.js                     199.53 kB │ gzip: 46.80 kB
+dist/assets/vendor-Bvo_F7WR.js                          221.32 kB │ gzip: 70.82 kB
+
+✓ built in 900ms

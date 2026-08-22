@@ -17,7 +17,10 @@
 	# SecurityHeadersMiddleware so protection survives proxy drift.
 	header {
 		Strict-Transport-Security "max-age=63072000; includeSubDomains; preload"
-		Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://*.s3.ir-thr1.arvanstorage.ir https://images.unsplash.com; connect-src 'self' https://generativelanguage.googleapis.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+		# Keep this proxy copy aligned with build_csp() in
+		# backend/app/core/security_headers.py (IR-005). Replace the S3 origins
+		# here when S3_PUBLIC_BASE_URL points at a deployment-specific CDN.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://s3.ir-thr-at1.arvanstorage.ir https://*.s3.ir-thr-at1.arvanstorage.ir https://images.unsplash.com; connect-src 'self' https://generativelanguage.googleapis.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests"
 		X-Content-Type-Options "nosniff"
 		X-Frame-Options "DENY"
 		Referrer-Policy "strict-origin-when-cross-origin"
@@ -25,6 +28,13 @@
 		Cross-Origin-Opener-Policy "same-origin"
 		X-Permitted-Cross-Domain-Policies "none"
 		-Server
+	}
+
+	# Prometheus scrapes the bare endpoint; restrict access at the network
+	# boundary or collector-facing listener in a deployment that is not
+	# private. The application emits no user or token labels.
+	handle /metrics {
+		reverse_proxy backend:8000
 	}
 
 	handle /api/* {

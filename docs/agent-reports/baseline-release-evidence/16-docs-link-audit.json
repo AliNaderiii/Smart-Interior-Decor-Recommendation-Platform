@@ -1,0 +1,75 @@
+{
+  "markdown_files_audited": 29,
+  "audit_reports_excluded_from_ref_check": [
+    "docs/RELEASE_BASELINE.md",
+    "docs/RELEASE_CHECKLIST.md",
+    "docs/REPRODUCIBILITY.md",
+    "docs/ROLLBACK_AND_VERSIONING.md",
+    "docs/agent-reports/baseline-release-evidence/README.md",
+    "docs/agent-reports/baseline-release-report.md",
+    "integration-request.md"
+  ],
+  "relative_links_checked": 22,
+  "backtick_path_refs_checked": 121,
+  "external_links_found_not_fetched": 6,
+  "broken_relative_links": [],
+  "missing_backtick_path_refs": [
+    {
+      "file": "docs/ARCHITECTURE.md",
+      "line": 64,
+      "ref": "backend/seed_data/embeddings_real.json"
+    },
+    {
+      "file": "docs/DATASETS_AUDIT.md",
+      "line": 49,
+      "ref": ".env.example.v2"
+    },
+    {
+      "file": "docs/DEPLOYMENT.md",
+      "line": 28,
+      "ref": "backend/seed_data/embeddings_real.json"
+    },
+    {
+      "file": "docs/DEPLOYMENT.md",
+      "line": 114,
+      "ref": ".env.example.v2"
+    },
+    {
+      "file": "docs/reports/ACCEPTANCE_REPORT.md",
+      "line": 13,
+      "ref": "seed_data/embeddings_real.json"
+    }
+  ],
+  "external_links": [
+    {
+      "file": "frontend/README.md",
+      "line": 7,
+      "target": "https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react"
+    },
+    {
+      "file": "frontend/README.md",
+      "line": 7,
+      "target": "https://oxc.rs"
+    },
+    {
+      "file": "frontend/README.md",
+      "line": 8,
+      "target": "https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc"
+    },
+    {
+      "file": "frontend/README.md",
+      "line": 8,
+      "target": "https://swc.rs/"
+    },
+    {
+      "file": "frontend/README.md",
+      "line": 12,
+      "target": "https://react.dev/learn/react-compiler/installation"
+    },
+    {
+      "file": "frontend/README.md",
+      "line": 32,
+      "target": "https://oxc.rs/docs/guide/usage/linter/rules"
+    }
+  ]
+}

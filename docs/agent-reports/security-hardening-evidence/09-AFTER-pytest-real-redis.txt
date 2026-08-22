@@ -1,0 +1,20 @@
+# Stage 03 — security tests against a REAL, shared Redis (not fakeredis)
+# server: redislite 6.2.14 on 127.0.0.1:6399 (no docker/root available in this sandbox)
+# command: TEST_REDIS_URL=redis://127.0.0.1:6399/9 .venv/bin/python -m pytest tests/test_redis_real.py -v -p no:warnings
+# date: 2026-08-21T16:08:59Z
+
+redis_version: 6.2.14
+ping: True
+
+============================= test session starts ==============================
+platform linux -- Python 3.11.2, pytest-9.1.1, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /home/user/Smart-Interior-Decor-Recommendation-Platform/backend
+configfile: pyproject.toml
+plugins: anyio-4.14.2, benchmark-5.2.3, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 8 items
+
+tests/test_redis_real.py ........                                        [100%]
+
+============================== 8 passed in 4.16s ===============================

@@ -30,6 +30,23 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     FERNET_KEY: str = ""
 
+    # ---- Demo / seed accounts (Stage 03 — IR-001, blocker B-1) ----
+    #: Opt-in, default OFF, and **ignored in production**. Historically both
+    #: seed entrypoints created `admin@smartdecor.dev / Admin123!` on every run,
+    #: and `docker-compose.yml` runs one of them on every backend start — so a
+    #: production deployment shipped with a publicly documented admin password.
+    #: The gate now lives in `app.core.demo_seed`; this flag only enables it for
+    #: development and test. Setting it in production is a boot-time failure,
+    #: not a silently ignored value, so a mistake is loud instead of dangerous.
+    SEED_DEMO_ACCOUNTS: bool = False
+    #: Optional override for the well-known development passwords. Empty means
+    #: "use the documented dev defaults" — which are only ever reachable when
+    #: SEED_DEMO_ACCOUNTS is true and APP_ENV is not production.
+    DEMO_ACCOUNT_PASSWORD: str = ""
+    #: Belt and braces: refuse to serve production if a demo account somehow
+    #: exists in the database (restored dump, pre-fix deployment, manual seed).
+    REFUSE_DEMO_ACCOUNTS_IN_PRODUCTION: bool = True
+
     # ---- Cookie auth (V2 — OWASP A02) ----
     #: When true, /auth/* also sets HttpOnly access+refresh cookies and the
     #: API accepts them. Body tokens are retained for Bearer/CLI clients.
@@ -46,6 +63,11 @@ class Settings(BaseSettings):
     LOGIN_RATE_LIMIT_PER_MINUTE: int = 30
     REGISTER_RATE_LIMIT_PER_MINUTE: int = 3
     RECOMMEND_IP_RATE_LIMIT_PER_MINUTE: int = 100
+    #: Stage 03: the Master Prompt requires abuse controls on login, register,
+    #: recommend, **share** and **upload**. The last two had none.
+    SHARE_RATE_LIMIT_PER_MINUTE: int = 30
+    UPLOAD_RATE_LIMIT_PER_MINUTE: int = 10
+    EXPORT_RATE_LIMIT_PER_HOUR: int = 5
 
     # ---- Database ----
     DATABASE_URL: str = "sqlite:///./decor.sqlite3"
@@ -82,6 +104,13 @@ class Settings(BaseSettings):
     S3_REGION: str = ""
     S3_PUBLIC_BASE_URL: str = ""
     LOCAL_STORAGE_DIR: str = "./local_storage"
+    #: Upload hardening (Stage 03 — OWASP A04/A05). Bytes, pixels and edge
+    #: length are all bounded: a 40 KB PNG can still decode to 30 000 x 30 000
+    #: pixels and exhaust memory (decompression bomb), so a byte cap alone is
+    #: not a limit.
+    MAX_UPLOAD_BYTES: int = 8 * 1024 * 1024
+    MAX_UPLOAD_PIXELS: int = 40_000_000
+    MAX_UPLOAD_EDGE_PX: int = 12_000
 
     # ---- Payment ----
     PAYMENT_PROVIDER: Literal["zarinpal", "zarinpal_sandbox", "zibal", "mock"] = (
@@ -95,17 +124,69 @@ class Settings(BaseSettings):
     RESEND_API_KEY: str = ""
     EMAIL_FROM: str = "noreply@smartdecor.dev"
 
+    # ---- Observability (Stage 07) ----
+    #: Root log level. Accepts any logging level name (DEBUG..CRITICAL).
+    LOG_LEVEL: str = "INFO"
+    #: "text" = readable multi-line logs (dev/test default); "json" = one
+    #: machine-parseable JSON object per line, redacted, with request_id
+    #: correlation (see app/core/observability.py). The production compose
+    #: overlay sets LOG_FORMAT=json; the application itself defaults to text.
+    LOG_FORMAT: Literal["text", "json"] = "text"
+    #: Expose the Prometheus-text /metrics endpoint. Disable only if the
+    #: collector is on a hostile network and the proxy cannot restrict it.
+    METRICS_ENABLED: bool = True
+
     @property
     def is_postgres(self) -> bool:
         return self.DATABASE_URL.startswith(("postgresql", "postgres"))
 
+    @property
+    def is_production(self) -> bool:
+        return self.APP_ENV == "production"
+
     #: V2 (OWASP A02): refuse to boot production with a weak/default signing key.
     DEFAULT_SECRET: ClassVar[str] = "dev-only-secret-change-me"
 
+    #: Stage 03 (T-05): the project signs with HMAC. Allowing an asymmetric or
+    #: `none` algorithm to be configured would open algorithm-confusion and
+    #: would also make the vulnerable `ecdsa` code path (PYSEC-2026-1325)
+    #: reachable. Pin the choice to HMAC family members only.
+    ALLOWED_JWT_ALGORITHMS: ClassVar[frozenset[str]] = frozenset(
+        {"HS256", "HS384", "HS512"}
+    )
+
+    #: Stage 03 (T-01): predictable identities that must never exist in a
+    #: production database. Kept here (not in the seed scripts) so the API
+    #: process can enforce it at boot even if the seeder is never run.
+    DEMO_ACCOUNT_EMAILS: ClassVar[tuple[str, ...]] = (
+        "admin@smartdecor.dev",
+        "designer@smartdecor.dev",
+        "demo@smartdecor.dev",
+    )
+
     def validate_runtime(self) -> None:
-        """Fail fast on insecure production configuration."""
-        if self.APP_ENV != "production":
+        """Fail fast on insecure configuration.
+
+        Checks that apply to *every* environment run first (a broken JWT
+        algorithm is not safer in development), then the production-only
+        fail-safes. Raises ``RuntimeError`` listing every problem at once —
+        an operator fixing a misconfiguration should not have to discover the
+        issues one restart at a time.
+        """
+        universal: list[str] = []
+        if self.JWT_ALGORITHM not in self.ALLOWED_JWT_ALGORITHMS:
+            universal.append(
+                f"JWT_ALGORITHM must be one of "
+                f"{sorted(self.ALLOWED_JWT_ALGORITHMS)} (got {self.JWT_ALGORITHM!r})"
+            )
+        if universal:
+            raise RuntimeError(
+                "Insecure configuration:\n  - " + "\n  - ".join(universal)
+            )
+
+        if not self.is_production:
             return
+
         problems: list[str] = []
         if self.SECRET_KEY == self.DEFAULT_SECRET:
             problems.append("SECRET_KEY is still the default value")
@@ -120,6 +201,49 @@ class Settings(BaseSettings):
             )
         if self.USE_COOKIE_AUTH and not self.COOKIE_SECURE:
             problems.append("COOKIE_SECURE must be true in production")
+
+        # ---- Stage 03 additions -------------------------------------------
+        # T-01: the single most important production invariant of this stage.
+        if self.SEED_DEMO_ACCOUNTS:
+            problems.append(
+                "SEED_DEMO_ACCOUNTS is true — demo/default accounts must never "
+                "be created in production (see docs/security/DEMO_ACCOUNTS.md)"
+            )
+        # T-40: an https SPA cannot be served from an http origin, and a
+        # non-https FRONTEND_ORIGIN would end up in the CORS allowlist.
+        if not self.FRONTEND_ORIGIN.startswith("https://"):
+            problems.append(
+                f"FRONTEND_ORIGIN must be an https:// origin in production "
+                f"(got {self.FRONTEND_ORIGIN!r})"
+            )
+        if self.COOKIE_SAMESITE == "none" and not self.COOKIE_SECURE:
+            problems.append("COOKIE_SAMESITE=none requires COOKIE_SECURE=true")
+        # T-45: an unset Fernet key means a *new* key per worker process, so
+        # anything encrypted at rest becomes undecryptable after a restart.
+        if not self.FERNET_KEY:
+            problems.append(
+                "FERNET_KEY is empty — a random key would be generated per "
+                "process, making at-rest ciphertext unrecoverable"
+            )
+        else:
+            try:
+                from cryptography.fernet import Fernet
+
+                Fernet(self.FERNET_KEY.encode())
+            except Exception:
+                problems.append(
+                    "FERNET_KEY is not a valid urlsafe-base64 32-byte Fernet key"
+                )
+        if self.STORAGE_BACKEND == "local":
+            problems.append(
+                "STORAGE_BACKEND=local serves uploaded bytes from the "
+                "application origin; production must use S3-compatible storage"
+            )
+        if self.AI_PROVIDER != "mock" and not (
+            self.GEMINI_API_KEY or self.OPENAI_API_KEY
+        ):
+            problems.append(f"AI_PROVIDER={self.AI_PROVIDER} but no API key is set")
+
         if problems:
             raise RuntimeError(
                 "Insecure production configuration:\n  - " + "\n  - ".join(problems)

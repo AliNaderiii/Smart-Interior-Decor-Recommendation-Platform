@@ -1,0 +1,54 @@
+Environment capture — baseline release governance
+Captured: 2026-08-21T13:32:38Z (UTC)
+Command : uname -a; node -v; npm -v; python3 -V; pip3 -V; docker --version; psql --version; git --version; gh --version
+
+$ uname -a
+Linux e2b.local 6.1.158+ #1 SMP PREEMPT_DYNAMIC Mon May 11 18:48:24 UTC 2026 x86_64 GNU/Linux
+
+$ node -v
+v22.22.3
+
+$ npm -v
+10.9.8
+
+$ python3 -V
+Python 3.11.2
+
+$ backend/.venv/bin/python -V
+Python 3.11.2
+
+$ backend/.venv/bin/pip -V
+pip 26.2.1 from /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/.venv/lib/python3.11/site-packages/pip (python 3.11)
+
+$ docker --version
+/bin/bash: line 2: docker: command not found
+
+$ docker compose version
+/bin/bash: line 2: docker: command not found
+
+$ psql --version
+/bin/bash: line 2: psql: command not found
+
+$ redis-server --version
+/bin/bash: line 2: redis-server: command not found
+
+$ git --version
+git version 2.39.5
+
+$ gh --version
+gh version 2.23.0 (2023-02-27 Debian 2.23.0+dfsg1-1)
+
+$ nproc / free -h
+2
+               total        used        free      shared  buff/cache   available
+Mem:           3.8Gi       337Mi       2.7Gi       1.0Mi       1.1Gi       3.5Gi
+Swap:             0B          0B          0B
+
+--- network egress probe ---
+https://pypi.org/simple/                           200
+https://registry.npmjs.org/                        200
+https://github.com                                 200
+https://huggingface.co                             000
+https://www.digikala.com                           000
+https://torob.com                                  000
+https://generativelanguage.googleapis.com          000

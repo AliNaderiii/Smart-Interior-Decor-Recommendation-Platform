@@ -1,0 +1,19 @@
+=== LOCAL frontend verification ===
+Versions: node v22.22.3, npm 10.9.8
+$ npm ci
+added 163 packages; found 0 vulnerabilities
+$ npm run lint
+Found 12 warnings and 0 errors.
+$ npx tsc -b
+exit=0
+$ node --experimental-strip-types --test tests/unit/*.test.ts
+# tests 9
+# pass 9
+# fail 0
+$ npm run build
+vite v8.2.1; built in 691ms
+$ npm audit --audit-level=low
+found 0 vulnerabilities
+$ dist credential-pattern scan
+credential-pattern hits in dist/: 0
+RESULT: PASS

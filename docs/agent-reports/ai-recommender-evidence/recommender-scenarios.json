@@ -1,0 +1,112 @@
+{
+  "environment": "sqlite+hash, cache off",
+  "versions": {
+    "ai_stack_version": "2026-08-21.1",
+    "extraction": {
+      "provider": "mock",
+      "model": "filename-heuristic (offline dev/CI only)",
+      "prompt_version": "p2",
+      "taxonomy_version": "2.1"
+    },
+    "embedding": {
+      "backend": "hash",
+      "model": "feature-hash-512 (DETERMINISTIC FALLBACK — NOT a semantic model)",
+      "dim": 512
+    },
+    "recommender_config_version": "2026-08-21.1"
+  },
+  "passed": 18,
+  "total": 18,
+  "results": [
+    {
+      "scenario": "01 default_quiz_results",
+      "status": "PASS",
+      "detail": "7 categories"
+    },
+    {
+      "scenario": "02 hard_budget_filter",
+      "status": "PASS",
+      "detail": "26 prices within window"
+    },
+    {
+      "scenario": "03 impossible_budget",
+      "status": "PASS",
+      "detail": "all 7 categories reported empty in meta"
+    },
+    {
+      "scenario": "04 no_padding_out_of_budget",
+      "status": "PASS",
+      "detail": "no out-of-budget items"
+    },
+    {
+      "scenario": "05 deterministic_order",
+      "status": "PASS",
+      "detail": "identical ordering across runs"
+    },
+    {
+      "scenario": "06 deterministic_score_ties",
+      "status": "PASS",
+      "detail": "ties resolved by stable product id"
+    },
+    {
+      "scenario": "07 style_pref_ranks_first",
+      "status": "PASS",
+      "detail": "boho top in 7/7 categories"
+    },
+    {
+      "scenario": "08 explanation_fidelity",
+      "status": "PASS",
+      "detail": "35 explanations match score components"
+    },
+    {
+      "scenario": "09 matched_materials_real",
+      "status": "PASS",
+      "detail": "28 matched_materials entries verified against real products"
+    },
+    {
+      "scenario": "10 duplicate_suppression",
+      "status": "PASS",
+      "detail": "2/6 near-duplicates kept (suppression active)"
+    },
+    {
+      "scenario": "11 style_cap_diversity",
+      "status": "PASS",
+      "detail": "4/4 same-style cap respected"
+    },
+    {
+      "scenario": "12 unverified_excluded",
+      "status": "PASS",
+      "detail": "unverified product excluded"
+    },
+    {
+      "scenario": "13 empty_category_reported",
+      "status": "PASS",
+      "detail": "'decor' reported in meta.empty_categories"
+    },
+    {
+      "scenario": "14 few_results_no_padding",
+      "status": "PASS",
+      "detail": "single candidate returned as-is (no padding)"
+    },
+    {
+      "scenario": "15 feedback_changes_order",
+      "status": "PASS",
+      "detail": "thumbs-down demoted below un-rated items"
+    },
+    {
+      "scenario": "16 weights_versioned_and_valid",
+      "status": "PASS",
+      "detail": "weights sum to 1; weights_version=2026-08-21.1; recommender=2026-08-21.1"
+    },
+    {
+      "scenario": "17 embeddings_dim_and_norm",
+      "status": "PASS",
+      "detail": "100 embeddings are 512-d and unit-norm"
+    },
+    {
+      "scenario": "18 unknown_pattern_rejected",
+      "status": "PASS",
+      "detail": "unknown pattern rejected at schema boundary"
+    }
+  ]
+}

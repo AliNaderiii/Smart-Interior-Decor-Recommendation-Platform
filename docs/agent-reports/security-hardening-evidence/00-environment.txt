@@ -1,0 +1,42 @@
+# Environment — Stage 03 Security, Privacy & Trust Hardening
+# Captured: 2026-08-21T15:21:27Z (UTC)
+
+$ uname -a
+Linux e2b.local 6.1.158+ #1 SMP PREEMPT_DYNAMIC Mon May 11 18:48:24 UTC 2026 x86_64 GNU/Linux
+
+$ cat /etc/os-release | head -3
+PRETTY_NAME="Debian GNU/Linux 12 (bookworm)"
+NAME="Debian GNU/Linux"
+VERSION_ID="12"
+
+$ nproc / free -h
+2
+               total        used        free      shared  buff/cache   available
+Mem:           3.8Gi       282Mi       3.1Gi       1.0Mi       689Mi       3.6Gi
+Swap:             0B          0B          0B
+
+$ python3 --version
+Python 3.11.2
+
+$ node --version && npm --version
+v22.22.3
+10.9.8
+
+$ git --version
+git version 2.39.5
+
+$ id -u
+1001
+
+# Infrastructure availability probes
+$ which docker  -> NOT INSTALLED
+$ which psql    -> NOT INSTALLED (system)
+$ which redis-server (system) -> NOT INSTALLED (system)
+$ apt-get download redis-server -> E: Unable to locate package redis-server (no root, restricted mirror)
+
+# Unblocked by this stage (userspace, no root):
+  redislite 6.2.912183 -> bundles redis-server v6.2.14  => REAL Redis available on 127.0.0.1:6399
+  pgserver  0.1.4      -> bundles PostgreSQL 16.2 + pgvector 0.6.2 => REAL Postgres available via unix socket
+
+$ backend/.venv/bin/redis-server --version
+Redis server v=6.2.14 sha=40305114:0 malloc=libc bits=64 build=dff95a8e7a99d269
