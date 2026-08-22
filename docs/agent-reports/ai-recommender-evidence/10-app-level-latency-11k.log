@@ -1,0 +1,10 @@
+== App-level /recommend latency on the 11,000-row catalog (real PG + real Redis) ==
+Inline probe (see docs/ai/evaluation-report.md for the source): 20 unique quizzes,
+7 categories each, recommend() with the production pgvector path; warm = Redis cache hit.
+
+$ DATABASE_URL=postgresql+psycopg://postgres:@/ai_test?host=/tmp/pgdata-ai REDIS_URL=redis://127.0.0.1:6399/3 python (probe)
+catalog rows: 11000 (1000+10000 synthetic, PG16+pgvector via pgserver)
+cold  p50/p95/max: 161/227/276 ms (20 unique quizzes, 7 categories each)
+warm  p50/p95/max: 1/2/2 ms (20 Redis cache hits)
+
+Singleflight/cache behaviour covered by tests/test_perf_v2.py and tests/test_recommender_redis_real.py.

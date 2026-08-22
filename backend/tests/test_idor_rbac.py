@@ -12,7 +12,8 @@ import uuid
 import pytest
 
 QUIZ_BODY = {
-    "styles": ["modern"], "color_palette": ["warm"],
+    # Stage 04: quiz colors must be #RRGGBB (was "warm" before the schema tightening)
+    "styles": ["modern"], "color_palette": ["#D9A05B"],
     "room_width_cm": 400, "room_length_cm": 500,
     "budget_min_toman": 1_000_000, "budget_max_toman": 9_000_000,
     "materials": ["wood"], "patterns": ["solid"],

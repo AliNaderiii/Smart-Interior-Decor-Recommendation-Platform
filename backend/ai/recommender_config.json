@@ -1,0 +1,36 @@
+{
+  "config_version": "2026-08-21.1",
+  "weights": {
+    "style": 0.30,
+    "color": 0.30,
+    "budget": 0.20,
+    "material": 0.15,
+    "pattern": 0.05
+  },
+  "weights_source": {
+    "kind": "heuristic",
+    "reference": "ADR-005 (docs/ARCHITECTURE.md): style and color dominate interior-design preference, budget is a strong practical filter, material is a secondary preference, pattern is a tiebreaker.",
+    "learned_from_data": false,
+    "tuning_plan": "Not tuned on interaction data. Revisit only with an offline evaluation set and a logged experiment; any change bumps config_version and requires re-running the acceptance scenarios (tests/test_recommender.py) and the scenario harness (scripts/evaluate_recommender.py)."
+  },
+  "stage_b": {
+    "candidate_limit": 100,
+    "hnsw_ef_search": 400
+  },
+  "results": {
+    "min_results": 3,
+    "max_results": 5,
+    "no_result_policy": "never pad beyond the hard budget/category filters; report the empty category explicitly in meta.empty_categories"
+  },
+  "feedback_rerank": {
+    "boost": 0.12,
+    "penalty": 0.35,
+    "note": "bounded heuristic adjustment applied AFTER explainable scoring; not a trained model"
+  },
+  "diversity": {
+    "duplicate_title_normalized": true,
+    "duplicate_embedding_cosine": 0.995,
+    "max_per_style": 4,
+    "note": "applied after scoring, before truncation to max_results; identical or near-identical items are suppressed, and no single style may monopolise the final cut"
+  }
+}

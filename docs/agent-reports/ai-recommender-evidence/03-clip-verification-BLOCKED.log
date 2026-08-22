@@ -1,0 +1,14 @@
+== REAL CLIP embedding verification — BLOCKED (HuggingFace egress blocked) ==
+$ curl -sI https://huggingface.co/sentence-transformers/clip-ViT-B-32/resolve/main/config.json -o /dev/null -w "%{http_code}"
+000
+
+$ python3 -m venv /tmp/clip-venv && pip install torch sentence-transformers  # PyPI reachable: torch 2.13.0+cu130, sentence-transformers 6.0.0 INSTALLED OK
+$ python -c "from sentence_transformers import SentenceTransformer; m=SentenceTransformer(\"clip-ViT-B-32\")"
+    raise OSError(
+OSError: We couldn't connect to 'https://huggingface.co' to load the files, and couldn't find them in the cached files.
+Check your internet connection or see how to run the library in offline mode at 'https://huggingface.co/docs/transformers/installation#offline-mode'.
+exit=0
+
+Unblock: run on a machine with huggingface.co egress (or HF_ENDPOINT mirror approved by the security owner),
+then: cd backend && EMBEDDING_BACKEND=clip python scripts/seed_products.py --real-embeddings
+commit seed_data/embeddings_real.json and deploy with load_realistic_products.py --from-json.

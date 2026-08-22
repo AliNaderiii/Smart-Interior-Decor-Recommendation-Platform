@@ -1,0 +1,5 @@
+== Real PostgreSQL 16.2 + pgvector 0.6.2 (pgserver) + real Redis 6.2.14 (redislite :6399) full suite ==
+$ cd backend
+$ DATABASE_URL=postgresql+psycopg://postgres:@/postgres?host=/tmp/pgdata-ai REDIS_URL=redis://127.0.0.1:6399/1 TEST_REDIS_URL=redis://127.0.0.1:6399/10 EMBEDDING_BACKEND=hash AI_PROVIDER=mock SEED_DEMO_ACCOUNTS=true COOKIE_SECURE=false APP_ENV=test /tmp/ai-venv/bin/python -m pytest tests/ --ignore=tests/test_pgvector_real.py -p no:warnings --tb=no
+476 passed in 91.66s (0:01:31)
+exit=0

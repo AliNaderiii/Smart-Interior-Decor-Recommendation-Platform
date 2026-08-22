@@ -702,3 +702,108 @@ and real GitHub Actions evidence; absence of an Actions run is not a pass.
 - IR-SEC-005 remains a product/privacy decision (breached-password corpus).
 - IR-004, IR-010 and release/tag/branch-protection work remain with the owning
   integration/release stages.
+
+---
+
+# Stage 04 (AI recommender, extraction & data quality) — requests and disclosures
+
+Branch `arena/01a02613-smart-interior-decor-recommend`, base `a07f014`,
+2026-08-21. Canonical report: `docs/agent-reports/ai-recommender-report.md`.
+
+## IR-AI-001 · HIGH · Wire the embedding runtime check into application startup
+
+`ai/embedding_service.validate_embedding_runtime()` implements the production
+fail-closed policy (no silent hash fallback) and is exported for startup use,
+but `app/main.py` (owned by the platform/integration stage) does not call it.
+Today the guard still protects every *call path* (first embedding raises
+`EmbeddingBackendError`), which fails the first affected request rather than
+the boot. Requested: call it in the lifespan next to the existing
+configuration validation so a misconfigured worker refuses to serve at all.
+
+**Files to change:** `backend/app/main.py`.
+
+## IR-AI-002 · MEDIUM · Admin review queue for flagged extractions
+
+The review gate (`needs_review`, `review_reasons`, thresholds) is implemented
+and stored in `products.extraction_raw`, and low-confidence products are
+already unreachable by recommendations (`is_verified=False`). What is missing
+is a **surface**: admins need `GET /products?extraction_review=required`
+(filtered, paginated) and a frontend queue view, otherwise flagged rows wait
+in an unfiltered list. The Stage 03 IR-SEC-003 note about `products.py`
+ownership applies here too.
+
+**Files to change:** `backend/app/api/routes/products.py`, frontend admin
+pages (Stage 05 ownership).
+
+## IR-AI-003 · HIGH · Base compose seeds production volumes with `--from-json`
+
+`docker-compose.yml` (backend command) runs
+`load_realistic_products.py --realistic --expand-to 150 --if-empty --from-json`.
+Before Stage 04, a fresh production volume without
+`seed_data/embeddings_real.json` silently fell back to hash vectors — fake
+semantic geometry in production. Now the loader **exits with an error** by
+design (and any production hash-embedding path raises). Requested decision:
+either (a) generate and commit `embeddings_real.json` from a machine with
+HuggingFace access (preferred; runbook in `docs/ai/model-versions.md` §3), or
+(b) move catalog seeding out of the production start path entirely.
+
+**Files to change:** `docker-compose.yml` or `backend/seed_data/embeddings_real.json` (owner: Stage 07 / release manager).
+
+## IR-AI-004 · HIGH · `GEMINI_MODEL` default points at a retired model
+
+`app/core/config.py` and `.env.example` default to `gemini-2.0-flash`, which
+Google shut down on 2026-06-01 (equivalent pricing successor:
+`gemini-2.5-flash-lite`). Any first REAL extraction run will fail with a
+model-not-found error — loud, but guaranteed broken. Requested: update the
+default and the example file (one line each), then rerun the REAL benchmark
+when a key exists.
+
+**Files to change:** `backend/app/core/config.py`, `.env.example`.
+
+## IR-AI-005 · MEDIUM · Run the real-service AI test modules in CI
+
+New service-gated modules verify the production paths:
+`tests/test_pgvector_real.py` (needs a dedicated PostgreSQL DB via
+`TEST_DATABASE_URL`) and `tests/test_recommender_redis_real.py` (needs
+`TEST_REDIS_URL`). They skip cleanly otherwise. Requested: add both to the
+CI Postgres/Redis job (`ci/github-ci.yml`) — the pg module must run in its
+own invocation/database because it rebuilds the schema.
+
+**Files to change:** `ci/github-ci.yml`.
+
+## IR-AI-006 · LOW · `feedback_events` table (design ready, not urgent)
+
+`docs/ai/feedback-events.md` specifies the impression/click/save event stream
+(append-only, position, weights_version, no PII). Requires a migration +
+endpoint (backend ownership beyond this stage's scope). Nothing in the
+current recommender depends on it.
+
+**Files to change:** new alembic revision, `backend/app/api/routes/feedback.py`.
+
+## Disclosures — files owned by other stages, changed here as directly-required test/policy updates
+
+1. `backend/tests/test_idor_rbac.py` (Stage 03): one fixture value
+   `color_palette: ["warm"]` → `["#D9A05B"]`. The quiz schema now rejects
+   non-`#RRGGBB` colors; the test's intent (access control) is unchanged.
+   The frontend sends hex swatches only (verified in `QuizPage.tsx`).
+2. `backend/tests/test_demo_seeding.py` (Stage 03): `_run_seeder` now
+   pre-seeds the catalog once in development mode before the production-mode
+   invocation, because production-mode seeding with hash embeddings is a
+   **deliberate hard error** as of this stage (previously it silently wrote
+   hash vectors — the exact behaviour Master Prompt 04 item 7 removes). All
+   original assertions are preserved verbatim; the dev pre-seed never carries
+   `--seed-demo-accounts`.
+3. `backend/scripts/load_realistic_products.py` (this stage's scope, listed
+   for visibility): `--from-json` without `embeddings_real.json` now exits
+   with an error instead of warning + hash fallback.
+
+## Stage 04 summary
+
+| ID | Severity | Owner | Title |
+|---|---|---|---|
+| IR-AI-001 | High | platform/integration | Call `validate_embedding_runtime()` at startup |
+| IR-AI-002 | Medium | 04 → 05/08 | Surface flagged extractions in an admin review queue |
+| IR-AI-003 | High | 07 / release | Prod compose seeding vs real embeddings artefact |
+| IR-AI-004 | High | 07 (config) | Retired `GEMINI_MODEL` default |
+| IR-AI-005 | Medium | 07 | Add real-service AI test modules to CI |
+| IR-AI-006 | Low | future | `feedback_events` implementation |
