@@ -58,8 +58,12 @@
    -------------------------------------------------------------------------- */
 
 @keyframes page-enter {
-  from { opacity: 0.01; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
+  /* Do not animate opacity on the full route wrapper: Lighthouse records LCP
+     only after the largest element is actually visible, so an opacity fade here
+     adds the full transition duration to the home-page LCP. Keep the gentle
+     DESIGN_SYSTEM_V2 slide without delaying paint metrics. */
+  from { transform: translateY(20px); }
+  to   { transform: translateY(0); }
 }
 .page-enter {
   animation: page-enter 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
