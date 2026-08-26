@@ -6,6 +6,11 @@ Stage 03 hardening (probe `R-01`, `T-19`):
     recommendation, so it was simultaneously a scraping surface, a token
     brute-force surface and an unmetered compute surface.
   * share creation is audited, and the emailed link is HTML-escaped.
+
+Stage 1 (T-1.1):
+  * ``POST /projects`` enforces the designer project quota from the versioned
+    plans dataset (client spec: "subscription required to create new
+    projects") — see ``app/services/designer_quota.py``.
 """
 from __future__ import annotations
 
@@ -30,6 +35,7 @@ from app.models.user import User
 from app.schemas.common import ok
 from app.schemas.sanitize import SafeText
 from app.services import audit
+from app.services.designer_quota import create_designer_project
 from app.services.emailer import send_email
 from app.services.recommender import recommend
 
@@ -77,9 +83,15 @@ def list_projects(user: User = Depends(require_designer), db: Session = Depends(
 
 @router.post("/projects", status_code=status.HTTP_201_CREATED)
 def create_project(body: ProjectIn, user: User = Depends(require_designer), db: Session = Depends(get_db)):
-    project = Project(designer_id=user.id, **body.model_dump())
-    db.add(project)
-    db.commit()
+    # Stage 1 (T-1.1): client spec — "subscription required to create new
+    # projects". The quota comes from the versioned plans dataset; the
+    # designer path is race-safe (row lock + conditional insert — see
+    # app/services/designer_quota.py). Non-designers (admins) have no quota.
+    project = create_designer_project(db, user, body.model_dump())
+    if project is None:
+        project = Project(designer_id=user.id, **body.model_dump())
+        db.add(project)
+        db.commit()
     return ok(_project_out(project))
 
 
