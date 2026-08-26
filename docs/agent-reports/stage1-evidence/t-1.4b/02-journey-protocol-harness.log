@@ -1,0 +1,67 @@
+# Stage 1, T-1.4 close-out — journey protocol harness
+# Date: 2026-08-26T11:38:54Z
+# Source: docs/agent-reports/stage1-evidence/t-1.4b/03-journey-protocol-harness.mjs
+# NOTE: token values in evidence logs are redacted (scripts/audit_secrets.py gate).
+# Purpose: chromium cannot be downloaded here (00-browser-download-blocked-retry.log,
+#          blocker IR-S1-001), so the three journey specs cannot RUN locally. This
+#          harness verifies every backend contract those specs assert on, against the
+#          same live app, so a CI failure would be a selector issue, not a wrong claim.
+
+Stage 1 T-1.4 close-out journey protocol harness — 2026-08-26T11:38:54.367Z
+API: http://localhost:8000/api/v1
+
+=== homeowner journey (journey-homeowner.spec.ts) ===
+PASS  homeowner login 200 — status=200
+PASS  session cookies issued (access+refresh+csrf) — access_token,refresh_token,csrf_token
+PASS  quiz submit 201/200 — status=201
+PASS  quiz returns an id — 6a060b19624c4ee88a5a7300e6eb6933
+PASS  recommend 200 — status=200
+PASS  recommend returns categories — 7 categories
+PASS  category "sofa" has 3-5 items — 5 items
+PASS  category "coffee_table" has 3-5 items — 5 items
+PASS  category "rug" has 3-5 items — 5 items
+PASS  category "lighting" has 3-5 items — 5 items
+PASS  category "chair" has 3-5 items — 5 items
+PASS  category "storage" has 3-5 items — 5 items
+PASS  category "decor" has 3-5 items — 5 items
+PASS  each product carries an explanation breakdown — style_match,color_match,budget_fit,material_match,pattern_match,matched_materials,summary
+PASS  products carry a price for the shopping list — 40300000
+PASS  moodboard create 201/200 — status=201
+PASS  moodboard returns an id
+PASS  moodboard readable by the editor — status=200
+PASS  moodboard contains the added item
+PASS  shopping list resolves products with prices (total is computable) — 40300000
+PASS  moodboard item removal accepted (PATCH) — status=200
+PASS  logout 200 — status=200
+PASS  session unusable after logout — status=401
+
+=== designer journey (journey-designer.spec.ts) ===
+PASS  designer login 200 — status=200
+PASS  projects dashboard readable — status=200
+PASS  create project #1 -> 201 — status=201
+PASS  create project #2 -> 201 — status=201
+PASS  project beyond quota -> 402 — status=402
+PASS  402 carries the Persian quota message the UI must surface — سهمیهٔ پروژه‌های شما در پلن «طراح - رایگان» به پایان رسیده است (حداکثر 2 پروژه). برای ایجاد پروژه‌های بیشتر، اشتراک خود را ارتقا دهید.
+PASS  nothing created behind the wall
+PASS  project count capped at the quota — 2 projects
+
+=== admin journey (journey-admin.spec.ts) ===
+PASS  admin login 200 — status=200
+PASS  products console data 200 — status=200
+PASS  catalogue has rows — 102 total
+PASS  upload -> 201 — status=201
+PASS  AI extraction returns colour / style / material / confidence — colors,style,material,patterns,description_for_embedding,confidence,unknown_taxonomy_values,provider,model,prompt_version,taxonomy_version,image_url,needs_review,review_reasons
+PASS  confidence is a number the preview can render as a percentage — 0.6
+PASS  upload created a draft product — 0f4246041db246be8c126c47122dfd78
+PASS  draft appears in the PENDING list
+PASS  verify -> 2xx — status=200
+PASS  product now appears in the VERIFIED list
+PASS  user management 200 — status=200
+PASS  seeded demo user listed
+PASS  subscription management 200 — status=200
+PASS  style taxonomy readable 200 — status=200
+
+---------------------------------------------
+TOTAL: 45 passed, 0 failed
+
+EXIT=0

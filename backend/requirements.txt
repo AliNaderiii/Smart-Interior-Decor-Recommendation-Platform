@@ -41,3 +41,13 @@ pillow>=10.3
 pytest>=8.2
 pytest-asyncio>=0.23
 pytest-benchmark>=4.0
+
+# Build tooling floor (Stage 1, T-1.5)
+# ------------------------------------
+# Not imported by the application — this is the packaging tooling that
+# `pip freeze` captures from the build venv into requirements.lock.txt.
+# The Stage-07 lockfile inherited `setuptools==66.1.1`, which pip-audit flags
+# for PYSEC-2025-49, PYSEC-2026-1918 and PYSEC-2026-3447. This floor stops a
+# lockfile regeneration on an old base image from silently reintroducing it.
+# See docs/DEPENDENCIES.md §4 (security pins).
+setuptools>=84.0.0

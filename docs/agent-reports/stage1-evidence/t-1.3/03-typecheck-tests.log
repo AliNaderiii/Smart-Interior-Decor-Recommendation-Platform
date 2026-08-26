@@ -1,0 +1,4 @@
+# strict typecheck over tests/unit + vitest.config.ts (tsconfig extends tsconfig.app.json,
+# types: vite/client+node+vitest; include: src, tests/unit, vitest.config.ts)
+command: npx tsc -p tsconfig.tests.json
+exit=0 — no output (clean)

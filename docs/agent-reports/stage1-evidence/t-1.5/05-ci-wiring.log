@@ -1,0 +1,20 @@
+# Stage 1, T-1.5 — CI workflow validation after the lock/audit changes
+# Date: 2026-08-26T11:50:53Z
+
+### YAML parses; jobs and their python install lines
+jobs: ['backend', 'multi-worker', 'frontend', 'e2e', 'security-scans', 'docker', 'lighthouse']
+  backend        | Install dependencies                         | pip install -r requirements.lock.txt
+  backend        | Verify locked install (pip freeze diff)      | python scripts/verify_lock_install.py \
+  backend        | Dependency audit (locked set + expiring allo | python scripts/audit_dependencies.py \
+  multi-worker   | Install dependencies                         | pip install -r requirements.lock.txt
+  multi-worker   | Install dependencies                         | python scripts/verify_lock_install.py --strict-extra
+  e2e            | Install backend dependencies                 | pip install -r requirements.lock.txt
+  e2e            | Install backend dependencies                 | python scripts/verify_lock_install.py --strict-extra
+  lighthouse     | Install, migrate and seed backend            | pip install -r requirements.lock.txt
+  lighthouse     | Install, migrate and seed backend            | python scripts/verify_lock_install.py --strict-extra
+
+### any remaining 'requirements.txt' installs in CI (expect none)
+(none)
+
+### ruff
+All checks passed!

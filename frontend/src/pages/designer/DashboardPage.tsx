@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { get, post } from "@/lib/api";
+import { ApiError, get, post } from "@/lib/api";
 import type { Project } from "@/lib/types";
 import { Button, Card, Input, Skeleton } from "@/components/ui";
 import { EmptyState, ErrorState } from "@/components/states";
@@ -66,7 +66,16 @@ export default function DesignerDashboardPage() {
       qc.invalidateQueries({ queryKey: ["projects"] });
       toast.success("Project created.");
     },
-    onError: () => toast.error("Could not create the project."),
+    // Stage 1 (T-1.4 close-out / T-1.7): this used to swallow the server's
+    // message and always say "Could not create the project.". The most
+    // important failure here is the 402 project quota, whose body carries a
+    // specific, actionable Persian sentence («سهمیهٔ پروژه‌های شما … به پایان
+    // رسیده است … اشتراک خود را ارتقا دهید») — a designer who hits the free
+    // limit was told nothing about why or what to do. Same ApiError shape and
+    // same fix as LoginPage. A dedicated upgrade/paywall surface is out of
+    // scope for this stage and stays recorded as a PARTIAL in spec-delta.md.
+    onError: (e: unknown) =>
+      toast.error(e instanceof ApiError ? e.message : "Could not create the project."),
   });
 
   useCommands(

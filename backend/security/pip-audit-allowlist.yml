@@ -1,0 +1,41 @@
+# Accepted pip-audit findings (Stage 1, T-1.5)
+# =============================================
+#
+# An entry here suppresses ONE advisory for ONE package. It is a temporary,
+# accountable exception — never a way to make a finding disappear quietly.
+#
+# Rules enforced by scripts/audit_dependencies.py (which the CI job runs):
+#   * every entry MUST have `expires` (YYYY-MM-DD). An expired entry is a HARD
+#     FAILURE — the audit job goes red and someone has to re-justify or fix it.
+#     There is no "permanent" exception.
+#   * `expires` may not be more than 180 days out (MAX_ACCEPTANCE_DAYS). A risk
+#     nobody has revisited in six months is not an accepted risk, it is a
+#     forgotten one.
+#   * every entry MUST have a non-empty `reason` and an `owner`.
+#   * an entry that no longer matches any finding is reported as STALE, so the
+#     list cannot silently rot after an upgrade fixes the underlying issue.
+#
+# Adding an entry is a review decision, not a build fix. Prefer, in order:
+#   1. upgrade the pinned version in requirements.lock.txt (see docs/DEPENDENCIES.md)
+#   2. replace the dependency
+#   3. allowlist with an expiry and a written justification
+#
+# Schema:
+#   allowlist:
+#     - id: <advisory id, e.g. PYSEC-2026-1234 or GHSA-xxxx-xxxx-xxxx>
+#       package: <distribution name as pip-audit reports it>
+#       reason: <why this is acceptable HERE — reachability, not "low severity">
+#       owner: <who re-reviews it>
+#       expires: <YYYY-MM-DD>
+#       ticket: <optional tracking reference>
+
+allowlist: []
+# Currently EMPTY, and that is the desired state.
+#
+# History: at the time this mechanism was introduced the lockfile pinned
+# `setuptools==66.1.1` (an artefact of `pip freeze` capturing the build venv's
+# own tooling), which carried PYSEC-2025-49, PYSEC-2026-1918 and
+# PYSEC-2026-3447. Rather than allowlisting a finding on a package the
+# application does not even import at runtime, the pin was raised to
+# `setuptools==84.0.0` — fixing the finding beats accepting it. See
+# docs/DEPENDENCIES.md and docs/agent-reports/stage1-evidence/t-1.5/.

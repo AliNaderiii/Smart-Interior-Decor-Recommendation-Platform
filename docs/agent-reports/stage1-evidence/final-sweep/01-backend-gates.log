@@ -1,0 +1,32 @@
+# Stage 1 final sweep — backend lint + dependency gates
+# Date: 2026-08-26T12:00:24Z
+
+### ruff check app ai scripts
+All checks passed!
+RUFF_EXIT=0
+
+### ruff check app ai scripts tests (as CI runs it)
+All checks passed!
+RUFF_TESTS_EXIT=0
+
+### verify_lock_install.py (pristine locked venv)
+packages pinned in lockfile: 64
+packages resolved in env:    65
+
+--- requirements.lock.txt (pinned)
++++ pip freeze (resolved)
+(no differences)
+
+MISSING:  0
+MISMATCH: 0
+EXTRA:    0 (tolerated unless --strict-extra)
+
+PASS: the installed environment matches requirements.lock.txt.
+
+### audit_dependencies.py
+Allowlist entries (valid, unexpired): 0
+
+$ /tmp/lockcheck/bin/python -m pip_audit --requirement /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/requirements.lock.txt --format json --progress-spinner off
+pip-audit findings: 0
+
+PASS: no unsuppressed vulnerabilities in the locked dependency set.

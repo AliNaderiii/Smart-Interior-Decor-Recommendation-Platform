@@ -188,7 +188,19 @@ def test_concurrent_creations_never_exceed_quota(client, designer):
 
 def _run_guard_race(engine) -> tuple[list[bool], int]:
     """Run 6 concurrent guarded inserts for a fresh designer; return the win
-    flags and the resulting project row count."""
+    flags and the resulting project row count.
+
+    Calls :func:`insert_project_guarded` **directly**, deliberately bypassing
+    the route and ``create_designer_project``: the point is to prove the guard
+    is self-sufficient, i.e. that a caller which does not take the user-row
+    lock itself still cannot exceed the quota. The guard takes that lock
+    internally, so this holds on PostgreSQL (READ COMMITTED) as well as on
+    SQLite.
+
+    Each worker gets its own session/connection, so these are 6 genuinely
+    concurrent transactions, exactly as 6 concurrent HTTP requests would be.
+    """
+    import threading
     import uuid as _uuid
 
     from sqlalchemy import func, select
@@ -211,9 +223,27 @@ def _run_guard_race(engine) -> tuple[list[bool], int]:
 
     quota = 2
 
+    # Force all 6 workers to hit the guard at the same instant. Two things are
+    # needed, and both matter:
+    #
+    #   * each session must already hold an open connection *before* the
+    #     barrier — SQLAlchemy connects lazily, and paying for connection
+    #     set-up after the barrier staggers the threads enough that they stop
+    #     overlapping;
+    #   * the barrier itself then releases them together.
+    #
+    # Without this the pool serialises them by accident and an unguarded
+    # insert passes by luck: measured on PostgreSQL 16, the lock-removed
+    # regression was caught in only 1 run out of 8. That is precisely how the
+    # missing lock survived every local run and only surfaced in CI. With the
+    # warm-up it is caught every time, so this test now has real teeth.
+    start = threading.Barrier(6)
+
     def worker(_: int) -> bool:
         sess = Session()
         try:
+            sess.execute(select(1))  # open the connection before the barrier
+            start.wait(timeout=30)
             ok = insert_project_guarded(
                 sess,
                 owner_id,
@@ -249,8 +279,10 @@ def test_insert_guarded_is_atomic_under_concurrency_sqlite():
     True multi-connection concurrency against a file-backed database (6
     fresh transactions, as concurrent HTTP requests would be): the row count
     can never exceed the quota regardless of interleaving. On SQLite the
-    ``FOR UPDATE`` row lock is a no-op, so this exercises exactly the layer
-    that protects the dev fallback engine.
+    ``FOR UPDATE`` row lock is a silent no-op, so this isolates the
+    conditional ``INSERT ... SELECT ... WHERE count < quota`` — exactly the
+    layer that protects the dev fallback engine, with the lock contributing
+    nothing.
     """
     import os
     import tempfile
@@ -275,6 +307,13 @@ def test_insert_guarded_is_atomic_under_concurrency_sqlite():
 def test_insert_guarded_is_atomic_under_concurrency_postgres():
     """PostgreSQL-side proof: the row lock + conditional insert must hold
     under true concurrency on the production engine.
+
+    This is the case the conditional insert *cannot* carry alone. Under
+    READ COMMITTED every statement takes a fresh snapshot, so without the
+    user-row lock all 6 transactions would read ``count = 0`` before any of
+    them committed and all 6 would insert. The lock inside
+    :func:`insert_project_guarded` serialises them; a blocked transaction
+    re-snapshots on acquiring it and therefore sees its committed siblings.
 
     Runs only in CI (``TEST_DATABASE_URL`` set, same pattern as
     ``test_pgvector_real.py``); skips cleanly on the SQLite dev suite.

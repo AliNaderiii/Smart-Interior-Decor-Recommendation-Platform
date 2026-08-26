@@ -909,3 +909,324 @@ artifact (egress-enabled machine + controlled deployment artifact / mounted
 volume, "do NOT commit"), `seed_products.py`'s docstring aligned, and a
 regression test added asserting the message never instructs committing
 (`tests/test_production_seeding.py`).
+
+---
+
+## Stage 1 (Hardening & Acceptance) — appended 2026-08-26
+
+## IR-S1-001 · BLOCKED CHECK · Playwright browser cannot be downloaded in the Stage 1 sandbox
+
+**Task ID:** T-1.4 (E2E: Playwright — authenticated homepage smoke + auth negatives)
+**Status:** BLOCKED locally — committed as the CI gate, which is where it will actually run (see "Unblock proposal"). NOT reported as passing.
+**Date:** 2026-08-26
+
+### Blocking element
+
+`npx playwright install chromium` (working directory `frontend/`) — the only
+way to obtain the Chromium binary the e2e suite needs. The sandbox egress
+allows `registry.npmjs.org` and `pypi.org` but resets every browser-CDN
+connection (`cdn.playwright.dev`, `playwright.azureedge.net`,
+`storage.googleapis.com` — all fail TLS with ECONNRESET, verified 2026-08-26).
+
+### Exact command + verbatim error
+
+Command: `npx playwright install chromium`
+
+```
+Downloading Chrome for Testing 151.0.7922.34 (playwright chromium v1234) from https://cdn.playwright.dev/builds/cft/151.0.7922.34/linux64/chrome-linux64.zip
+Error: Client network socket disconnected before secure TLS connection was established
+    at TLSSocket.onConnectEnd (node:internal/tls/wrap:1754:19)
+    at TLSSocket.emit (node:events (NodeEventTarget) [...])
+    ...
+  code: 'ECONNRESET',
+  path: null,
+  host: '150.171.110.147',
+  port: 443,
+  localAddress: undefined
+}
+(repeated 5x across retry hosts 150.171.110.146/147, 13.107.253.70)
+Failed to install browsers
+Error: Failed to download Chrome for Testing 151.0.7922.34 (playwright chromium v1234), caused by
+Error: Download failure, code=1
+    at ChildProcess.<anonymous> (.../frontend/node_modules/playwright-core/lib/coreBundle.js:32015:32)
+```
+
+Full verbatim log: `docs/agent-reports/stage1-evidence/t-1.4/01-browser-download-blocked.log`.
+This is the same blocker the Phase 4 dead-keys spec documented (`tests/e2e/deadKeys.spec.ts`
+header: "the sandbox this was authored in cannot download a Chromium binary
+(`npx playwright install chromium` fails with ECONNRESET against the CDN)").
+
+### Workarounds attempted
+
+1. `npx playwright install chromium` — ECONNRESET (verbatim above).
+2. Mirror hosts probed directly: `curl -sI https://playwright.azureedge.net/` → exit 35 (TLS error); `https://cdn.playwright.dev/` → exit 35; `https://storage.googleapis.com/` → exit 35.
+3. Searched for any preinstalled browser (system `chromium`/`chrome`, `~/.cache/ms-playwright`, full-disk search for `headless_shell`/`chrome` binaries) — none exist on this machine.
+4. Debian archive probe (`http://deb.debian.org/debian/`) — also unreachable, so `apt-get install chromium` is not an option either.
+
+### Unblock proposal
+
+Run in GitHub CI, where the download works: the new `e2e` job in
+`.github/workflows/ci.yml` installs Chromium with
+`npx playwright install --with-deps chromium`, starts the real backend
+(uvicorn + Postgres16/pgvector + Redis, seeded demo accounts,
+`COOKIE_SECURE=false`) and the vite dev server, then runs
+`E2E_BASE_URL=http://localhost:5173 npx playwright test`. The GitHub Actions
+token has no `workflows` scope on this repo, so I could not verify the job
+remotely from here — it must be run by the repo owner (push the branch / open
+the PR; same disclosure as the Stage 01 CI caveat). No other stage's scope is
+touched: the e2e job is additive to `ci.yml` and the specs live under
+`frontend/tests/e2e/`.
+
+### Impact
+
+* `tests/e2e/auth-negative.spec.ts` + `tests/e2e/auth-smoke.spec.ts` +
+  `tests/e2e/globalSetup.ts` (storageState session) are committed but could NOT
+  be executed in this sandbox. They are a CI gate, not a local proof.
+* To keep the evidence honest, the equivalent assertions were executed locally
+  at the two levels this sandbox allows, and both are green:
+  1. **Protocol level** (real running app, vite :5173 → uvicorn :8000, default
+     cookie mode): 14/14 checks — valid login issues httpOnly + SameSite=Strict
+     cookies, XSS payload in the login form → 401 with the generic
+     "Invalid credentials" and zero reflection of the payload, no credentials
+     issued on any failure, no redirect, anonymous admin API → 401.
+     Log: `docs/agent-reports/stage1-evidence/t-1.4/00-protocol-auth.log`
+     (harness source: `05-protocol-harness.mjs`).
+  2. **DOM level** (Vitest + Testing Library under jsdom, real components):
+     `tests/unit/requireAuth.test.tsx` (6 tests) and
+     `tests/unit/loginPage.test.tsx` (4 tests) — the login error renders as
+     escaped plain text (HTML-looking message → no live `<img>`/`<script>`),
+     the user stays on /login, and — see below — the cookie-mode session
+     regression is pinned.
+* T-1.4 DoD "the CI gate actually runs it" is met by construction (dedicated
+  `e2e` job); "locally verified" is met for everything the sandbox can
+  execute, and the browser-level gap is this entry.
+
+---
+
+## IR-S1-002 — `homeowner_free` moodboard/floorplan limits are declared but never enforced
+
+**Raised by:** Stage 1, T-1.7 (spec-delta audit) · **Date:** 2026-08-26
+**Suggested owner:** Stage 2 (product) · **Severity:** medium — revenue leak, not a security hole
+
+`backend/seed_data/subscription_plans.json` declares for `homeowner_free`:
+
+```json
+"limits": { "recommendations_per_category": 1, "moodboards": 0, "floorplans": 0, "projects": 1 }
+```
+
+`recommendations_per_category` **is** enforced (`routes/quiz.py:118-135` marks
+surplus items `locked`). `moodboards` and `floorplans` are **not**: `POST
+/moodboards` (`routes/moodboards.py:28`) has no plan check at all, so a free
+user can create unlimited moodboards, and the floorplan page is reachable by
+any authenticated user. The advertised bullet "subscription paywall for full
+access" is therefore only partly true.
+
+Out of scope for Stage 1 (hardening/acceptance, not new product surface) and
+deliberately not built. Note that enforcing this changes observable behaviour
+for existing free accounts, so it needs a product decision about grandfathering
+before implementation — which is exactly why it is not a silent fix here.
+
+**Evidence:** `docs/agent-reports/stage1-evidence/spec-delta.md` row 1.7.
+
+---
+
+## IR-S1-003 — No designer upgrade/paywall surface
+
+**Raised by:** Stage 1, T-1.7 · **Date:** 2026-08-26
+**Suggested owner:** Stage 2 (product) · **Severity:** medium
+
+T-1.1 enforces the designer project quota server-side (402 + a Persian message),
+and Stage 1 fixed the dashboard so that message is actually shown to the user.
+What still does not exist is any **upgrade path** from that moment: no plan
+comparison for designer tiers, no CTA from the quota error to `/upgrade`, no
+indication of the current plan or of how many projects remain before the wall.
+
+The Stage-1 brief explicitly excludes building a designer paywall UI
+("NO designer paywall UI — record as PARTIAL"), so this is recorded rather than
+implemented.
+
+**Evidence:** `docs/agent-reports/stage1-evidence/spec-delta.md` row 2.6.
+
+---
+
+## IR-S1-004 — Style taxonomy is read-only; the advertisement promises management
+
+**Raised by:** Stage 1, T-1.7 · **Date:** 2026-08-26
+**Suggested owner:** Stage 2 (product) · **Severity:** medium
+
+Portal 3 advertises "style-taxonomy management (modern/scandinavian/
+industrial/…)". The API exposes only `GET /admin/taxonomy`
+(`routes/admin.py:122-125`); there is no create/update/delete. The taxonomy is
+a static dataset (`frontend/src/assets/style_taxonomy.json` + backend
+constants), so adding or renaming a style requires a code change and a deploy.
+
+Admins *can* assign existing styles to a product (the review dialog's taxonomy
+chips), which covers the day-to-day case, but not the advertised management
+capability.
+
+Implementation note for whoever picks this up: style ids are embedded in
+product rows, quiz payloads and the recommender's scoring, so taxonomy CRUD
+needs a migration/renaming story — it is not a thin CRUD endpoint.
+
+**Evidence:** `docs/agent-reports/stage1-evidence/spec-delta.md` row 3.4.
+
+---
+
+## IR-S1-005 — Subscription administration is read-only
+
+**Raised by:** Stage 1, T-1.7 · **Date:** 2026-08-26
+**Suggested owner:** Stage 2 (product) · **Severity:** medium
+
+Portal 3 advertises "user & subscription management". User management is
+complete (`GET /admin/users`, `PATCH /admin/users/{id}` with a UI).
+Subscription management is a **read-only** list (`GET /admin/subscriptions` +
+a table); there is no endpoint to grant, extend, downgrade or cancel a
+subscription. An admin cannot resolve a billing dispute or comp an account
+without direct database access.
+
+**Evidence:** `docs/agent-reports/stage1-evidence/spec-delta.md` row 3.5.
+
+---
+
+## IR-S1-006 — Room dimensions are collected and stored but ignored by the recommender
+
+**Raised by:** Stage 1, T-1.7 · **Date:** 2026-08-26
+**Suggested owner:** Stage 2 (AI / product) · **Severity:** medium — quality-of-result
+
+The quiz collects room width and length (step 3) and persists them
+(`quizzes.room_width_cm`, `room_length_cm`), and every product carries
+`width_cm` / `depth_cm` / `height_cm`. The recommender **never reads any of
+them**: `services/recommender.py` mentions `room_width` only in a docstring;
+there is no dimensional hard filter and no dimensional term in the weighted
+score. A 320 cm sofa can be ranked #1 for a 300 cm room.
+
+This is not a literal breach — the advertisement lists room dimensions as a
+quiz *input*, and the five advertised scoring signals are style, colour,
+budget, material and pattern — but a user who is asked for their room size
+reasonably expects it to matter.
+
+Options for Stage 2: (a) a hard filter rejecting items that cannot fit, (b) a
+soft "fit" scoring signal (which would reopen the C-6 weight normalisation),
+or (c) a UI disclosure that dimensions are used only for the 2D floorplan.
+
+**Evidence:** `docs/agent-reports/stage1-evidence/spec-delta.md` row 4.5.
+
+---
+
+## IR-S1-007 — At-rest encryption uses a static Fernet key, not a managed KMS
+
+**Raised by:** Stage 1, T-1.7 · **Date:** 2026-08-26
+**Suggested owner:** Stage 4/5 (deployment) · **Severity:** medium
+
+The advertisement says "encryption at rest (KMS or equivalent)". The repository
+implements Fernet-based at-rest encryption (`app/core/security.py`) and
+production boot refuses an unset or malformed `FERNET_KEY`
+(`app/core/config.py:272-286`) — which correctly prevents the
+"new key per worker, data undecryptable after restart" failure.
+
+The gap is operational: a single static application key held in an environment
+variable, with no rotation procedure, no envelope encryption and no key-access
+audit trail. Whether that qualifies as "or equivalent" is a client/compliance
+decision; if a managed KMS is required, it is deployment-stage work.
+
+**Evidence:** `docs/agent-reports/stage1-evidence/spec-delta.md` row 5.3.
+
+---
+
+## IR-S1-008 — GDPR delete/export exist in the API but have no UI
+
+**Raised by:** Stage 1, T-1.7 · **Date:** 2026-08-26
+**Suggested owner:** Stage 3 (compliance) · **Severity:** **high** — a compliance commitment users cannot exercise
+
+`DELETE /api/v1/users/me` performs a genuine right-to-erasure (hard-deletes the
+user and all owned data — feedback, share links, payments, quizzes, moodboards
+— and pseudonymises audit rows), and `GET /users/me/export` provides data
+portability. Both are well implemented.
+
+Neither is reachable from the product: a search across `frontend/src` for
+`users/me` / delete-account / export finds **zero** call sites. There is no
+account-settings page. A user exercising "GDPR delete on request" therefore
+depends on a support process that is not documented either.
+
+The advertised bullet is "GDPR delete **on request**", so a manual process is
+arguably compliant — but it must then exist and be written down. The minimal
+resolution is either (a) a small account-settings surface with export +
+delete-with-confirmation, or (b) a documented, staffed support procedure
+referenced from the privacy policy.
+
+Flagged as the highest-severity item in this audit because it is the only gap
+that touches a legal commitment rather than a product capability.
+
+**Evidence:** `docs/agent-reports/stage1-evidence/spec-delta.md` row 5.4.
+
+---
+
+## IR-S1-009 · CRITICAL · Stage-1 branch is only partially pushable — `workflows` permission still not effective
+
+**Owner:** Master Prompt 07 — Infrastructure / CI/CD (human action required)
+**Blocker ID:** B-2a (refinement of B-2)
+**Raised:** 2026-08-26, Stage 1 close-out
+
+### Evidence
+
+The supervisor granted the GitHub App the `workflows` permission. It is **not
+effective on the token this session holds**. Measured, not assumed:
+
+```
+$ gh api -i /repos/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform --silent | grep X-Accepted-Github-Permissions
+X-Accepted-Github-Permissions: metadata=read
+```
+
+Push of the full branch, retried 12 times over ~12 minutes:
+
+```
+$ git push -u origin arena/01a03cf5-smart-interior-decor-recommend
+ ! [remote rejected] arena/01a03cf5-smart-interior-decor-recommend -> arena/01a03cf5-smart-interior-decor-recommend
+   (refusing to allow a GitHub App to create or update workflow `.github/workflows/ci.yml`
+    without `workflows` permission)
+error: failed to push some refs
+```
+
+### Scope of the block — isolated by bisection, not guessed
+
+Repository **write access works**. Pushing the commit prefix that predates any
+workflow edit succeeded:
+
+```
+$ git push origin cfbd8f3:refs/heads/arena/01a03cf5-smart-interior-decor-recommend
+ * [new branch]      cfbd8f3 -> arena/01a03cf5-smart-interior-decor-recommend
+```
+
+So the remote branch currently exists at `cfbd8f3` — **2 of 9 commits**. Only
+`.github/workflows/ci.yml` is refused. The two commits that touch it are
+`7711ce4` (adds the `frontend` test/typecheck steps) and `d2c6346` (moves all
+Python installs to `requirements.lock.txt`, adds the lock-verify and pip-audit
+steps). Because git evaluates the complete ref update, those two commits gate
+the seven that follow them, including the Stage-1 report.
+
+### Likely cause
+
+The credential is a **GitHub App installation token**. Installation tokens are
+minted with the permission set frozen at creation time; granting a new
+permission afterwards does not widen an already-issued token. The session must
+be handed a re-minted token.
+
+### Requested change (any one unblocks it)
+
+1. **Preferred** — reconnect/refresh the GitHub integration in Arena so a new
+   installation token is minted *after* the grant, then re-run
+   `git push -u origin arena/01a03cf5-smart-interior-decor-recommend`.
+2. Confirm the grant was saved on the **installation** for this repository
+   (Settings → GitHub Apps → the Arena app → Repository permissions →
+   **Workflows: Read and write**), and that any resulting "pending owner
+   approval" request was accepted.
+3. Fallback — a human pushes the two workflow commits from a PAT-authenticated
+   clone, or applies `.github/workflows/ci.yml` from this branch by hand.
+
+### Impact
+
+Stage 1 cannot reach its **CONDITIONAL PASS → PASS** transition. The CI run that
+the conditional acceptance depends on cannot be triggered, so the 29 Playwright
+E2E tests (IR-S1-001) still have no environment in which to execute, and the
+supervisor's independent verification of the pushed branch cannot begin. All
+work is committed locally and is not at risk.

@@ -1,0 +1,231 @@
+### npm test (Vitest)
+
+> frontend@0.0.0 test
+> vitest run
+
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vitest.config.ts:18:32). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/home/user/Smart-Interior-Decor-Recommendation-Platform/frontend[39m
+
+ [32m✓[39m tests/unit/useFeedback.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 351[2mms[22m[39m
+ [32m✓[39m tests/unit/designerQuotaToast.test.tsx [2m([22m[2m5 tests[22m[2m)[22m[33m 885[2mms[22m[39m
+     [33m[2m✓[22m[39m surfaces the backend's Persian 402 message in the toast [33m 336[2mms[22m[39m
+ [32m✓[39m tests/unit/requireAuth.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[32m 64[2mms[22m[39m
+ [32m✓[39m tests/unit/quizStore.test.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m tests/unit/loginPage.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[33m 669[2mms[22m[39m
+ [32m✓[39m tests/unit/projectStatus.test.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+ [32m✓[39m tests/unit/authStore.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m tests/unit/safeUrl.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m      Tests [22m [1m[32m58 passed[39m[22m[90m (58)[39m
+[2m   Start at [22m 11:40:03
+[2m   Duration [22m 10.02s[2m (transform 283ms, setup 895ms, import 674ms, tests 2.01s, environment 5.40s)[22m
+
+
+### npx tsc -p tsconfig.tests.json
+TSC_EXIT=0
+
+### npm run lint (oxlint)
+
+> frontend@0.0.0 lint
+> oxlint
+
+
+  ! react(set-state-in-effect): Calling setState synchronously within an effect can trigger cascading renders
+     ,-[src/pages/RecommendationsPage.tsx:148:42]
+ 146 | 
+ 147 |   useEffect(() => {
+     :   ^^^^|^^^^
+     :       `-- This is the containing effect
+ 148 |     if (!activeCat && categories.length) setActiveCat(categories[0]);
+     :                                          ^^^^^^|^^^^^
+     :                                                `-- Avoid calling setState() directly within an effect
+ 149 |   }, [categories, activeCat]);
+     `----
+  help: Effects should synchronize React with external systems. Calling setState synchronously inside an effect starts another render and is usually unnecessary. Derive the value during render, initialize state directly, or update it from the event that caused the change. Use an effect only when synchronizing with an external system.
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/set-state-in-effect
+
+  ! react(refs): Cannot access refs during render
+     ,-[src/pages/MoodboardEditorPage.tsx:111:10]
+ 110 |   const saveRef = useRef(save.mutate);
+ 111 |   saveRef.current = save.mutate;
+     :   ^^^|^^^^^^^|^^^
+     :      |       `-- Cannot update ref value during render
+     :      `-- This value is a ref
+ 112 | 
+     `----
+  help: React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/refs
+
+  ! react(refs): Cannot access refs during render
+     ,-[src/pages/MoodboardEditorPage.tsx:121:12]
+ 120 |   const layoutRef = useRef(layout);
+ 121 |   layoutRef.current = layout;
+     :   ^^^^|^^^^^^^^|^^^
+     :       |        `-- Cannot update ref value during render
+     :       `-- This value is a ref
+ 122 | 
+     `----
+  help: React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/refs
+
+  ! react(refs): Cannot access refs during render
+     ,-[src/pages/MoodboardEditorPage.tsx:221:19]
+ 220 |   );
+ 221 |   const canUndo = past.current.length > 0;
+     :                   ^^^^^^^^^|^^^^^^^^^
+     :                            `-- Cannot access ref value during render
+ 222 |   const canRedo = future.current.length > 0;
+     `----
+  help: React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/refs
+
+  ! react(refs): Cannot access refs during render
+     ,-[src/pages/MoodboardEditorPage.tsx:222:19]
+ 221 |   const canUndo = past.current.length > 0;
+ 222 |   const canRedo = future.current.length > 0;
+     :                   ^^^^^^^^^^|^^^^^^^^^^
+     :                             `-- Cannot access ref value during render
+ 223 |   void historyTick; // re-render trigger for the ref-backed stacks
+     `----
+  help: React refs are values that are not needed for rendering. Refs should only be accessed outside of render, such as in event handlers or effects. Accessing a ref value (the `current` property) during render can cause your component not to update as expected
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/refs
+
+  ! react(set-state-in-effect): Calling setState synchronously within an effect can trigger cascading renders
+     ,-[src/pages/ShoppingListPage.tsx:110:18]
+ 108 | 
+ 109 |   useEffect(() => {
+     :   ^^^^|^^^^
+     :       `-- This is the containing effect
+ 110 |     if (boardId) setQty(loadQty(boardId));
+     :                  ^^^|^^
+     :                     `-- Avoid calling setState() directly within an effect
+ 111 |   }, [boardId]);
+     `----
+  help: Effects should synchronize React with external systems. Calling setState synchronously inside an effect starts another render and is usually unnecessary. Derive the value during render, initialize state directly, or update it from the event that caused the change. Use an effect only when synchronizing with an external system.
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/set-state-in-effect
+
+  ! react(only-export-components): Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+    ,-[src/components/guards.tsx:29:17]
+ 28 |  *  otherwise shows the upgrade CTA overlay provided by the caller. */
+ 29 | export function withSubscription<P extends object>(
+    :                 ^^^^^^^^^^^^^^^^
+ 30 |   Component: ComponentType<P>,
+    `----
+
+  ! react(only-export-components): Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+    ,-[src/components/Toast.tsx:35:17]
+ 34 |  *  forgot the provider (e.g. an isolated test render). */
+ 35 | export function useToast(): ToastApi {
+    :                 ^^^^^^^^
+ 36 |   const ctx = useContext(ToastContext);
+    `----
+
+  ! react(set-state-in-effect): Calling setState synchronously within an effect can trigger cascading renders
+     ,-[src/components/OptimizedImage.tsx:107:20]
+ 105 |   // virtualised/paginated grid shows the previous image's loaded state.
+ 106 |   useEffect(() => {
+     :   ^^^^|^^^^
+     :       `-- This is the containing effect
+ 107 |     if (!priority) setLoaded(false);
+     :                    ^^^^|^^^^
+     :                        `-- Avoid calling setState() directly within an effect
+ 108 |   }, [src, priority]);
+     `----
+  help: Effects should synchronize React with external systems. Calling setState synchronously inside an effect starts another render and is usually unnecessary. Derive the value during render, initialize state directly, or update it from the event that caused the change. Use an effect only when synchronizing with an external system.
+  note: React Compiler skipped optimizing this component or hook. Additional guidance: https://react.dev/reference/eslint-plugin-react-hooks/lints/set-state-in-effect
+
+  ! react(only-export-components): Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+    ,-[src/components/JsonDiff.tsx:31:17]
+ 30 | 
+ 31 | export function diffObjects(
+    :                 ^^^^^^^^^^^
+ 32 |   before: Record<string, Json>,
+    `----
+
+  ! react(only-export-components): Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+    ,-[src/components/CommandPalette.tsx:42:17]
+ 41 | 
+ 42 | export function useCommandPalette() {
+    :                 ^^^^^^^^^^^^^^^^^
+ 43 |   const ctx = useContext(PaletteContext);
+    `----
+
+  ! react(only-export-components): Fast refresh only works when a file only exports components. Use a new file to share constants or functions between components.
+    ,-[src/components/CommandPalette.tsx:48:17]
+ 47 | /** Register page-scoped commands for the lifetime of the calling component. */
+ 48 | export function useCommands(items: CommandItem[], deps: unknown[] = []) {
+    :                 ^^^^^^^^^^^
+ 49 |   const { register } = useCommandPalette();
+    `----
+
+Found 12 warnings and 0 errors.
+Finished in 119ms on 66 files with 116 rules using 2 threads.
+LINT_EXIT=0
+
+### npm run build
+
+> frontend@0.0.0 build
+> tsc -b && vite build
+
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - `__dirname` (vite.config.ts:10:32). Use `import.meta.dirname` instead
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+vite v8.2.1 building client environment for production...
+transforming...
+✓ 704 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                                           0.95 kB │ gzip:  0.48 kB
+dist/assets/hero-CLDdwZDr.png                            13.05 kB
+dist/assets/vazirmatn-arabic-400-normal-DMZFCm7K.woff2   21.08 kB
+dist/assets/vazirmatn-arabic-700-normal-Dge_DOjm.woff2   21.72 kB
+dist/assets/inter-latin-wght-normal-Dx4kXJAl.woff2       48.25 kB
+dist/assets/inter-latin-ext-wght-normal-DO1Apj_S.woff2   85.06 kB
+dist/assets/index-Di-xWpbc.css                           61.57 kB │ gzip: 11.11 kB
+dist/assets/moodboardStore-BewE7V6E.js                    0.22 kB │ gzip:  0.17 kB
+dist/assets/use-reduced-motion-W3NX7ACI.js                0.24 kB │ gzip:  0.20 kB
+dist/assets/motion-CDwZ44n0.js                            0.33 kB │ gzip:  0.22 kB
+dist/assets/safeUrl-CbAcrLF8.js                           0.35 kB │ gzip:  0.24 kB
+dist/assets/rolldown-runtime-CbXtAM7H.js                  0.58 kB │ gzip:  0.36 kB
+dist/assets/quizStore-BxPTq6jl.js                         0.77 kB │ gzip:  0.42 kB
+dist/assets/projectStatus-CIBtRnSn.js                     0.90 kB │ gzip:  0.51 kB
+dist/assets/states-KiMJTRfx.js                            2.09 kB │ gzip:  0.82 kB
+dist/assets/ShortcutsDialog-CpZd51-j.js                   2.25 kB │ gzip:  1.05 kB
+dist/assets/SubscriptionsPage-BKGh_Zyi.js                 2.44 kB │ gzip:  0.92 kB
+dist/assets/UsersPage-4H4NrQOr.js                         3.02 kB │ gzip:  1.10 kB
+dist/assets/PresentMode-C1Ze5Fgg.js                       3.15 kB │ gzip:  1.37 kB
+dist/assets/SharePage-JAw9C1_Z.js                         3.27 kB │ gzip:  1.28 kB
+dist/assets/RegisterPage-CyH4UlSe.js                      3.53 kB │ gzip:  1.29 kB
+dist/assets/MoodboardsPage-B8QMA15k.js                    4.26 kB │ gzip:  1.66 kB
+dist/assets/ProjectPage-SiEd9N1b.js                       5.82 kB │ gzip:  2.23 kB
+dist/assets/DashboardPage-BIa4Q2K9.js                     6.97 kB │ gzip:  2.53 kB
+dist/assets/UpgradePage-CObjxAqd.js                       7.26 kB │ gzip:  3.07 kB
+dist/assets/ShoppingListPage-Ce-DTvvN.js                  7.44 kB │ gzip:  2.68 kB
+dist/assets/MoodboardEditorPage-DcTBAw53.js               7.75 kB │ gzip:  2.97 kB
+dist/assets/FloorplanPage-C4l7KvnJ.js                    10.35 kB │ gzip:  3.85 kB
+dist/assets/confetti.module-D2OR7shl.js                  10.57 kB │ gzip:  4.20 kB
+dist/assets/QuizPage-mdFgNHWs.js                         12.86 kB │ gzip:  4.28 kB
+dist/assets/ProductsPage-CtThW9W9.js                     15.05 kB │ gzip:  4.59 kB
+dist/assets/dist-BoCXEzRY.js                             16.16 kB │ gzip:  5.55 kB
+dist/assets/CommandPaletteOverlay-B7Vldvwq.js            34.50 kB │ gzip: 12.47 kB
+dist/assets/RecommendationsPage-UjSkLNi1.js              47.55 kB │ gzip: 16.80 kB
+dist/assets/query-Ctn2HzOU.js                            49.67 kB │ gzip: 15.12 kB
+dist/assets/BoardGrid-CyF8q4v-.js                        64.89 kB │ gzip: 17.75 kB
+dist/assets/proxy-B7xT4H3N.js                           125.30 kB │ gzip: 40.75 kB
+dist/assets/index-08keU7h_.js                           131.68 kB │ gzip: 41.25 kB
+dist/assets/html2canvas-BxJQVYMI.js                     199.53 kB │ gzip: 46.80 kB
+dist/assets/vendor-Bvo_F7WR.js                          221.32 kB │ gzip: 70.82 kB
+
+✓ built in 639ms
+BUILD_EXIT=0
+
+### npx playwright test --list
+  [chromium-admin] › journey-admin.spec.ts:84:3 › admin journey › human-in-the-loop: a pending product can be reviewed and approved
+  [chromium-admin] › journey-admin.spec.ts:121:3 › admin journey › style taxonomy is available to the reviewer
+  [chromium-admin] › journey-admin.spec.ts:133:3 › admin journey › user management loads
+  [chromium-admin] › journey-admin.spec.ts:143:3 › admin journey › subscription management loads
+Total: 29 tests in 6 files

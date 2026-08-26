@@ -1,0 +1,31 @@
+# T-1.8 — NEGATIVE CONTROL: does the PG race test actually catch the missing lock?
+# Date: 2026-08-26T13:26:36Z
+# Real PostgreSQL 16.2. The in-guard SELECT..FOR UPDATE is temporarily removed,
+# the test is run 10x, then the fix is restored and it is run 10x again.
+# A test that cannot fail without the fix is not evidence.
+
+## ARM 1 — lock REMOVED (expect: fail every run)
+  run 1: FAILED  assert 5 == 2  (rows inserted vs quota 2)
+  run 2: FAILED  assert 5 == 2  (rows inserted vs quota 2)
+  run 3: FAILED  assert 5 == 2  (rows inserted vs quota 2)
+  run 4: FAILED  assert 5 == 2  (rows inserted vs quota 2)
+  run 5: FAILED  assert 5 == 2  (rows inserted vs quota 2)
+  run 6: FAILED  assert 5 == 2  (rows inserted vs quota 2)
+  run 7: FAILED  assert 5 == 2  (rows inserted vs quota 2)
+  run 8: FAILED  assert 4 == 2  (rows inserted vs quota 2)
+  run 9: FAILED  assert 4 == 2  (rows inserted vs quota 2)
+  run 10: FAILED  assert 5 == 2  (rows inserted vs quota 2)
+  ARM 1 TOTAL: 10 failed / 0 passed   (want 10 failed)
+
+## ARM 2 — lock RESTORED (expect: pass every run)
+  run 1: PASSED
+  run 2: PASSED
+  run 3: PASSED
+  run 4: PASSED
+  run 5: PASSED
+  run 6: PASSED
+  run 7: PASSED
+  run 8: PASSED
+  run 9: PASSED
+  run 10: PASSED
+  ARM 2 TOTAL: 10 passed / 0 failed   (want 10 passed)

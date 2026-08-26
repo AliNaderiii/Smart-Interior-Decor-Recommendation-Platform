@@ -1,0 +1,26 @@
+{
+  /* Type-check gate for the test suites (Stage 1, T-1.3 / T-1.4).
+   *
+   * tsconfig.app.json deliberately includes only `src`, so neither the Vitest
+   * unit tests nor the Playwright specs are covered by `npm run build`. This
+   * config extends it and adds the test trees plus the test-runner globals.
+   *
+   * Note: `types` must keep "vite/client" — dropping it breaks the css/png/
+   * svg module declarations that `src` relies on.
+   *
+   * Run:  npx tsc -p tsconfig.tests.json
+   */
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tests.tsbuildinfo",
+    "types": ["vite/client", "node", "vitest"],
+    "noEmit": true
+  },
+  "include": [
+    "src",
+    "tests/unit",
+    "tests/e2e",
+    "vitest.config.ts",
+    "playwright.config.ts"
+  ]
+}

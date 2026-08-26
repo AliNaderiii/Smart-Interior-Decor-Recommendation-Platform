@@ -1,0 +1,7 @@
+ ✓ tests/unit/useFeedback.test.tsx (4 tests) 341ms
+ ✓ tests/unit/authStore.test.ts (5 tests) 16ms
+ ✓ tests/unit/projectStatus.test.ts (15 tests) 9ms
+ ✓ tests/unit/quizStore.test.ts (10 tests) 7ms
+ ✓ tests/unit/safeUrl.test.ts (9 tests) 8ms
+ Test Files  5 passed (5)
+      Tests  43 passed (43)

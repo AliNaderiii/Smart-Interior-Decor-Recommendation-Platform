@@ -307,6 +307,30 @@ def _stage_b_semantic(
     return scored[:CANDIDATE_LIMIT]
 
 
+def _session_is_postgres(db: Session) -> bool:
+    """Does *this session* actually speak PostgreSQL?
+
+    Deliberately inspects the session's own bind instead of the global
+    ``settings.is_postgres``. The two can disagree: the evaluation harness
+    (``scripts/evaluate_recommender.py``) builds an in-memory SQLite catalog
+    for reproducibility, and it must keep working when the *process* is
+    configured for PostgreSQL — as it is in the CI backend job. Branching on
+    the global setting there sent PostgreSQL-only SQL
+    (``SET LOCAL hnsw.ef_search``, ``cosine_distance``) to a SQLite
+    connection, which fails with ``near "SET": syntax error``.
+
+    Falls back to the engine bound to the model class when the session has no
+    bind of its own, and to False if neither is resolvable — SQLite is the
+    portable path, so an unknown dialect degrades safely rather than emitting
+    dialect-specific SQL.
+    """
+    try:
+        bind = db.get_bind()
+    except Exception:  # pragma: no cover - unbound session, exotic setups
+        return False
+    return bool(bind is not None and bind.dialect.name == "postgresql")
+
+
 def _stage_ab_postgres(
     db: Session, category: str, lo: int, hi: int, user_emb: list[float]
 ) -> list[tuple[Product, float]]:
@@ -676,7 +700,7 @@ def _compute(
     result_categories: dict[str, list[dict[str, Any]]] = {}
     empty_categories: list[str] = []
     for category in categories:
-        if settings.is_postgres:
+        if _session_is_postgres(db):
             scored_pairs = _stage_ab_postgres(db, category, lo, hi, user_emb)
         else:
             pool = _stage_a_hard_filter(db, category, lo, hi)

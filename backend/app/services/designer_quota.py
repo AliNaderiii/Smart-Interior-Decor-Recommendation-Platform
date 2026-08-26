@@ -22,20 +22,31 @@ code):
   designer route). Homeowners have no projects at all and are stopped by the
   role guard upstream.
 
-Race safety — two independent guards, so the check is atomic on every engine:
+Race safety — ``insert_project_guarded`` is atomic on every engine *on its
+own*, because it owns both halves of the guard:
 
-1. ``raise_for_quota_exhausted`` locks the designer's user row
-   (``SELECT ... FOR UPDATE`` on PostgreSQL) *before* counting. On the
-   production engine two concurrent creations by the same designer therefore
-   serialise: the second transaction reads the count only after the first has
-   committed.
-2. ``insert_project_guarded`` performs the insert itself as
+1. it locks the designer's user row (``SELECT ... FOR UPDATE`` on PostgreSQL)
+   inside its own transaction, immediately before counting, so two concurrent
+   creations by the same designer serialise: the second reads the count only
+   after the first has committed;
+2. it then performs the insert as
    ``INSERT ... SELECT ... WHERE (SELECT count) < quota`` — a single
    statement, atomic by construction even on SQLite (the dev fallback), where
-   ``FOR UPDATE`` is a no-op and two connections could otherwise both read a
-   stale count. The row lock (1) is what makes that statement's count fresh
-   on PostgreSQL; the conditional insert (2) is the backstop that also holds
-   on SQLite.
+   ``FOR UPDATE`` is a silent no-op and two connections could otherwise both
+   read a stale count.
+
+The lock deliberately lives *inside* the guard rather than only in the caller:
+under PostgreSQL's READ COMMITTED isolation every statement takes a fresh
+snapshot, so the conditional insert alone would let concurrent transactions
+all observe the pre-insert count and all succeed. Any caller — including a
+test or a future service — that reaches straight for
+``insert_project_guarded`` therefore gets the full guarantee, not a
+half-guarded insert that only holds on SQLite's single-writer engine.
+
+``raise_for_quota_exhausted`` keeps its own fast-path lock so it can reject an
+over-quota request with the exact 402 *before* attempting an insert. Taking
+the same row lock twice within one transaction is idempotent, so the two
+layers compose at no extra cost.
 
 ``create_designer_project`` combines both guards in a bounded retry loop: a
 failed conditional insert is re-checked under the lock (a concurrent project
@@ -157,8 +168,11 @@ def _quota_exceeded_error(user: User) -> HTTPException:
 def raise_for_quota_exhausted(user: User, db: Session) -> None:
     """Raise 402 (Persian) when ``user`` has used up their project quota.
 
-    Layer 1 of the race-safe check: locks the designer row first so the count
-    is taken under the lock (PostgreSQL) — see module docstring.
+    Fast path: rejects an over-quota request with the exact 402 message
+    *before* any insert is attempted. Locks the designer row first so the
+    count is taken under the lock (PostgreSQL), matching the lock
+    :func:`insert_project_guarded` takes internally — re-locking the same row
+    inside one transaction is idempotent, so the two compose freely.
     """
     if user.role != "designer" or designer_project_quota_for(user) == UNLIMITED:
         return
@@ -175,16 +189,35 @@ def insert_project_guarded(
 ) -> bool:
     """Atomically insert a project row, but only while ``count < quota``.
 
-    Layer 2 of the race-safe check: ``INSERT ... SELECT ... WHERE
-    (SELECT count) < quota`` is a single statement, so it cannot interleave
-    with a concurrent creation on any engine. Returns True when the row was
-    inserted; False when the quota was reached first (the caller then raises
-    the 402 via :func:`raise_for_quota_exhausted`).
+    Self-contained and atomic on **every** engine: the designer's user row is
+    locked (``SELECT ... FOR UPDATE``) inside this same transaction
+    immediately before the conditional
+    ``INSERT ... SELECT ... WHERE (SELECT count) < quota``.
+
+    Both halves are load-bearing, on different engines:
+
+    * **PostgreSQL** — under READ COMMITTED each statement takes a *fresh*
+      snapshot, so the count subquery on its own is not enough: concurrent
+      transactions would all read the pre-insert count and all insert. The
+      row lock serialises them, and because a blocked transaction re-snapshots
+      once it acquires the lock, the count that follows sees every previously
+      committed sibling.
+    * **SQLite** (dev fallback) — ``FOR UPDATE`` is a silent no-op, so the
+      single-statement conditional insert is what holds the line.
+
+    Returns True when the row was inserted; False when the quota was reached
+    first (the caller then raises the 402 via
+    :func:`raise_for_quota_exhausted`).
 
     ``values`` must be the scalar project fields *including* ``id`` (so the
     caller can fetch the row after commit) — do not pass relationship or
     server-default fields.
     """
+    # Layer 1, in-transaction: serialise same-designer creations before
+    # counting. Re-locking a row already held by this transaction is a no-op,
+    # so callers that locked first (create_designer_project via
+    # raise_for_quota_exhausted) pay nothing extra.
+    db.execute(select(User).where(User.id == designer_id).with_for_update())
     count_subq = (
         select(func.count(Project.id))
         .where(Project.designer_id == designer_id)
