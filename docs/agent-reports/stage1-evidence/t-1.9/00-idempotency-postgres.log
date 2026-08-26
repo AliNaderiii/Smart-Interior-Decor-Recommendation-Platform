@@ -1,0 +1,28 @@
+# T-1.9 — suite idempotency on a PERSISTENT PostgreSQL database
+# Date: 2026-08-26T14:33:47Z
+#
+# CI failure reproduced locally: the CI backend job runs pytest more than once
+# against the same PostgreSQL database. The seeded demo designer is capped at 2
+# projects by the Stage-1 quota, so from the 3rd creation in the database's
+# lifetime onward, unrelated tests received 402 and failed.
+# Fix: conftest clears rows owned by the @smartdecor.dev demo accounts at
+# session start. Three back-to-back runs against ONE database must all pass.
+
+## RUN 1
+sssss................................................................... [ 88%]
+...................................................................      [100%]
+558 passed, 13 skipped in 85.35s (0:01:25)
+RUN_1_EXIT=0
+
+## RUN 2
+sssss................................................................... [ 88%]
+...................................................................      [100%]
+558 passed, 13 skipped in 86.51s (0:01:26)
+RUN_2_EXIT=0
+
+## RUN 3
+sssss................................................................... [ 88%]
+...................................................................      [100%]
+558 passed, 13 skipped in 87.08s (0:01:27)
+RUN_3_EXIT=0
+

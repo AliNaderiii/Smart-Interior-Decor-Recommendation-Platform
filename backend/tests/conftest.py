@@ -34,7 +34,19 @@ from app.models import Base  # noqa: E402
 
 @pytest.fixture(scope="session", autouse=True)
 def _database():
-    """Create schema + seed the 100-product catalog once per session."""
+    """Create schema + seed the 100-product catalog once per session.
+
+    On the SQLite dev fallback the database file is deleted at both ends, so
+    every run starts empty. On PostgreSQL (CI) there is no file to delete: the
+    database outlives the run, and the CI backend job invokes pytest more than
+    once against it. Rows created by a previous run therefore survive into the
+    next one, which is not merely untidy — it is a **quota** problem. The
+    seeded demo designer is shared by several tests, and since Stage 1
+    (T-1.1) that account is limited to 2 projects, so the third creation in
+    the database's lifetime returns 402 and unrelated tests fail. Clearing the
+    per-run rows for the shared demo accounts makes the suite idempotent on a
+    persistent engine.
+    """
     db_file = Path("test_decor.sqlite3")
     if db_file.exists():
         db_file.unlink()
@@ -42,10 +54,41 @@ def _database():
     from scripts.seed_products import seed
 
     seed()
+    _reset_demo_account_state()
     yield
     engine.dispose()
     if db_file.exists():
         db_file.unlink()
+
+
+def _reset_demo_account_state() -> None:
+    """Delete rows owned by the seeded demo accounts, newest dependants first.
+
+    Only touches the three well-known ``@smartdecor.dev`` accounts, never
+    rows created by a test's own throwaway users, and is a no-op on a fresh
+    database. Guarded so a schema without one of these tables (or a database
+    the suite has not migrated yet) cannot break collection.
+    """
+    from sqlalchemy import delete, select
+
+    from app.models.project import Project
+    from app.models.user import User
+
+    session = SessionLocal()
+    try:
+        demo_ids = list(
+            session.scalars(
+                select(User.id).where(User.email.like("%@smartdecor.dev"))
+            )
+        )
+        if not demo_ids:
+            return
+        session.execute(delete(Project).where(Project.designer_id.in_(demo_ids)))
+        session.commit()
+    except Exception:  # pragma: no cover - best-effort hygiene, never fatal
+        session.rollback()
+    finally:
+        session.close()
 
 
 @pytest.fixture()
