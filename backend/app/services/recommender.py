@@ -4,8 +4,12 @@ Stage A — Hard filter (SQL): room_type + category + budget window + is_verifie
 Stage B — Semantic candidate retrieval: pgvector cosine distance
           ``style_embedding <=> :user_embedding LIMIT 100`` on Postgres;
           Python cosine fallback on SQLite (tests).
-Stage C — Weighted scoring with full explainability:
-          final = 0.30*style + 0.30*color + 0.20*budget + 0.15*material + 0.05*pattern
+Stage C — Weighted scoring with full explainability (default "current"
+          profile: 0.30*style + 0.30*color + 0.20*budget + 0.15*material +
+          0.05*pattern). Stage 1 (T-1.2) makes the weights a validated,
+          switchable profile (RECOMMENDER_WEIGHT_PROFILE; the "client-ad"
+          profile carries the normalised client-advertisement weights) — see
+          ai/recommender_config.json and docs/reports/weights_profiles.md.
 
 Stage D — Bounded feedback re-rank (heuristic, NOT a trained model) and
           diversity/duplicate suppression before the final cut.
@@ -85,22 +89,95 @@ def load_recommender_config(path: Path = CONFIG_PATH) -> dict[str, Any]:
             f"config_version {cfg.get('config_version')!r} != registry "
             f"{RECOMMENDER_CONFIG_VERSION!r}"
         )
-    weights = cfg.get("weights", {})
-    if set(weights) != _EXPECTED_WEIGHT_KEYS:
-        problems.append(f"weights keys {sorted(weights)} != {sorted(_EXPECTED_WEIGHT_KEYS)}")
+    _validate_weight_set(cfg.get("weights", {}), "", problems)
+    profiles = cfg.get("profiles")
+    if not isinstance(profiles, dict) or not profiles:
+        problems.append("profiles must be a non-empty object")
     else:
-        total = sum(weights.values())
-        if abs(total - 1.0) > 1e-9:
-            problems.append(f"weights sum to {total}, expected 1.0")
-        if any(w < 0 or w > 1 for w in weights.values()):
-            problems.append("weights must be within [0, 1]")
+        for name, prof in profiles.items():
+            _validate_weight_set(
+                prof.get("weights", {}) if isinstance(prof, dict) else {},
+                f"profile {name!r} ",
+                problems,
+            )
+        default_profile = cfg.get("default_profile")
+        if default_profile not in profiles:
+            problems.append(
+                f"default_profile {default_profile!r} not in profiles {sorted(profiles)}"
+            )
+        else:
+            if profiles[default_profile]["weights"] != cfg.get("weights"):
+                problems.append(
+                    "top-level weights must mirror profiles[default_profile].weights "
+                    "(drift guard — update both together)"
+                )
     if problems:
         raise RuntimeError("invalid recommender config: " + "; ".join(problems))
     return cfg
 
 
+def _validate_weight_set(weights: Any, label: str, problems: list[str]) -> None:
+    """Shared weight validation for the top-level set and every profile.
+
+    Error strings are stable contracts: ``tests/test_recommender_v2.py``
+    matches them, so keep the wording when touching this.
+    """
+    if not isinstance(weights, dict) or set(weights) != _EXPECTED_WEIGHT_KEYS:
+        problems.append(
+            f"{label}weights keys "
+            f"{sorted(weights) if isinstance(weights, dict) else type(weights).__name__} "
+            f"!= {sorted(_EXPECTED_WEIGHT_KEYS)}"
+        )
+        return
+    total = sum(weights.values())
+    if abs(total - 1.0) > 1e-9:
+        problems.append(f"{label}weights sum to {total}, expected 1.0")
+    if any(w < 0 or w > 1 for w in weights.values()):
+        problems.append(f"{label}weights must be within [0, 1]")
+
+
 CONFIG = load_recommender_config()
-WEIGHTS: dict[str, float] = CONFIG["weights"]
+#: Every validated profile name -> its weight vector.
+PROFILES: dict[str, dict[str, float]] = {
+    name: dict(prof["weights"]) for name, prof in CONFIG["profiles"].items()
+}
+DEFAULT_PROFILE: str = CONFIG["default_profile"]
+
+
+def select_active_profile() -> dict[str, float]:
+    """Resolve ``RECOMMENDER_WEIGHT_PROFILE`` to its weight vector.
+
+    A typo in the env setting is a boot failure, not a silent baseline — the
+    module-level guard below calls this at import.
+    """
+    name = settings.RECOMMENDER_WEIGHT_PROFILE
+    if name not in PROFILES:
+        raise RuntimeError(
+            f"RECOMMENDER_WEIGHT_PROFILE={name!r} is not one of the configured "
+            f"profiles {sorted(PROFILES)} (see ai/recommender_config.json)"
+        )
+    return PROFILES[name]
+
+
+#: The profile this process ranks with (validated at import).
+ACTIVE_PROFILE: str = settings.RECOMMENDER_WEIGHT_PROFILE
+#: Backward-compatible alias for the active profile's weights (the top-level
+#: config weights mirror it by construction).
+WEIGHTS: dict[str, float] = select_active_profile()
+
+
+def get_weights(profile: str | None = None) -> dict[str, float]:
+    """Weight vector for ``profile`` (default: the active one).
+
+    Raises ``KeyError`` on an unknown profile name; callers that surface
+    profiles to users can list ``PROFILES`` for a helpful message.
+    """
+    name = profile or ACTIVE_PROFILE
+    if name not in PROFILES:
+        raise KeyError(f"unknown weight profile {name!r}; available: {sorted(PROFILES)}")
+    return PROFILES[name]
+
+
 CANDIDATE_LIMIT: int = CONFIG["stage_b"]["candidate_limit"]
 MIN_RESULTS: int = CONFIG["results"]["min_results"]
 MAX_RESULTS: int = CONFIG["results"]["max_results"]
@@ -266,8 +343,15 @@ def _stage_ab_postgres(
     return [(row[0], max(0.0, min(1.0, 1.0 - row[1] / 2))) for row in rows]
 
 
-def calculate_score(product: Product, quiz: dict[str, Any], style_sim: float) -> dict[str, Any]:
-    """Stage C weighted scoring with a full explainability breakdown."""
+def calculate_score(
+    product: Product, quiz: dict[str, Any], style_sim: float, weights: dict[str, float] | None = None
+) -> dict[str, Any]:
+    """Stage C weighted scoring with a full explainability breakdown.
+
+    ``weights`` selects the profile (Stage 1, T-1.2); defaults to the active
+    profile so every existing call site keeps its behaviour.
+    """
+    weights = weights or WEIGHTS
     c_score = color_score(quiz.get("color_palette", []), product.colors or [])
     b_score = budget_score(
         product.price_toman,
@@ -278,11 +362,11 @@ def calculate_score(product: Product, quiz: dict[str, Any], style_sim: float) ->
     p_score = jaccard(quiz.get("patterns", []), product.patterns or [])
 
     final = (
-        WEIGHTS["style"] * style_sim
-        + WEIGHTS["color"] * c_score
-        + WEIGHTS["budget"] * b_score
-        + WEIGHTS["material"] * m_score
-        + WEIGHTS["pattern"] * p_score
+        weights["style"] * style_sim
+        + weights["color"] * c_score
+        + weights["budget"] * b_score
+        + weights["material"] * m_score
+        + weights["pattern"] * p_score
     )
 
     matched_materials = sorted(set(quiz.get("materials", [])) & set(product.materials or []))
@@ -505,6 +589,7 @@ def recommend(
     categories: list[str] | None = None,
     use_cache: bool = True,
     user_id: str | None = None,
+    profile: str | None = None,
 ) -> dict[str, Any]:
     """Run the full 3-stage pipeline and return ranked products per category.
 
@@ -512,8 +597,13 @@ def recommend(
 
         {styles: [..], color_palette: ["#HEX"], room_width_cm, room_length_cm,
          budget_min_toman, budget_max_toman, materials: [..], patterns: [..]}
+
+    ``profile`` selects the weight profile (Stage 1, T-1.2); it is part of
+    the cache identity — two profiles must never share a cache entry.
     """
     categories = categories or CATEGORIES
+    profile_name = profile or ACTIVE_PROFILE
+    weights = get_weights(profile_name)  # KeyError -> 500 on a bad name
     feedback = load_feedback(db, user_id)
     # Feedback is part of the cache identity: a thumbs-down that did not
     # invalidate the cached payload would appear to do nothing until the TTL
@@ -522,12 +612,13 @@ def recommend(
         **quiz,
         "_categories": categories,
         "_fb": sorted(feedback.items()) if feedback else None,
+        "_profile": profile_name,
     }
     cache_key = quiz_cache_key(fingerprint, user_id)
     redis = get_redis()
 
     if not use_cache:
-        return _compute(db, quiz, categories, feedback)
+        return _compute(db, quiz, categories, feedback, weights=weights, profile_name=profile_name)
 
     hit = _read_cache(redis, cache_key)
     if hit is not None:
@@ -538,7 +629,7 @@ def recommend(
     acquired = lock.acquire(timeout=_SINGLEFLIGHT_TIMEOUT_S)
     if not acquired:
         logger.warning("single-flight wait timed out for %s; computing anyway", cache_key)
-        return _compute(db, quiz, categories, feedback)
+        return _compute(db, quiz, categories, feedback, weights=weights, profile_name=profile_name)
     try:
         # Re-check: the leader we queued behind has just populated the cache.
         hit = _read_cache(redis, cache_key)
@@ -546,7 +637,7 @@ def recommend(
             return hit
 
         started = time.perf_counter()
-        result = _compute(db, quiz, categories, feedback)
+        result = _compute(db, quiz, categories, feedback, weights=weights, profile_name=profile_name)
         try:
             redis.setex(cache_key, settings.RECOMMEND_CACHE_TTL, orjson.dumps(result))
         except Exception as exc:
@@ -565,8 +656,12 @@ def _compute(
     quiz: dict[str, Any],
     categories: list[str],
     feedback: dict[str, int] | None = None,
+    weights: dict[str, float] | None = None,
+    profile_name: str | None = None,
 ) -> dict[str, Any]:
     """Run the actual 3-stage pipeline (uncached)."""
+    weights = weights or WEIGHTS
+    profile_name = profile_name or ACTIVE_PROFILE
     user_emb = quiz.get("quiz_embedding") or get_embedding(
         quiz_to_text(
             quiz.get("styles", []),
@@ -589,7 +684,7 @@ def _compute(
 
         ranked = []
         for product, style_sim in scored_pairs:
-            score = calculate_score(product, quiz, style_sim)
+            score = calculate_score(product, quiz, style_sim, weights)
             ranked.append({
                 **_product_payload(product),
                 **score,
@@ -616,7 +711,8 @@ def _compute(
         "meta": {
             "recommender_version": AI_STACK_VERSION,
             "weights_version": CONFIG["config_version"],
-            "weights": dict(WEIGHTS),
+            "weights_profile": profile_name,
+            "weights": dict(weights),
             "embedding_backend": settings.EMBEDDING_BACKEND,
             "taxonomy_version": taxonomy_version(),
             "categories_queried": list(categories),

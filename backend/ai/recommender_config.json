@@ -1,5 +1,5 @@
 {
-  "config_version": "2026-08-21.1",
+  "config_version": "2026-08-26.1",
   "weights": {
     "style": 0.30,
     "color": 0.30,
@@ -11,8 +11,31 @@
     "kind": "heuristic",
     "reference": "ADR-005 (docs/ARCHITECTURE.md): style and color dominate interior-design preference, budget is a strong practical filter, material is a secondary preference, pattern is a tiebreaker.",
     "learned_from_data": false,
-    "tuning_plan": "Not tuned on interaction data. Revisit only with an offline evaluation set and a logged experiment; any change bumps config_version and requires re-running the acceptance scenarios (tests/test_recommender.py) and the scenario harness (scripts/evaluate_recommender.py)."
+    "tuning_plan": "Not tuned on interaction data. Revisit only with an offline evaluation set and a logged experiment; any change bumps config_version and requires re-running the acceptance scenarios (tests/test_recommender.py) and the scenario harness (scripts/evaluate_recommender.py), including under every profile (see profiles below and docs/reports/weights_profiles.md)."
   },
+  "profiles": {
+    "current": {
+      "weights": {
+        "style": 0.30,
+        "color": 0.30,
+        "budget": 0.20,
+        "material": 0.15,
+        "pattern": 0.05
+      },
+      "source": "ADR-005 heuristic baseline (unchanged): style/color .30/.30, budget .20, material .15, pattern .05"
+    },
+    "client-ad": {
+      "weights": {
+        "style": 0.30,
+        "color": 0.30,
+        "budget": 0.20,
+        "material": 0.10,
+        "pattern": 0.10
+      },
+      "source": "Client advertisement weights, normalised to sum to 1. The ad states pattern 10% alongside the existing weights, which as stated sum to 1.05; material is reduced .15 -> .10 to compensate (the alternative — reducing budget or style — is open client decision C-6, see docs/reports/weights_profiles.md)"
+    }
+  },
+  "default_profile": "current",
   "stage_b": {
     "candidate_limit": 100,
     "hnsw_ef_search": 400

@@ -31,14 +31,15 @@ from __future__ import annotations
 from app.core.config import settings
 
 #: Coarse version of the AI stack as deployed by this branch.
-AI_STACK_VERSION = "2026-08-21.1"
+AI_STACK_VERSION = "2026-08-26.1"
 
 #: Version of the extraction prompt template in ``ai.feature_extractor``.
 EXTRACTION_PROMPT_VERSION = "p2"
 
 #: Version of the recommender configuration (weights + knobs) in
-#: ``ai/recommender_config.json``.
-RECOMMENDER_CONFIG_VERSION = "2026-08-21.1"
+#: ``ai/recommender_config.json``. 2026-08-26.1 = Stage 1 (T-1.2): switchable,
+#: validated weight profiles ("current" baseline + normalised "client-ad").
+RECOMMENDER_CONFIG_VERSION = "2026-08-26.1"
 
 #: Embedding model identity. ``clip-ViT-B/32`` via sentence-transformers
 #: produces 512-d unit vectors; the deterministic hash backend mimics the
