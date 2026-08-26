@@ -575,6 +575,11 @@ jobs:
   lighthouse:
     name: Lighthouse CI — performance and accessibility
     runs-on: ubuntu-latest
+    # WAIVED FOR STAGE 1 (IR-S1-010). The perf budget currently fails on TTI
+    # (interactive 6727ms vs a 4000ms budget); performance tuning is Stage 2
+    # scope, so this job reports but does not block. Stage-2 task G-2.6
+    # removes this line and restores it as a required check.
+    continue-on-error: true
     needs:
       - frontend
       - backend

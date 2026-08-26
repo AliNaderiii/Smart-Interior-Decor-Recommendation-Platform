@@ -14,12 +14,24 @@
  * Static analysis (`scripts/auditDeadKeys.ts`) can only prove a handler
  * EXISTS. This proves it does something.
  *
- * NOTE ON EXECUTION: the sandbox this was authored in cannot download a
- * Chromium binary (`npx playwright install chromium` fails with ECONNRESET
- * against the CDN), so this spec is committed as the CI gate but was not run
- * here. The equivalent assertions were executed in a jsdom harness instead —
- * see `scripts/clickAudit.mts` and `docs/DEADKEYS_CLICK_LOG.md` for the real
- * click-by-click log of all 89 controls.
+ * NOTE ON EXECUTION: this spec was authored in a sandbox that cannot download
+ * a Chromium binary (`npx playwright install chromium` fails with ECONNRESET
+ * against the CDN — see IR-S1-001), so it shipped unexecuted and its first
+ * real browser run was CI run 32988827678. That run exposed three harness
+ * bugs in the spec itself, all fixed here and each documented at its fix:
+ *
+ *   1. it clicked the `sr-only` skip link, which Tailwind renders as a 1x1
+ *      clipped element — reported visible, but not actionable until focused,
+ *      so `click()` timed out;
+ *   2. it clicked controls that open a modal/overlay and never dismissed it,
+ *      so every later click in the sweep hit the overlay and timed out;
+ *   3. it attributed page-load network noise (a 422 from /recommendations
+ *      opened without quiz answers) to whichever control happened to be
+ *      clicked next.
+ *
+ * The product controls themselves were fine: the three role journeys pass on
+ * the same routes. `scripts/clickAudit.mts` and `docs/DEADKEYS_CLICK_LOG.md`
+ * hold the earlier jsdom click-by-click log of all 89 controls.
  */
 import { test, expect, type Page, type ConsoleMessage } from "@playwright/test";
 
@@ -44,6 +56,12 @@ const SKIP = [
   /log out/i,
   /delete/i,        // destructive; covered by its own dedicated test
   /confirm delete/i,
+  // The skip link is `sr-only`: Tailwind renders it as a 1x1 clipped element
+  // that reports as visible but is only actionable once focused, so a plain
+  // click() times out. It is NOT dead — `href="#main"` resolves to the
+  // `<main id="main">` in Layout.tsx, and the dedicated keyboard test below
+  // exercises it properly.
+  /skip to content/i,
 ];
 
 interface Failure {
@@ -77,7 +95,32 @@ function attachWatchers(page: Page) {
     consoleErrors,
     badResponses,
     get requestCount() { return requestCount; },
+    /** Forget everything observed so far (used after a navigation, so that
+     *  page-load traffic is not attributed to the next control clicked). */
+    reset() {
+      consoleErrors.length = 0;
+      badResponses.length = 0;
+      requestCount = 0;
+    },
   };
+}
+
+/**
+ * Close any modal/overlay a click may have opened.
+ *
+ * An overlay left open covers the page and swallows pointer events, so every
+ * subsequent click in the sweep times out. Escape is the app's documented
+ * dismissal for both the command palette and the shortcuts dialog; the
+ * `aria-modal` probe is a cheap check that it actually closed, and a second
+ * Escape covers a stacked dialog.
+ */
+async function dismissOverlay(page: Page): Promise<void> {
+  const modal = page.locator("[aria-modal='true'], [role='dialog']");
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (!(await modal.first().isVisible().catch(() => false))) return;
+    await page.keyboard.press("Escape");
+    await page.waitForTimeout(150);
+  }
 }
 
 async function login(page: Page, who: keyof typeof ACCOUNTS) {
@@ -102,6 +145,10 @@ for (const role of Object.keys(ROUTES) as (keyof typeof ROUTES)[]) {
       for (const route of ROUTES[role]) {
         await page.goto(`${BASE}${route}`);
         await page.waitForLoadState("networkidle");
+        // Network noise from the page load itself (e.g. /recommendations
+        // answers a 422 when opened without quiz answers) must not be charged
+        // to the first control that happens to be clicked next.
+        watch.reset();
 
         const controls = page.locator(
           "button:not([disabled]), a[href], [role='button']:not([aria-disabled='true'])",
@@ -124,8 +171,12 @@ for (const role of Object.keys(ROUTES) as (keyof typeof ROUTES)[]) {
           const beforeHtml = await page.locator("body").innerHTML();
           const beforeUrl = page.url();
 
-          await el.click({ timeout: 5_000, trial: false }).catch(() => {
-            failures.push({ route, control: name, reason: "click threw" });
+          await el.click({ timeout: 5_000, trial: false }).catch((e: Error) => {
+            failures.push({
+              route,
+              control: name,
+              reason: `click threw: ${e.message.split("\n")[0]}`,
+            });
           });
           await page.waitForTimeout(220); // let optimistic UI + toasts settle
 
@@ -153,10 +204,18 @@ for (const role of Object.keys(ROUTES) as (keyof typeof ROUTES)[]) {
 
           log.push(`${changed ? "OK  " : "DEAD"} ${route} :: ${name}`);
 
+          // A click may open a modal/overlay (command palette, dialogs). Left
+          // open, it swallows pointer events and every remaining click in the
+          // sweep times out — which is what turned 3 real openers into ~90
+          // bogus "click threw" failures on the first browser run. Dismiss it
+          // before moving on.
+          await dismissOverlay(page);
+
           // A click may navigate away; return so the index stays meaningful.
           if (page.url() !== beforeUrl) {
             await page.goto(`${BASE}${route}`);
             await page.waitForLoadState("networkidle");
+            watch.reset();
           }
         }
       }
@@ -225,9 +284,37 @@ test.describe("dead keys — specific known suspects", () => {
   test("command palette opens with Cmd+K and runs a command", async ({ page }) => {
     await login(page, "homeowner");
     await page.goto(`${BASE}/recommendations`);
+    await page.waitForLoadState("networkidle");
     await page.keyboard.press("ControlOrMeta+k");
-    await expect(page.getByPlaceholder(/type a command/i)).toBeVisible();
+
+    // The overlay is lazy-loaded (`lazy(() => import(...))` in
+    // CommandPalette.tsx), so the input only exists once that chunk resolves.
+    // The placeholder is "Search commands…" — the original spec waited for
+    // /type a command/i, a string that has never been in the component, and
+    // failed on the suite's first real browser run.
+    const input = page.getByPlaceholder(/search commands/i);
+    await expect(input).toBeVisible({ timeout: 15_000 });
+
     await page.keyboard.press("Escape");
-    await expect(page.getByPlaceholder(/type a command/i)).toBeHidden();
+    await expect(input).toBeHidden();
+  });
+
+  test("skip link is focusable and jumps to main content", async ({ page }) => {
+    await login(page, "homeowner");
+    await page.goto(`${BASE}/`);
+    await page.waitForLoadState("networkidle");
+
+    // The skip link is `sr-only` until focused (WCAG 2.4.1), so it cannot be
+    // clicked cold — it is excluded from the click sweep and asserted here the
+    // way a keyboard user actually reaches it: Tab from the top of the page.
+    const skip = page.getByRole("link", { name: /skip to content/i });
+    await page.keyboard.press("Tab");
+    await expect(skip).toBeFocused();
+    await expect(skip).toBeVisible();
+
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/#main$/);
+    // The target must exist, otherwise the link is decorative.
+    await expect(page.locator("#main")).toBeVisible();
   });
 });

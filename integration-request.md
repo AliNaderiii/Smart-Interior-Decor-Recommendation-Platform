@@ -1230,3 +1230,64 @@ the conditional acceptance depends on cannot be triggered, so the 29 Playwright
 E2E tests (IR-S1-001) still have no environment in which to execute, and the
 supervisor's independent verification of the pushed branch cannot begin. All
 work is committed locally and is not at risk.
+
+---
+
+## IR-S1-010 · Lighthouse perf budget waived for Stage 1 (TTI 6727ms vs 4000ms)
+
+**Owner:** Master Prompt 02 — Frontend / Performance (Stage 2, task G-2.6)
+**Blocker ID:** none — accepted deviation, not a blocker
+**Raised:** 2026-08-26, Stage 1 close-out
+**Decision:** WAIVED for Stage 1 by supervisor ruling.
+
+### Evidence
+
+CI run `32988827678`, job *Lighthouse CI — performance and accessibility*, failed
+one assertion and one only:
+
+```
+interactive  maxNumericValue  expected <= 4000, found 6727.4085
+url: http://127.0.0.1:4173/
+```
+
+Every other Lighthouse assertion in the budget passed, including the
+accessibility set. No functional check failed.
+
+### Why it is waived rather than fixed here
+
+Performance tuning is explicitly **out of Stage-1 scope** (Stage 2 owns it).
+A TTI fix means code-splitting the entry bundle, deferring the recommender
+warm-up fetch and revisiting font loading — none of which are Stage-1 tasks,
+and all of which would be unreviewable churn inside a release-hardening PR.
+
+### Implementation
+
+`ci/ci.stage1.yml`, job `lighthouse`, gains:
+
+```yaml
+    continue-on-error: true
+```
+
+The job still runs and still publishes its report, so the regression stays
+visible; it just no longer fails the required check set. Scope is exactly one
+job — `backend`, `multi-worker`, `frontend`, `e2e`, `security-scans` and
+`docker` all remain blocking (verified by parsing the YAML).
+
+### Restore conditions (Stage-2 task G-2.6)
+
+Delete the `continue-on-error: true` line once **all** of these hold:
+
+1. `interactive` <= 4000ms on `http://127.0.0.1:4173/` in three consecutive runs;
+2. LCP < 3s, the client's acceptance metric, measured on the same page;
+3. Lighthouse performance score >= 80 (client acceptance metric).
+
+Until then the job is advisory. It must never be deleted or its budget relaxed
+as a way of going green — the budget numbers are the client's acceptance
+criteria and stay as they are.
+
+### Human action required
+
+The ACTIVE `.github/workflows/ci.yml` cannot be pushed by the agent token
+(IR-S1-009). Apply this one-line change via the GitHub web UI — see the
+"Human hand-off" section of `docs/agent-reports/stage1-report.md` for the exact
+edit.

@@ -23,6 +23,8 @@
  */
 import { test, expect, type Page, type APIRequestContext } from "@playwright/test";
 
+import { statePath } from "./statePaths";
+
 const BASE = process.env.E2E_BASE_URL ?? "http://localhost:5173";
 
 /** The designer free-plan quota from the seed dataset. Kept as a constant so
@@ -70,7 +72,7 @@ async function cleanup(page: Page, request: APIRequestContext) {
 test.describe.serial("designer journey", () => {
   test.afterAll(async ({ browser, request }) => {
     const context = await browser.newContext({
-      storageState: "test-results/state/designer.json",
+      storageState: statePath("designer"),
     });
     const page = await context.newPage();
     await page.goto(`${BASE}/designer/dashboard`);

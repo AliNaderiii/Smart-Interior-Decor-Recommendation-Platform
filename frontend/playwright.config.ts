@@ -1,4 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
+import { statePath } from "./tests/e2e/statePaths";
 
 /**
  * Playwright config (Stage 1, T-1.4 + T-1.4 close-out).
@@ -17,8 +18,12 @@ import { defineConfig, devices } from "@playwright/test";
  *   chromium-admin       — admin session: product upload/review/approve,
  *                          users and subscriptions
  *
- *  The role projects depend on `setup-state` implicitly: globalSetup writes
- *  all three storageState files before any project runs.
+ *  The role projects depend on globalSetup implicitly: it writes all three
+ *  storageState files before any project runs. Those paths come from
+ *  `tests/e2e/statePaths.ts` and are ABSOLUTE on purpose — a relative
+ *  `storageState` is resolved against `process.cwd()` while globalSetup used
+ *  to resolve against `config.rootDir` (= testDir), and the two disagreed,
+ *  which is what produced the auth-smoke ENOENT in CI run 32988827678.
  */
 const BASE = process.env.E2E_BASE_URL ?? "http://localhost:5173";
 
@@ -55,7 +60,7 @@ export default defineConfig({
       testMatch: ["auth-smoke.spec.ts", "journey-homeowner.spec.ts"],
       use: {
         ...devices["Desktop Chrome"],
-        storageState: "test-results/state/homeowner.json",
+        storageState: statePath("homeowner"),
       },
     },
     {
@@ -63,7 +68,7 @@ export default defineConfig({
       testMatch: ["journey-designer.spec.ts"],
       use: {
         ...devices["Desktop Chrome"],
-        storageState: "test-results/state/designer.json",
+        storageState: statePath("designer"),
       },
     },
     {
@@ -71,7 +76,7 @@ export default defineConfig({
       testMatch: ["journey-admin.spec.ts"],
       use: {
         ...devices["Desktop Chrome"],
-        storageState: "test-results/state/admin.json",
+        storageState: statePath("admin"),
       },
     },
   ],
