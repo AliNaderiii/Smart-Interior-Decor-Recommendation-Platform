@@ -231,7 +231,17 @@ def insert_project_guarded(
         ).where(count_subq < quota),
     )
     result = db.execute(stmt)
-    return bool(result.rowcount)
+    # `bool(rowcount)` is NOT safe here. The DBAPI contract allows -1 for
+    # "unknown", and psycopg3 (the production driver, `postgresql+psycopg`)
+    # returns -1 for this INSERT..SELECT while psycopg2 returns 0 — so a
+    # blocked insert would be read as bool(-1) == True and the caller would
+    # report success for a row that was never written, silently handing the
+    # designer a project beyond their quota. Compare explicitly, and when the
+    # driver genuinely cannot tell us, fall back to asking the database.
+    inserted = result.rowcount
+    if inserted >= 0:
+        return inserted > 0
+    return db.scalar(select(Project.id).where(Project.id == values["id"])) is not None
 
 
 def create_designer_project(

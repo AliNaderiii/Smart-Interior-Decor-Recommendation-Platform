@@ -342,3 +342,51 @@ def test_insert_guarded_is_atomic_under_concurrency_postgres():
         engine.dispose()
     assert wins.count(True) == 2, wins
     assert n_projects == 2, n_projects
+
+
+def test_guarded_insert_reports_failure_when_driver_returns_unknown_rowcount():
+    """A blocked insert must report False even when rowcount is -1.
+
+    Regression test for a driver-dependent silent-success bug. The DBAPI lets a
+    driver return ``rowcount == -1`` for "unknown", and psycopg3 — the
+    production driver (``postgresql+psycopg``) — does exactly that for this
+    ``INSERT ... SELECT``, while psycopg2 returns 0. The guard originally did
+    ``bool(result.rowcount)``, and ``bool(-1)`` is ``True``: on the production
+    driver a quota-blocked insert was reported as a success, so the caller
+    would hand the designer a project that had never been written.
+
+    This pins the contract without needing PostgreSQL: the execute result is
+    stubbed to report -1 while the row genuinely does not exist, which is the
+    exact shape psycopg3 produces.
+    """
+    import uuid as _uuid
+
+    from app.services import designer_quota as dq
+
+    class _FakeResult:
+        rowcount = -1
+
+    class _FakeSession:
+        """Session double: the insert 'runs' but reports an unknown rowcount."""
+
+        def __init__(self):
+            self.scalar_calls = 0
+
+        def execute(self, *_a, **_k):
+            return _FakeResult()
+
+        def scalar(self, *_a, **_k):
+            # The verification lookup: the row is absent, so the insert failed.
+            self.scalar_calls += 1
+            return None
+
+    session = _FakeSession()
+    inserted = dq.insert_project_guarded(
+        session,
+        _uuid.uuid4().hex,
+        {"id": _uuid.uuid4().hex, "name": "n", "client_name": "",
+         "client_email": "", "notes": "", "designer_id": _uuid.uuid4().hex},
+        2,
+    )
+    assert inserted is False, "a blocked insert must never report success"
+    assert session.scalar_calls == 1, "must verify against the database when rowcount is unknown"

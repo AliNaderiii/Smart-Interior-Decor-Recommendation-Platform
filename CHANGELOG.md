@@ -24,6 +24,23 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ### Fixed
 
+- **Quota guard reported success for rows it never inserted (production
+  driver only).** `insert_project_guarded` returned `bool(result.rowcount)`.
+  The DBAPI permits `rowcount == -1` for "unknown", and **psycopg3** — the
+  driver CI and production use (`postgresql+psycopg`) — returns -1 for this
+  `INSERT ... SELECT`, while psycopg2 returns 0. Since `bool(-1)` is `True`, a
+  quota-blocked insert was read as a success and the caller handed the
+  designer a project that had never been written. The guard now compares
+  explicitly and verifies against the database when the driver cannot report a
+  count. Pinned by a driver-independent regression test.
+- **Backend suite is idempotent on a persistent database.** The CI backend job
+  runs pytest more than once against the same PostgreSQL database; the seeded
+  demo designer accumulated projects across runs and, once past the Stage-1
+  quota of 2, unrelated tests failed with 402. The session fixture now clears
+  rows owned by the `@smartdecor.dev` demo accounts.
+- Pytest failures are emitted as GitHub Actions annotations, so a red job is
+  diagnosable without downloading logs.
+
 - **Designer quota guard is now atomic on PostgreSQL, not just SQLite.**
   `insert_project_guarded` took no row lock of its own: it relied on the
   caller. Under PostgreSQL's READ COMMITTED isolation every statement takes a
