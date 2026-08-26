@@ -241,3 +241,21 @@ def reset_settings():
     yield _set
     for key, value in saved.items():
         object.__setattr__(live, key, value)
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    """Emit each failure as a GitHub Actions annotation.
+
+    CI job logs are large and, for some networks, undownloadable; annotations
+    are exposed through the check-runs API and show up inline on the PR. This
+    turns "Process completed with exit code 1" into an actionable list of test
+    ids and messages. Active only when GITHUB_ACTIONS is set, so local runs are
+    untouched.
+    """
+    if not os.environ.get("GITHUB_ACTIONS"):
+        return
+    for status in ("failed", "error"):
+        for report in terminalreporter.stats.get(status, []):
+            nodeid = getattr(report, "nodeid", "?")
+            message = str(getattr(report, "longrepr", "")).replace("\n", "%0A")
+            print(f"::error title=pytest {status}::{nodeid}%0A{message[:3000]}")
