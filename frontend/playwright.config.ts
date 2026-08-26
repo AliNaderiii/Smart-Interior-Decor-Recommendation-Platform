@@ -31,6 +31,9 @@ export default defineConfig({
   workers: 1,
   reporter: [
     ["list"],
+    // Emits failures as ::error:: annotations so a red CI job is diagnosable
+    // without downloading the report artifact (no-op outside GitHub Actions).
+    ["./tests/e2e/ciAnnotationReporter.ts"],
     ["json", { outputFile: "test-results/e2e-report.json" }],
     ["html", { outputFolder: "test-results/html", open: "never" }],
   ],
