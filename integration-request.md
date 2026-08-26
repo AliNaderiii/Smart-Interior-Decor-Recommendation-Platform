@@ -1291,3 +1291,53 @@ The ACTIVE `.github/workflows/ci.yml` cannot be pushed by the agent token
 (IR-S1-009). Apply this one-line change via the GitHub web UI — see the
 "Human hand-off" section of `docs/agent-reports/stage1-report.md` for the exact
 edit.
+
+---
+
+## IR-S1-011 · Modal Escape handlers are focus-scoped, so Escape can fail to close a dialog
+
+**Owner:** Master Prompt 02 — Frontend (accessibility)
+**Blocker ID:** none — minor a11y defect, found while triaging the e2e sweep
+**Raised:** 2026-08-26, Stage 1 close-out
+**Status:** deferred to Stage 3 (accessibility/compliance scope)
+
+### Evidence
+
+`frontend/src/pages/designer/DashboardPage.tsx:129` binds dismissal as a React
+prop on the dialog element itself:
+
+```tsx
+<div role="dialog" aria-modal="true" aria-label="Create project"
+     onKeyDown={(e) => e.key === "Escape" && setOpen(false)}>
+```
+
+React attaches this at the root and dispatches by event target, so it only
+fires when focus is already **inside** the dialog. The dialog does autofocus its
+first input, but until that focus lands (or if the user moves focus out, e.g.
+to the browser chrome and back to `<body>`), Escape is delivered to `<body>`
+and the modal does not close.
+
+Observed in CI run `33005106968`: after the dead-key sweep clicked
+"New project" / "Create your first project" on `/designer/dashboard`, the
+overlay stayed up and subsequent clicks in the sweep timed out against it.
+
+### Why it is not fixed in Stage 1
+
+WCAG 2.1.2 (No Keyboard Trap) / 2.4.3 focus management for modals is Stage-3
+compliance scope, and the correct fix is a shared `useDialog` primitive
+(document-level `keydown`, focus trap, restore focus on close, inert
+background) applied to every dialog — not a one-line patch to one page. Doing
+it properly touches every modal in the app, which is out of scope for a
+release-hardening PR.
+
+### Interim mitigation (test-side only, no product change)
+
+`frontend/tests/e2e/deadKeys.spec.ts` `dismissOverlay()` now escalates:
+Escape -> focus the dialog then Escape -> click the dialog's own
+Cancel/Close control. This keeps the sweep honest without hiding the defect.
+
+### Requested change (Stage 3)
+
+Introduce a shared modal primitive that registers Escape on `document`, traps
+and restores focus, and marks background content inert; migrate
+`DashboardPage.tsx` and every other `role="dialog"` site to it.

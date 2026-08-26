@@ -33,35 +33,60 @@ const TOMAN_PRICE = /[۰-۹0-9][۰-۹0-9٬,\s]*\s*تومان/;
 
 /** Walk the 5-step quiz and submit it. Leaves the page on
  *  /recommendations?quiz=<id>. */
+/** Wait until the stepper reports the given 0-based step as current.
+ *
+ *  QuizPage renders `<li aria-current="step">` for the active segment, so this
+ *  is the app's own statement about which step is mounted. Without it the
+ *  helper could interact with a step that React has not swapped in yet: the
+ *  five steps share the same `button[aria-pressed]` tile markup, so a click
+ *  can land on the OUTGOING step, leaving the incoming step with nothing
+ *  selected and `Next` disabled — which is how this journey flaked in CI run
+ *  33005106968 (`toBeEnabled` failed, 24x "unexpected value disabled"). */
+async function waitForStep(page: Page, index: number) {
+  await expect(
+    page.locator(`ol[aria-label*="Quiz progress"] li`).nth(index),
+  ).toHaveAttribute("aria-current", "step", { timeout: 20_000 });
+}
+
+/** Select the first tile of the current step and confirm the store took it. */
+async function pickFirstTile(page: Page) {
+  const tile = page.locator("button[aria-pressed]").first();
+  await expect(tile).toBeVisible({ timeout: 20_000 });
+  await tile.click();
+  // The button is the source of truth: aria-pressed flips only once the store
+  // has the answer, which is exactly the precondition for `Next` enabling.
+  await expect(tile).toHaveAttribute("aria-pressed", "true", { timeout: 10_000 });
+}
+
 async function completeQuiz(page: Page) {
   await page.goto(`${BASE}/quiz`);
   await expect(page).toHaveURL(/\/quiz/);
 
-  // Step 1 — style. Each style tile is a button with aria-pressed.
-  const styleTiles = page.locator('button[aria-pressed]');
-  await expect(styleTiles.first()).toBeVisible({ timeout: 20_000 });
-  await styleTiles.first().click();
-  await expect(styleTiles.first()).toHaveAttribute("aria-pressed", "true");
-
   const next = page.getByRole("button", { name: /next/i });
+
+  // Step 1 — style. Each style tile is a button with aria-pressed.
+  await waitForStep(page, 0);
+  await pickFirstTile(page);
   await expect(next).toBeEnabled();
   await next.click();
 
   // Step 2 — colour palette (same aria-pressed button pattern).
-  const paletteTiles = page.locator('button[aria-pressed]');
-  await expect(paletteTiles.first()).toBeVisible();
-  await paletteTiles.first().click();
+  await waitForStep(page, 1);
+  await pickFirstTile(page);
   await expect(next).toBeEnabled();
   await next.click();
 
   // Step 3 — room dimensions. Defaults are already valid; set them explicitly
   // so the journey does not depend on the store's initial values.
+  await waitForStep(page, 2);
   await page.getByLabel(/room width/i).fill("400");
   await page.getByLabel(/room length/i).fill("500");
+  await expect(next).toBeEnabled();
   await next.click();
 
   // Step 4 — budget. The preset range buttons are the resilient control (the
   // histogram is a custom drag surface). Any preset gives max > min.
+  await waitForStep(page, 3);
   await page.getByRole("button", { name: /تومان|میلیون/ }).first().click().catch(() => {
     /* presets are dataset-driven; the store default is already a valid range */
   });
@@ -69,6 +94,7 @@ async function completeQuiz(page: Page) {
   await next.click();
 
   // Step 5 — materials (optional). Submit.
+  await waitForStep(page, 4);
   const submit = page.getByRole("button", { name: /get my recommendations/i });
   await expect(submit).toBeVisible();
   await submit.click();

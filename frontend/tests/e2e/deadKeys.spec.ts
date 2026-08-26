@@ -115,12 +115,31 @@ function attachWatchers(page: Page) {
  * Escape covers a stacked dialog.
  */
 async function dismissOverlay(page: Page): Promise<void> {
-  const modal = page.locator("[aria-modal='true'], [role='dialog']");
-  for (let attempt = 0; attempt < 2; attempt++) {
-    if (!(await modal.first().isVisible().catch(() => false))) return;
-    await page.keyboard.press("Escape");
-    await page.waitForTimeout(150);
-  }
+  const modal = page.locator("[aria-modal='true'], [role='dialog']").first();
+  const isOpen = () => modal.isVisible().catch(() => false);
+
+  if (!(await isOpen())) return;
+
+  // 1) Escape. NOTE: some dialogs (e.g. the designer "New client project"
+  //    modal, DashboardPage.tsx:129) bind Escape with a React `onKeyDown` on
+  //    the dialog element itself, so it only fires when focus is already
+  //    INSIDE the dialog. If the autofocused field has not taken focus yet,
+  //    Escape lands on <body> and the modal stays open. Tracked as IR-S1-011.
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(150);
+  if (!(await isOpen())) return;
+
+  // 2) Focus the dialog, then Escape again — satisfies the focus-scoped
+  //    handlers described above.
+  await modal.click({ position: { x: 5, y: 5 }, timeout: 2_000 }).catch(() => {});
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(150);
+  if (!(await isOpen())) return;
+
+  // 3) Last resort: the dialog's own dismiss control.
+  const cancel = modal.getByRole("button", { name: /cancel|close|بستن|انصراف/i }).first();
+  await cancel.click({ timeout: 2_000 }).catch(() => {});
+  await page.waitForTimeout(150);
 }
 
 async function login(page: Page, who: keyof typeof ACCOUNTS) {
@@ -198,7 +217,14 @@ for (const role of Object.keys(ROUTES) as (keyof typeof ROUTES)[]) {
               reason: `bad response: ${watch.badResponses.at(-1)}`,
             });
           }
-          if (!changed) {
+          // A nav link pointing at the route we are already on legitimately
+          // changes nothing — same URL, no re-render, no request. That is
+          // correct behaviour, not a dead control, so do not report it.
+          const href = await el.getAttribute("href").catch(() => null);
+          const selfLink =
+            href !== null && new URL(href, page.url()).pathname === new URL(beforeUrl).pathname;
+
+          if (!changed && !selfLink) {
             failures.push({ route, control: name, reason: "DEAD — no DOM/URL/network change" });
           }
 

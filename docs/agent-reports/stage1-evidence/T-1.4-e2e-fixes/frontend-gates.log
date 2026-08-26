@@ -19,3 +19,8 @@ tsc rc=0
 === playwright --list ===
   [chromium-admin] › journey-admin.spec.ts:143:3 › admin journey › subscription management loads
 Total: 30 tests in 6 files
+
+Found 12 warnings and 0 errors.
+Finished in 85ms on 68 files with 116 rules using 2 threads.
+TSC_CLEAN
+Total: 30 tests in 6 files
