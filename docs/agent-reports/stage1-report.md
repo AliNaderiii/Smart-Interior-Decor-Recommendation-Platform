@@ -404,14 +404,29 @@ token cannot push `.github/workflows/**`. Already applied in `ci/ci.stage1.yml`.
       # behaviour belongs. This job is not testing rate limiting.
       LOGIN_RATE_LIMIT_PER_MINUTE: "200"
       REGISTER_RATE_LIMIT_PER_MINUTE: "100"
+      # globalSetup captures each role's storageState ONCE, at t=0, but the
+      # suite takes ~25 minutes (run 33045931573: 06:28:40 -> 06:53:56). With
+      # the 15-minute production access-token lifetime the later specs run with
+      # an expired token and get bounced to /login mid-suite. Token lifetime is
+      # not what this job tests - expiry and refresh are covered by the backend
+      # suite - so give sessions room to outlive the run.
+      ACCESS_TOKEN_EXPIRE_MINUTES: "120"
 ```
 
-**This edit is an optimisation, not a hard dependency.** The shipped default
+**The two rate-limit lines are an optimisation.** The shipped default
 `REGISTER_RATE_LIMIT_PER_MINUTE` is 3 and the suite needs 4 registrations, so
 `registerUser()` in `frontend/tests/e2e/users.ts` honours the `Retry-After`
-header and retries. Without the edit the e2e job still passes, roughly a minute
-slower; with it, setup runs straight through. Nothing else in the suite depends
-on it.
+header and retries. Without them the e2e job still passes, roughly a minute
+slower.
+
+**`ACCESS_TOKEN_EXPIRE_MINUTES` is a hard dependency.** The suite runs longer
+than the 15-minute production token lifetime, and refresh tokens rotate with a
+Redis blacklist (`auth.py:232`), so a snapshot's refresh token can be spent only
+once — every later browser context then replays a revoked token and is
+redirected to `/login`. Full analysis in **IR-S1-012**. Until this line is
+applied, expect `auth-smoke.spec.ts:44` to fail with an explicit message
+pointing at IR-S1-012; the spec now detects and explains this rather than
+reporting a bare URL mismatch.
 
 ## 11. Files changed in this stage
 
