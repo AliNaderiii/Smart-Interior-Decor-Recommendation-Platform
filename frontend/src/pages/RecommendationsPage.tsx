@@ -157,6 +157,29 @@ export default function RecommendationsPage() {
 
   const categories = useMemo(() => Object.keys(data?.categories ?? {}), [data]);
 
+  // T-2.1 progressive render (Directive 4 R2.3): three CI runs measured LCP
+  // 6497-6570ms with TTI pinned at ~6.7-6.8s regardless of chunk layout or
+  // fetch timing — the binding constraint is the main-thread cost of the
+  // INITIAL commit: 30 ProductCards (MotionCard + Radix HoverCard portal +
+  // AnimatePresence each) across 6 sections, multiplied 4x by the mobile CPU
+  // simulation. Only the first section can paint inside the first viewport,
+  // so commit that one synchronously (the LCP card is in it) and mount the
+  // rest one idle callback later. Content and order are identical; the
+  // below-fold sections appear within milliseconds of the browser going
+  // idle — before any human can scroll to them.
+  const [deferBelowFold, setDeferBelowFold] = useState(true);
+  useEffect(() => {
+    if (!data || !deferBelowFold) return;
+    const win = window as Window & {
+      requestIdleCallback?: (cb: () => void) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    const schedule = win.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1));
+    const cancel = win.cancelIdleCallback ?? window.clearTimeout;
+    const id = schedule(() => setDeferBelowFold(false));
+    return () => cancel(id);
+  }, [data, deferBelowFold]);
+
   useEffect(() => {
     if (!activeCat && categories.length) setActiveCat(categories[0]);
   }, [categories, activeCat]);
@@ -177,11 +200,18 @@ export default function RecommendationsPage() {
     );
     for (const el of Object.values(sectionRefs.current)) if (el) io.observe(el);
     return () => io.disconnect();
-  }, [categories]);
+    // deferBelowFold: re-attach once the deferred sections have mounted,
+    // otherwise the observer only ever saw the first section.
+  }, [categories, deferBelowFold]);
 
   const scrollToCat = useCallback((c: string) => {
     setActiveCat(c);
-    sectionRefs.current[c]?.scrollIntoView({ behavior: "smooth", block: "start" });
+    // A tab click may target a section the idle callback has not mounted
+    // yet — mount everything first, then scroll on the next frame.
+    setDeferBelowFold(false);
+    requestAnimationFrame(() => {
+      sectionRefs.current[c]?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   }, []);
 
   useCommands(
@@ -322,7 +352,9 @@ export default function RecommendationsPage() {
         </div>
       )}
 
-      {Object.entries(data.categories).map(([category, items]) => (
+      {Object.entries(data.categories)
+        .slice(0, deferBelowFold ? 1 : undefined)
+        .map(([category, items]) => (
         <section
           key={category}
           data-cat={category}
