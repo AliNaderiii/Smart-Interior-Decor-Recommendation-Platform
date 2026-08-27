@@ -653,7 +653,10 @@ jobs:
           # a dependency set no other job — and no deployment — ever used.
           pip install -r requirements.lock.txt
           python scripts/verify_lock_install.py --strict-extra
-          python scripts/seed_products.py
+          # Stage 2 (T-2.1/A3): seed the REAL 150-product catalog (images,
+          # retailer links) instead of the tiny demo set, so the measured
+          # /recommendations page renders representative content.
+          python scripts/load_realistic_products.py --realistic --if-empty
 
       - name: Start backend
         working-directory: backend
@@ -667,6 +670,12 @@ jobs:
           EMAIL_PROVIDER: mock
           SECRET_KEY: ci-secret
           COOKIE_SECURE: "false"
+          # Stage 2 (T-2.1/A3): the authenticated Lighthouse matrix (6 pages x
+          # 2 form factors) runs longer than the 15-minute production access
+          # token, and its session is minted once before the matrix starts.
+          # Same rationale and precedent as the e2e job (IR-S1-012); token
+          # lifetime is not what this job measures.
+          ACCESS_TOKEN_EXPIRE_MINUTES: "120"
         run: |
           nohup uvicorn app.main:app \
             --host 127.0.0.1 \
@@ -771,85 +780,310 @@ jobs:
       - name: Lighthouse CI
         uses: treosh/lighthouse-ci-action@v12
         with:
+          # Stage 2 (A3): the anonymous /recommendations URL was removed — it
+          # measured the RequireAuth login redirect, not the page (wrong-page
+          # artifact behind the IR-S1-010 numbers). The budget is asserted on
+          # the public home page; /recommendations is measured AUTHENTICATED
+          # by the matrix step below.
           urls: |
             http://127.0.0.1:4173/
-            http://127.0.0.1:4173/recommendations
           budgetPath: ./lighthouse-budget.json
           uploadArtifacts: true
           temporaryPublicStorage: false
 
-      - name: Assert performance and LCP/TTI thresholds
+      - name: Create authenticated session and quiz (A3)
         run: |
-          npm install -g lighthouse
+          set -e
+          API=http://127.0.0.1:8000/api/v1
+          EMAIL="lighthouse-$(date +%s)@example.com"
+          PASS='Lighthouse-Passw0rd!'
 
-          lighthouse http://127.0.0.1:4173/ \
-            --only-categories=performance,accessibility,best-practices \
-            --chrome-flags="--headless --no-sandbox" \
-            --output=json \
-            --output-path=./lighthouse-report.json \
-            --quiet
+          curl -fsS -X POST "$API/auth/register" \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASS\",\"role\":\"homeowner\",\"full_name\":\"Lighthouse Matrix\"}" \
+            > /tmp/lh-register.json
 
-          node - <<'NODE'
-          const fs = require('fs');
+          curl -fsS -X POST "$API/auth/login" \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASS\"}" \
+            > /tmp/lh-login.json
 
-          const report = JSON.parse(
-            fs.readFileSync('./lighthouse-report.json', 'utf8')
-          );
+          ACCESS=$(jq -r '.data.access_token' /tmp/lh-login.json)
+          REFRESH=$(jq -r '.data.refresh_token' /tmp/lh-login.json)
+          CSRF=$(jq -r '.data.csrf_token' /tmp/lh-login.json)
+          test -n "$ACCESS" && test "$ACCESS" != "null"
+          test -n "$CSRF" && test "$CSRF" != "null"
 
-          const performanceScore = Math.round(
-            report.categories.performance.score * 100
-          );
+          curl -fsS -X POST "$API/quiz" \
+            -H "Authorization: Bearer $ACCESS" \
+            -H 'Content-Type: application/json' \
+            -d '{"styles":["modern"],"color_palette":["#2E2E2E","#FFFFFF"],"room_width_cm":400,"room_length_cm":500,"budget_min_toman":1000000,"budget_max_toman":150000000,"materials":["wood"],"patterns":[]}' \
+            > /tmp/lh-quiz.json
+          QUIZ_ID=$(jq -r '.data.id' /tmp/lh-quiz.json)
+          test -n "$QUIZ_ID" && test "$QUIZ_ID" != "null"
 
-          const lcp =
-            report.audits['largest-contentful-paint']?.numericValue;
+          # Session must survive the preview proxy before anything is measured.
+          curl -fsS -H "Cookie: access_token=$ACCESS" \
+            http://127.0.0.1:4173/api/v1/auth/me > /tmp/lh-me.json
+          jq -e '.data.email' /tmp/lh-me.json
 
-          const interactive =
-            report.audits['interactive']?.numericValue;
+          {
+            echo "LH_ACCESS_TOKEN=$ACCESS"
+            echo "LH_REFRESH_TOKEN=$REFRESH"
+            echo "LH_CSRF_TOKEN=$CSRF"
+            echo "LH_QUIZ_ID=$QUIZ_ID"
+          } >> "$GITHUB_ENV"
+          echo "::add-mask::$ACCESS"
+          echo "::add-mask::$REFRESH"
+          echo "quiz id: $QUIZ_ID"
 
-          console.log('Performance:', performanceScore);
-          console.log('LCP:', lcp);
-          console.log('Interactive:', interactive);
-
-          if (!Number.isFinite(lcp)) {
-            console.error('LCP is null or non-numeric.');
-            process.exit(1);
-          }
-
-          if (!Number.isFinite(interactive)) {
-            console.error('Interactive is null or non-numeric.');
-            process.exit(1);
-          }
-
-          if (performanceScore < 80) {
-            console.error('Lighthouse performance score is below 80.');
-            process.exit(1);
-          }
-
-          if (lcp > 3000) {
-            console.error('LCP is greater than 3000 ms.');
-            process.exit(1);
-          }
-
-          if (interactive > 4000) {
-            console.error('Interactive is greater than 4000 ms.');
-            process.exit(1);
-          }
-          NODE
+      - name: Authenticated Lighthouse matrix — 6 pages x 2 form factors (A3)
+        working-directory: frontend
+        env:
+          LH_BASE_URL: http://127.0.0.1:4173
+          LH_OUT_DIR: /tmp/lighthouse-matrix
+        run: |
+          npm install --no-save lighthouse@12 chrome-launcher puppeteer-core
+          node scripts/lighthouse-auth-matrix.mjs
 
       - name: Lighthouse report secret scan
         run: |
           HITS=$(
-            grep -cE \
+            grep -rcE \
               "(BEGIN (RSA|OPENSSH|EC|PRIVATE) KEY|ghp_[A-Za-z0-9]{36}|sk-[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{35})" \
-              lighthouse-report.json \
-              || true
+              /tmp/lighthouse-matrix/*.json \
+              | awk -F: '{s+=$2} END {print s+0}'
           )
 
           echo "Credential-pattern hits: $HITS"
           test "$HITS" -eq 0
 
-      - name: Upload Lighthouse report
+      - name: Upload Lighthouse matrix (JSON + HTML, all cells)
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: lighthouse-report
-          path: lighthouse-report.json
+          name: lighthouse-matrix
+          path: /tmp/lighthouse-matrix/
+
+  # ---------------------------------------------------------------------------
+  # Stage 2 (T-2.2 / amendment A5): the CONTRACT-EVIDENCE environment for the
+  # /recommend p95 < 2 s gate. Real Postgres 16 + pgvector + real Redis;
+  # 20 150-row corpus; cold and warm cells, >= 200 samples each; EXPLAIN
+  # ANALYZE + raw JSON uploaded as artifacts. Local pgserver/fakeredis runs
+  # are iteration-only (A1) — the numbers quoted to the client come from HERE.
+  # ---------------------------------------------------------------------------
+  p95-evidence:
+    name: p95 evidence — /recommend vs Postgres16+pgvector & Redis
+    runs-on: ubuntu-latest
+    needs:
+      - backend
+
+    services:
+      postgres:
+        image: pgvector/pgvector:0.6.2-pg16
+        env:
+          POSTGRES_USER: decor
+          POSTGRES_PASSWORD: decor
+          POSTGRES_DB: decor_perf
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U decor -d decor_perf"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - "6379:6379"
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://decor:decor@localhost:5432/decor_perf
+      REDIS_URL: redis://localhost:6379/1
+      AI_PROVIDER: mock
+      EMBEDDING_BACKEND: hash
+      STORAGE_BACKEND: local
+      PAYMENT_PROVIDER: mock
+      EMAIL_PROVIDER: mock
+      SECRET_KEY: ci-secret
+      APP_ENV: test
+      COOKIE_SECURE: "false"
+      # The documented load-test switch (backend/app/core/config.py:95).
+      # This job measures latency, not the limiter; the limiter has its own
+      # backend tests.
+      RECOMMEND_RATE_LIMIT_PER_MINUTE: "0"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies (lockfile)
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.lock.txt
+          python scripts/verify_lock_install.py --strict-extra
+
+      - name: Migrate and seed the perf corpus (150 realistic + 20k synthetic)
+        working-directory: backend
+        run: |
+          alembic upgrade head
+          python scripts/load_realistic_products.py --realistic --if-empty
+          python scripts/seed_perf_products.py
+          # MANDATORY (T-2.2 finding): without fresh statistics the planner
+          # estimated 564 rows in the 20 150-row table and chose a Seq Scan
+          # over the HNSW index — a measurement artifact that must not reach
+          # the evidence.
+          python - <<'PY'
+          import os
+          from sqlalchemy import create_engine, text
+          eng = create_engine(os.environ["DATABASE_URL"],
+                              isolation_level="AUTOCOMMIT")
+          with eng.connect() as c:
+              c.execute(text("VACUUM ANALYZE products"))
+              n = c.execute(text("SELECT count(*) FROM products")).scalar()
+              est = c.execute(text(
+                  "SELECT reltuples::bigint FROM pg_class "
+                  "WHERE relname='products'")).scalar()
+          print(f"rows={n} planner_estimate={est}")
+          assert n >= 20000 and abs(est - n) < 1000, "stale stats or bad seed"
+          PY
+
+      - name: EXPLAIN ANALYZE + ef_search sensitivity (artifact)
+        working-directory: backend
+        run: |
+          mkdir -p /tmp/p95-evidence
+          python scripts/ef_search_sweep.py \
+            --json /tmp/p95-evidence/ef-search-sweep.json \
+            | tee /tmp/p95-evidence/ef-search-sweep.log
+
+      - name: DB-level fused-query bench (artifact)
+        working-directory: backend
+        run: |
+          python scripts/bench_pgvector.py --sizes 20150 \
+            --json /tmp/p95-evidence/bench-pgvector.json \
+            | tee /tmp/p95-evidence/bench-pgvector.log
+
+      - name: Start backend (uvicorn, 1 worker)
+        working-directory: backend
+        run: |
+          nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 \
+            > /tmp/p95-backend.log 2>&1 &
+
+      - name: Wait for backend readiness
+        run: |
+          set -e
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8000/api/v1/health/ready; then
+              echo; echo "Backend ready."
+              exit 0
+            fi
+            echo "waiting ($i/30)"; sleep 2
+          done
+          echo "::error::Backend did not become ready."
+          cat /tmp/p95-backend.log || true
+          exit 1
+
+      - name: "Cold + warm cells — >=200 samples each (gate p95 < 2000 ms)"
+        working-directory: backend
+        run: |
+          python scripts/load_recommend.py \
+            --base-url http://127.0.0.1:8000 \
+            --samples 250 --concurrency 20 \
+            --json /tmp/p95-evidence/load-recommend-ci.json \
+            | tee /tmp/p95-evidence/load-recommend-ci.log
+          # load_recommend.py exits 1 if either cell has errors or p95 >= 2000.
+
+      - name: Record runner environment
+        if: always()
+        run: |
+          {
+            echo "date_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "commit: $GITHUB_SHA"
+            echo "runner: ubuntu-latest ($(nproc) vCPU, $(free -h | awk '/Mem/{print $2}') RAM)"
+            echo "cpu: $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2-)"
+            echo "postgres: pgvector/pgvector:0.6.2-pg16 (service container)"
+            echo "redis: redis:7.4-alpine (service container)"
+            echo "app: uvicorn 1 worker; RECOMMEND_RATE_LIMIT_PER_MINUTE=0"
+          } | tee /tmp/p95-evidence/environment.txt
+
+      - name: Upload p95 evidence artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: p95-evidence
+          path: /tmp/p95-evidence/
+
+  # ---------------------------------------------------------------------------
+  # Stage 2 (T-2.5 / amendment A4): seller-link liveness from an egress-enabled
+  # host — the sandbox cannot reach the internet (B-10), the runner can.
+  # ADVISORY (continue-on-error): third-party shop availability must not gate
+  # unrelated commits; docs/reports/seller_links.md consumes the artifact and
+  # the T-2.5 verdict is made there. Polite: 1 req/s, retries only on
+  # network errors, honest classification (ok/redirect/blocked/dead/...).
+  # ---------------------------------------------------------------------------
+  link-liveness:
+    name: Seller-link liveness — 150-product catalog (advisory, T-2.5)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    needs:
+      - backend
+
+    env:
+      DATABASE_URL: sqlite:///./links.sqlite3
+      EMBEDDING_BACKEND: hash
+      APP_ENV: test
+      AI_PROVIDER: mock
+      STORAGE_BACKEND: local
+      PAYMENT_PROVIDER: mock
+      EMAIL_PROVIDER: mock
+      SECRET_KEY: ci-secret
+      COOKIE_SECURE: "false"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies (lockfile)
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.lock.txt
+
+      - name: Migrate and load the 150-product catalog
+        working-directory: backend
+        run: |
+          alembic upgrade head
+          python scripts/load_realistic_products.py --realistic --if-empty
+
+      - name: "Check every seller link — polite 1 req/s, retry network errors"
+        run: |
+          mkdir -p /tmp/link-liveness
+          python scripts/check_links.py \
+            --report /tmp/link-liveness/links-summary.json \
+            --detailed-report /tmp/link-liveness/links-detailed.json \
+            --delay 1.0 --retries 2 \
+            | tee /tmp/link-liveness/check-links.log
+
+      - name: Upload link-liveness artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: link-liveness
+          path: /tmp/link-liveness/
