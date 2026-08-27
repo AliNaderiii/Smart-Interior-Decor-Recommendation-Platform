@@ -43,9 +43,27 @@ const TOMAN_PRICE = /[۰-۹0-9][۰-۹0-9٬,\s]*\s*تومان/;
  *  selected and `Next` disabled — which is how this journey flaked in CI run
  *  33005106968 (`toBeEnabled` failed, 24x "unexpected value disabled"). */
 async function waitForStep(page: Page, index: number) {
-  await expect(
-    page.locator(`ol[aria-label*="Quiz progress"] li`).nth(index),
-  ).toHaveAttribute("aria-current", "step", { timeout: 20_000 });
+  const stepper = page.locator('ol[aria-label*="Quiz progress"]');
+  try {
+    await expect(stepper.nth(0).locator("li").nth(index)).toHaveAttribute(
+      "aria-current",
+      "step",
+      { timeout: 20_000 },
+    );
+  } catch (error) {
+    // Without this the whole test just burns its 120s budget and reports
+    // "Received: undefined" against whatever assertion happened to be pending,
+    // which says nothing about where it actually got stuck.
+    const label = await stepper.first().getAttribute("aria-label").catch(() => null);
+    const heading = await page.locator("main h1, h1").first().textContent().catch(() => null);
+    throw new Error(
+      `completeQuiz: the quiz never reached step ${index + 1}/5.\n` +
+        `  url            : ${page.url()}\n` +
+        `  stepper says   : ${label ?? "(no stepper found)"}\n` +
+        `  page heading   : ${heading?.trim() ?? "(none)"}\n` +
+        `  original error : ${error instanceof Error ? error.message.split("\n")[0] : String(error)}`,
+    );
+  }
 }
 
 /** Select the first tile of the current step and confirm the store took it.
@@ -88,8 +106,8 @@ async function completeQuiz(page: Page) {
   // Step 3 — room dimensions. Defaults are already valid; set them explicitly
   // so the journey does not depend on the store's initial values.
   await waitForStep(page, 2);
-  await page.getByLabel(/room width/i).fill("400");
-  await page.getByLabel(/room length/i).fill("500");
+  await page.getByLabel(/room width/i).fill("400", { timeout: 15_000 });
+  await page.getByLabel(/room length/i).fill("500", { timeout: 15_000 });
   await expect(next).toBeEnabled();
   await next.click();
 

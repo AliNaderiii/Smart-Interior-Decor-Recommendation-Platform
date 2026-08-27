@@ -406,6 +406,15 @@ jobs:
       # behaviour belongs. This job is not testing rate limiting.
       LOGIN_RATE_LIMIT_PER_MINUTE: "200"
       REGISTER_RATE_LIMIT_PER_MINUTE: "100"
+      # globalSetup captures each role's storageState ONCE, at t=0, but the
+      # suite takes ~25 minutes (run 33045931573: 06:28:40 -> 06:53:56). With
+      # the 15-minute production access-token lifetime the later specs were
+      # running with an expired token and got bounced to /login mid-suite
+      # (auth-smoke "session survives a full page reload" is the tell). The
+      # token lifetime is not what this job is testing — expiry and refresh
+      # are covered by the backend suite — so give the sessions room to
+      # outlive the run.
+      ACCESS_TOKEN_EXPIRE_MINUTES: "120"
 
     steps:
       - name: Checkout

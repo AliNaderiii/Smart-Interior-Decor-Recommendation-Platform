@@ -44,6 +44,19 @@ test.describe("authenticated smoke (storageState session)", () => {
   test("session survives a full page reload (cookies re-sent on fresh load)", async ({ page }) => {
     await page.goto(`${BASE}/moodboards`);
     await page.waitForLoadState("networkidle");
+    // If this lands on /login the session died before the reload was even
+    // attempted, which is a different failure from the one under test. Say so,
+    // because the bare URL mismatch reads as a product bug and is not one:
+    // see IR-S1-012 (refresh-token rotation vs a shared storageState).
+    if (new URL(page.url()).pathname.startsWith("/login")) {
+      throw new Error(
+        "auth-smoke: the storageState session was already invalid before the " +
+          "reload step. Expected /moodboards, got /login. This usually means " +
+          "the access token in the snapshot expired mid-suite and its refresh " +
+          "token was already rotated away by an earlier test — see IR-S1-012 " +
+          "and ACCESS_TOKEN_EXPIRE_MINUTES in the e2e job.",
+      );
+    }
     await expect(page).toHaveURL(/\/moodboards/);
     await page.reload();
     await page.waitForLoadState("networkidle");

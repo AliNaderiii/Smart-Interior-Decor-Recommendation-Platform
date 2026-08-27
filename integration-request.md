@@ -1341,3 +1341,49 @@ Cancel/Close control. This keeps the sweep honest without hiding the defect.
 Introduce a shared modal primitive that registers Escape on `document`, traps
 and restores focus, and marks background content inert; migrate
 `DashboardPage.tsx` and every other `role="dialog"` site to it.
+
+---
+
+## IR-S1-012 · Refresh-token rotation is incompatible with a long-lived shared storageState
+
+**Owner:** Master Prompt 04 — QA / test infrastructure
+**Blocker ID:** none — understood and mitigated in Stage 1
+**Raised:** 2026-08-27, Stage 1 close-out
+**Status:** mitigated (see below); no product change requested
+
+### Evidence
+
+`POST /api/v1/auth/refresh` rotates: it blacklists the presented token's `jti`
+in Redis for the token's remaining lifetime
+(`backend/app/api/routes/auth.py:232-237`). This is correct — it is what makes
+refresh-token theft detectable — and it must NOT be relaxed.
+
+Playwright's `storageState` is a *snapshot*. Every test in a role project
+starts a fresh browser context from that same snapshot, so they all carry the
+**same** refresh token. The access cookie lives 15 minutes
+(`ACCESS_TOKEN_EXPIRE_MINUTES`), and the e2e suite now runs ~25 minutes
+(run `33045931573`: Playwright step `06:28:40 -> 06:53:56`). Once past the
+15-minute mark:
+
+1. a test's first API call 401s on the expired access token;
+2. `lib/api.ts` refreshes — succeeds once, and the snapshot's token is burned;
+3. every later context replays that same, now-blacklisted token, gets
+   `401 Refresh token revoked`, and `lib/api.ts` hard-redirects to `/login`.
+
+Symptom: `auth-smoke.spec.ts:44` ("session survives a full page reload") landed
+on `http://localhost:5173/login`. Nothing was wrong with the product.
+
+### Mitigation applied in Stage 1
+
+`ci/ci.stage1.yml`, e2e job: `ACCESS_TOKEN_EXPIRE_MINUTES: "120"`, so no access
+token in the snapshot expires inside the run and the rotation path is never
+entered. Token expiry and rotation remain fully covered by the backend suite,
+which is the right place for them — the e2e job is not testing token lifetime.
+
+### If the suite ever exceeds two hours
+
+Do not raise the number again. Switch the role projects to a per-test session:
+a fixture that logs in fresh (or a `storageState` regenerated per worker), so
+each context owns its own refresh token. That is strictly more correct; it was
+not done now because it multiplies logins by the test count and this suite is
+already rate-limit sensitive.
