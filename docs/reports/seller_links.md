@@ -8,7 +8,7 @@ an egress-enabled GitHub runner (the sandbox itself cannot reach the internet, b
 — the result is stable, not a one-shot snapshot. Artifacts: `link-liveness`
 (`links-summary.json`, `links-detailed.json`, `check-links.log`) on each run.
 
-Method: `backend/scripts/check_links.py`, polite 1 req/s, 2 retries on *network* errors only
+Method: `scripts/check_links.py`, polite 1 req/s, 2 retries on *network* errors only
 (never on HTTP status), honest classes `ok / redirect / blocked / dead / unsafe`. Hosts that
 do not resolve are **refused before any fetch** (“refusing to fetch unsafe seller link”) —
 they are quarantined as `unsafe`, not silently skipped and not counted as valid.
