@@ -83,27 +83,50 @@ export function makeUser(role: DisposableRole, label = "e2e"): TestUser {
 export async function registerUser(
   baseUrl: string,
   user: TestUser,
+  { attempts = 4 }: { attempts?: number } = {},
 ): Promise<TestUser> {
-  const response = await fetch(`${baseUrl}/api/v1/auth/register`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      email: user.email,
-      password: user.password,
-      full_name: user.fullName,
-      role: user.role,
-    }),
-  });
+  let lastDetail = "";
 
-  if (!response.ok) {
-    const detail = await response.text().catch(() => "<unreadable body>");
-    throw new Error(
-      `Failed to register the disposable ${user.role} ${user.email}: ` +
-        `HTTP ${response.status}.\n${detail}\n` +
-        `Check that the API is reachable at ${baseUrl} and that ` +
-        `REGISTER_RATE_LIMIT_PER_MINUTE is high enough for the suite.`,
-    );
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    const response = await fetch(`${baseUrl}/api/v1/auth/register`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: user.email,
+        password: user.password,
+        full_name: user.fullName,
+        role: user.role,
+      }),
+    });
+
+    if (response.ok) return user;
+
+    lastDetail = await response.text().catch(() => "<unreadable body>");
+
+    // 429: the per-IP registration limit. The e2e job raises it, but the
+    // ACTIVE workflow only gets that env once the human applies the hand-off
+    // edit, and the shipped default is 3/min — fewer than the 4 accounts this
+    // suite needs. Honour Retry-After so setup succeeds either way instead of
+    // depending on a manual workflow change.
+    if (response.status === 429 && attempt < attempts) {
+      const retryAfter = Number(response.headers.get("Retry-After") ?? 0);
+      const waitMs = (Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : 20) * 1000 + 1_000;
+      console.log(
+        `users: registration of ${user.email} was rate limited (429); ` +
+          `waiting ${Math.round(waitMs / 1000)}s then retrying ` +
+          `(attempt ${attempt + 1}/${attempts}).`,
+      );
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
+      continue;
+    }
+
+    break;
   }
 
-  return user;
+  throw new Error(
+    `Failed to register the disposable ${user.role} ${user.email} after ` +
+      `${attempts} attempt(s).\n${lastDetail}\n` +
+      `Check that the API is reachable at ${baseUrl} and that ` +
+      `REGISTER_RATE_LIMIT_PER_MINUTE is high enough for the suite.`,
+  );
 }

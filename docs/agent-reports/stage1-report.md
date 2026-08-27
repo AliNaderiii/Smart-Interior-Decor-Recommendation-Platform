@@ -383,6 +383,36 @@ again are recorded as **IR-S1-010** in `integration-request.md`. Scope is one
 job only: `backend`, `multi-worker`, `frontend`, `e2e`, `security-scans` and
 `docker` all remain blocking.
 
+## 10c. Human hand-off — e2e rate limits in `.github/workflows/ci.yml`
+
+Second (and last) human-applied workflow edit, same reason as 10b: the agent
+token cannot push `.github/workflows/**`. Already applied in `ci/ci.stage1.yml`.
+
+**File:** `.github/workflows/ci.yml`
+**Where:** job `e2e`, the `env:` block — immediately after `COOKIE_SECURE: "false"`.
+**Edit:** add the two variables below.
+
+```yaml
+      SEED_DEMO_ACCOUNTS: "true"
+      COOKIE_SECURE: "false"
+      # The suite registers 4 disposable users and performs ~9 logins from a
+      # single runner IP (globalSetup, the sweep's own UI logins, and the auth
+      # negative tests which deliberately fail logins). The production defaults
+      # (login 30/min, register 3/min) throttle that, which made the suite fail
+      # a different subset of tests on every run. Raised HERE ONLY: the limits
+      # themselves are asserted by the backend suite, which is where that
+      # behaviour belongs. This job is not testing rate limiting.
+      LOGIN_RATE_LIMIT_PER_MINUTE: "200"
+      REGISTER_RATE_LIMIT_PER_MINUTE: "100"
+```
+
+**This edit is an optimisation, not a hard dependency.** The shipped default
+`REGISTER_RATE_LIMIT_PER_MINUTE` is 3 and the suite needs 4 registrations, so
+`registerUser()` in `frontend/tests/e2e/users.ts` honours the `Retry-After`
+header and retries. Without the edit the e2e job still passes, roughly a minute
+slower; with it, setup runs straight through. Nothing else in the suite depends
+on it.
+
 ## 11. Files changed in this stage
 
 **New capability**
