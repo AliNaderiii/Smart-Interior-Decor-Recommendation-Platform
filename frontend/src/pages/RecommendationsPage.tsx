@@ -200,14 +200,39 @@ export default function RecommendationsPage() {
   if (isLoading) {
     return (
       <div>
-        <Skeleton className="h-8 w-64" />
-        {/* Layout-matched shimmer (Stripe/Linear pattern): the skeleton mirrors
-            the real card so nothing shifts when data lands. */}
-        <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <ProductCardSkeleton key={i} />
-          ))}
+        {/* Layout-matched shimmer (Stripe/Linear pattern): the skeleton must
+            mirror the LOADED page chrome, not just the cards. T-2.1 baseline
+            (run 33078900123) measured CLS 0.112 on recommendations/mobile —
+            the old skeleton had no actions row, no category tab bar and no
+            section heading, so the entire grid shifted down when data landed. */}
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <Skeleton className="h-8 w-64" />
+            <Skeleton className="mt-2 h-4 w-72 max-w-full" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-8 w-28 rounded-xl" />
+            <Skeleton className="h-10 w-40 rounded-xl" />
+          </div>
         </div>
+        <div className="mt-6 border-b border-[var(--color-line)]">
+          <div className="flex gap-1 py-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-8 w-20 rounded-lg" />
+            ))}
+          </div>
+        </div>
+        <section className="mt-12">
+          <div className="mb-4 flex items-baseline justify-between">
+            <Skeleton className="h-7 w-40" />
+            <Skeleton className="h-3 w-16" />
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <ProductCardSkeleton key={i} />
+            ))}
+          </div>
+        </section>
       </div>
     );
   }
