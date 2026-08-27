@@ -145,7 +145,24 @@ async function completeQuiz(page: Page) {
   await submit.click({ timeout: 15_000 });
 
   await page.waitForURL(/\/recommendations/, { timeout: 60_000 });
+
+  // Remember the quiz this run produced. POST /recommend requires either a
+  // quiz_id or an inline body (quiz.py:103-110), so a later test that browses
+  // to a bare /recommendations gets a 422 and the page renders its error state
+  // instead of the results heading. The id is the thread that ties the
+  // serial journey together.
+  const quizId = new URL(page.url()).searchParams.get("quiz");
+  if (!quizId) {
+    throw new Error(
+      `completeQuiz: submitted but landed on ${page.url()} without a ?quiz= id.`,
+    );
+  }
+  recommendationsUrl = `${BASE}/recommendations?quiz=${quizId}`;
 }
+
+/** `/recommendations?quiz=<id>` for the quiz completed by the first test.
+ *  Shared across this serial file; set by completeQuiz. */
+let recommendationsUrl = `${BASE}/recommendations`;
 
 test.describe.serial("homeowner journey", () => {
   test("completes the 5-step quiz and lands on recommendations", async ({ page }) => {
@@ -160,7 +177,7 @@ test.describe.serial("homeowner journey", () => {
   test("every category returns 3-5 ranked items, each with an explanation chip", async ({
     page,
   }) => {
-    await page.goto(`${BASE}/recommendations`);
+    await page.goto(recommendationsUrl);
     await expect(page.getByRole("heading", { name: /your recommendations/i })).toBeVisible({
       timeout: 60_000,
     });
@@ -202,7 +219,7 @@ test.describe.serial("homeowner journey", () => {
   });
 
   test("the explanation chip opens a match breakdown", async ({ page }) => {
-    await page.goto(`${BASE}/recommendations`);
+    await page.goto(recommendationsUrl);
     const chip = page.getByRole("button", { name: /why we matched/i }).first();
     await expect(chip).toBeVisible({ timeout: 60_000 });
     await chip.click({ timeout: 15_000 });
@@ -214,7 +231,7 @@ test.describe.serial("homeowner journey", () => {
   });
 
   test("adds a product to a moodboard and the editor shows it", async ({ page }) => {
-    await page.goto(`${BASE}/recommendations`);
+    await page.goto(recommendationsUrl);
     const addButton = page.getByRole("button", { name: /^add to moodboard$/i }).first();
     await expect(addButton).toBeVisible({ timeout: 60_000 });
     await addButton.click({ timeout: 15_000 });

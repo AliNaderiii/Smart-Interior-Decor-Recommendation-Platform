@@ -256,10 +256,23 @@ for (const role of Object.keys(ROUTES) as (keyof typeof ROUTES)[]) {
           let clicked = true;
           await el.click({ timeout: 5_000, trial: false }).catch((e: Error) => {
             clicked = false;
+            // Keep Playwright's "retrying ... intercepts pointer events" lines:
+            // the first line alone only ever says "Timeout 5000ms exceeded",
+            // which does not identify WHAT blocked the click.
+            const detail = e.message
+              .split("\n")
+              .map((line) => line.trim())
+              .filter((line) =>
+                /intercepts pointer events|not visible|not enabled|not stable|outside of the viewport|<[a-z]/i.test(
+                  line,
+                ),
+              )
+              .slice(0, 3)
+              .join(" | ");
             failures.push({
               route,
               control: name,
-              reason: `click threw: ${e.message.split("\n")[0]}`,
+              reason: `click threw: ${e.message.split("\n")[0]}${detail ? ` — ${detail}` : ""}`,
             });
           });
           await page.waitForTimeout(220); // let optimistic UI + toasts settle

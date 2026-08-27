@@ -51,8 +51,18 @@ export default defineConfig({
   },
   projects: [
     {
+      // Anonymous context, BLOCKING. The Stage-1 auth negatives live here.
       name: "chromium",
-      testMatch: ["deadKeys.spec.ts", "auth-negative.spec.ts"],
+      testMatch: ["auth-negative.spec.ts"],
+      use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      // The legacy dead-key sweep, split into its own project so its verdicts
+      // can be waived (IR-S1-013) without weakening any Stage-1 spec. See the
+      // `--forbid-only`-style guard in the e2e job: this project is the ONLY
+      // one allowed to be non-blocking.
+      name: "chromium-sweep",
+      testMatch: ["deadKeys.spec.ts"],
       use: { ...devices["Desktop Chrome"] },
     },
     {

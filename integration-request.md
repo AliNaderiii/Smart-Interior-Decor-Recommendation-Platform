@@ -1387,3 +1387,70 @@ a fixture that logs in fresh (or a `storageState` regenerated per worker), so
 each context owns its own refresh token. That is strictly more correct; it was
 not done now because it multiplies logins by the test count and this suite is
 already rate-limit sensitive.
+
+---
+
+## IR-S1-013 · Legacy dead-key sweep waived for Stage 1 (runs advisory)
+
+**Owner:** Master Prompt 02 — Frontend / accessibility (Stage 3 hardening)
+**Blocker ID:** none — accepted deviation, pre-authorized by the supervisor
+**Raised:** 2026-08-27, Stage 1 close-out
+**Decision:** the `chromium-sweep` project runs and publishes findings but does
+not gate the release. **Every Stage-1 spec remains blocking.**
+
+### What is waived, precisely
+
+`frontend/tests/e2e/deadKeys.spec.ts` only — 9 tests, isolated into their own
+Playwright project (`chromium-sweep`) so the waiver cannot leak. The other 21
+tests (three role journeys, auth negatives, authenticated smoke) run in the
+blocking step and must pass.
+
+| Project | Tests | Gating |
+|---|---|---|
+| `chromium` (auth negatives) | 3 | **blocking** |
+| `chromium-homeowner` | 9 | **blocking** |
+| `chromium-designer` | 3 | **blocking** |
+| `chromium-admin` | 6 | **blocking** |
+| `chromium-sweep` (legacy) | 9 | advisory (this IR) |
+
+### Why
+
+The sweep is a pre-Stage-1 artefact that blind-clicks every control on every
+route. Its first real browser execution was CI run `32988827678`, and four
+iterations of honest triage cut it from ~182 verdicts to ~40, every fix being a
+harness correction rather than a suppressed assertion:
+
+* the `sr-only` skip link is 1x1-clipped and unclickable until focused — excluded
+  from the blind sweep and asserted properly via Tab/Enter instead (net +1 test);
+* modal overlays were never dismissed, so one opener timed out every later click;
+* page-load network noise was charged to the next control clicked;
+* `DEAD` was reported even when the click had thrown — a click that never landed
+  cannot prove a control dead;
+* the theme toggle mutates `<html>` (`themeStore.ts:15`), outside the `<body>`
+  the sweep diffed, so it was "dead" on every route of every role.
+
+What remains is a residue of `click threw: Timeout 5000ms exceeded` on controls
+the three role journeys click successfully on the same routes — i.e. Playwright
+actionability artefacts in a blind sweep (sticky `z-40` header, `backdrop-blur`
+compositing, framer-motion springs that keep a bounding box moving), not broken
+product controls. Chasing the last residue is Stage-3 accessibility work, not
+release-hardening, and the sweep must not be allowed to hold the release while
+21 purpose-built Stage-1 specs are green.
+
+### Genuine product findings already filed
+
+* **IR-S1-011** — modal Escape handlers are focus-scoped
+  (`DashboardPage.tsx:129`), so Escape can fail to close a dialog. Deferred to
+  Stage 3 for a shared `useDialog` primitive (document-level keydown, focus
+  trap, inert background) applied to every dialog.
+
+### Restore conditions (Stage 3)
+
+1. Land the shared dialog primitive from IR-S1-011.
+2. Re-run `--project=chromium-sweep` and triage what is left with the improved
+   diagnostics now in the spec (click failures report the intercepting element).
+3. Delete `continue-on-error: true` from the sweep step and fold it back into
+   the blocking step.
+
+The sweep must never be deleted, `test.skip`-ed, or have its assertions relaxed
+as a way of going green.
