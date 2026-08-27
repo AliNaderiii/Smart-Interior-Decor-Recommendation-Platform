@@ -85,7 +85,7 @@ jobs:
 
       - name: Upload locked-install proof
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: backend-lock-verification
           path: |
@@ -179,7 +179,7 @@ jobs:
 
       - name: Upload dependency audit report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: backend-dependency-audit
           path: |
@@ -351,7 +351,7 @@ jobs:
           test "$HITS" -eq 0
 
       - name: Upload frontend artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: frontend-dist
           path: frontend/dist
@@ -521,7 +521,7 @@ jobs:
       # not only when something breaks.
       - name: Upload e2e report (JSON + HTML) and traces
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: e2e-report
           path: frontend/test-results
@@ -873,7 +873,7 @@ jobs:
 
       - name: Upload Lighthouse matrix (JSON + HTML, all cells)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: lighthouse-matrix
           path: /tmp/lighthouse-matrix/
@@ -1033,7 +1033,7 @@ jobs:
 
       - name: Upload p95 evidence artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: p95-evidence
           path: /tmp/p95-evidence/
@@ -1096,7 +1096,7 @@ jobs:
 
       - name: Upload link-liveness artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: link-liveness
           path: /tmp/link-liveness/
