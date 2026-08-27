@@ -206,6 +206,13 @@ async function main() {
     const tasks = (lhr.audits['long-tasks']?.details?.items ?? []).slice(0, 5)
       .map((t) => `${(t.url || '?').replace(/^https?:\/\//, '').slice(0, 60)} ${Math.round(t.duration)}ms`);
     diagNotes.push(`slowest5: ${slowest.join(' | ') || 'n/a'} ;; longtasks: ${tasks.join(' | ') || 'n/a'}`);
+    // CPU attribution (three runs held TTI ~6.7-6.8s across different chunk
+    // layouts — the constraint is exec volume, so name the scripts burning it).
+    const bootup = (lhr.audits['bootup-time']?.details?.items ?? []).slice(0, 6)
+      .map((b) => `${(b.url || '?').replace(/^https?:\/\//, '').split('/').pop().slice(0, 40)} script=${Math.round(b.scripting ?? 0)}ms parse=${Math.round(b.scriptParseCompile ?? 0)}ms`);
+    const breakdown = (lhr.audits['mainthread-work-breakdown']?.details?.items ?? [])
+      .map((w) => `${w.groupLabel || w.group}=${Math.round(w.duration)}ms`);
+    diagNotes.push(`bootup6: ${bootup.join(' | ') || 'n/a'} ;; breakdown: ${breakdown.join(' ') || 'n/a'} ;; tbt=${Math.round(lhr.audits['total-blocking-time']?.numericValue ?? -1)}ms`);
   };
 
   for (const p of PAGES) {
@@ -282,6 +289,7 @@ async function main() {
   // Directive 4 R1 diagnosis + R2(2) API split + R4 console-error identity.
   if (diagNotes[0]) console.log(`::notice title=lcp-element-phases::${diagNotes[0].slice(0, 2000)}`);
   if (diagNotes[1]) console.log(`::notice title=lcp-network-longtasks::${diagNotes[1].slice(0, 2000)}`);
+  if (diagNotes[2]) console.log(`::notice title=cpu-attribution::${diagNotes[2].slice(0, 2000)}`);
   if (apiLatency.length) console.log(`::notice title=recommend-api-observed::${apiLatency.join(' ;; ').slice(0, 1500)}`);
   if (consoleErrs.size) {
     const errsTxt = [...consoleErrs]
