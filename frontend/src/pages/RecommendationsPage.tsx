@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { motion, useReducedMotion } from "framer-motion";
 import { post } from "@/lib/api";
+import { takeEarlyRecommend } from "@/lib/earlyRecommend";
 import type { RecommendResult, RecommendedProduct } from "@/lib/types";
 import { CATEGORY_LABELS } from "@/lib/constants";
 import { useMoodboardStore } from "@/stores/moodboardStore";
@@ -21,6 +22,18 @@ function useRecommendations(quizId: string | null) {
   return useQuery({
     queryKey: ["recommend", quizId],
     queryFn: async (): Promise<RecommendResult> => {
+      // T-2.1: consume the boot-time kickoff when one is in flight (started
+      // in main.tsx before React mounted — see lib/earlyRecommend.ts). Any
+      // early failure falls through to the normal post() path, which owns
+      // refresh-on-401 and error shaping.
+      const early = takeEarlyRecommend(quizId);
+      if (early) {
+        try {
+          return await early;
+        } catch {
+          /* fall back to the canonical request below */
+        }
+      }
       const url = quizId ? `/recommend?quiz_id=${quizId}` : "/recommend";
       return post<RecommendResult>(url);
     },
