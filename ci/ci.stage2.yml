@@ -611,11 +611,13 @@ jobs:
   lighthouse:
     name: Lighthouse CI — performance and accessibility
     runs-on: ubuntu-latest
-    # WAIVED FOR STAGE 1 (IR-S1-010). The perf budget currently fails on TTI
-    # (interactive 6727ms vs a 4000ms budget); performance tuning is Stage 2
-    # scope, so this job reports but does not block. Stage-2 task G-2.6
-    # removes this line and restores it as a required check.
-    continue-on-error: true
+    # RESTORED AS BLOCKING (Stage 2, T-2.6 — closes IR-S1-010). The Stage-1
+    # waiver (`continue-on-error: true`) is removed: the IR-S1-010 restore
+    # conditions are met on the authenticated matrix, which enforces
+    # perf >= 80 / LCP < 3000 ms / TTI <= 4000 ms on home plus the contract
+    # gates on /recommendations (measured on 65f4783: home perf=100,
+    # LCP 1281–1282 ms, TTI 1289 ms; recommendations/mobile perf 98/97,
+    # LCP 2338 ms — runs 33086824717 and 33086828679).
     needs:
       - frontend
       - backend
