@@ -166,6 +166,48 @@ async function main() {
   const summary = [];
   const failures = [];
 
+  // Directive 4 R1/R4 instrumentation: artifact downloads are egress-blocked
+  // for the operating sandbox (302 -> Azure blob), so the diagnosis the
+  // supervisor requires — LCP element, phase breakdown, slowest requests,
+  // long tasks, console-error identity — is pushed out through annotations.
+  // network-requests durations are OBSERVED (unthrottled) times from the
+  // trace, i.e. the real in-job latency split; the LCP phases are simulated
+  // and sum to the reported LCP.
+  const consoleErrs = new Map(); // identity -> cells seen in
+  const diagNotes = [];
+  const apiLatency = [];
+  const collectDiag = (lhr, slug, ff) => {
+    const cell = `${slug}/${ff}`;
+    for (const it of lhr.audits['errors-in-console']?.details?.items ?? []) {
+      const key = `${(it.description || it.source || 'unknown').replace(/\s+/g, ' ').slice(0, 140)} @ ${(it.sourceLocation?.url || it.url || '?').slice(0, 80)}`;
+      if (!consoleErrs.has(key)) consoleErrs.set(key, []);
+      consoleErrs.get(key).push(cell);
+    }
+    const requests = (lhr.audits['network-requests']?.details?.items ?? []).map((r) => ({
+      url: r.url || '',
+      dur: Math.round((r.networkEndTime ?? 0) - (r.networkRequestTime ?? 0)),
+      kb: Math.round((r.transferSize ?? 0) / 1024),
+      type: r.resourceType || '',
+    }));
+    for (const r of requests) {
+      if (r.url.includes('/api/v1/recommend')) apiLatency.push(`${cell}: ${r.dur}ms`);
+    }
+    if (slug !== 'recommendations' || ff !== 'mobile') return;
+    const lcpEl = lhr.audits['largest-contentful-paint-element']?.details?.items ?? [];
+    const node = lcpEl[0]?.items?.[0]?.node;
+    const phases = (lcpEl[1]?.items ?? [])
+      .map((i) => `${i.phase}=${Math.round(i.timing)}ms`).join(' ');
+    const nodeTxt = node
+      ? (node.snippet || node.selector || '').replace(/\s+/g, ' ').slice(0, 220)
+      : 'n/a';
+    diagNotes.push(`node=${nodeTxt} ;; phases: ${phases || 'n/a'}`);
+    const slowest = [...requests].sort((a, b) => b.dur - a.dur).slice(0, 5)
+      .map((r) => `${r.url.replace(/^https?:\/\//, '').slice(0, 80)} ${r.dur}ms ${r.kb}KB ${r.type}`);
+    const tasks = (lhr.audits['long-tasks']?.details?.items ?? []).slice(0, 5)
+      .map((t) => `${(t.url || '?').replace(/^https?:\/\//, '').slice(0, 60)} ${Math.round(t.duration)}ms`);
+    diagNotes.push(`slowest5: ${slowest.join(' | ') || 'n/a'} ;; longtasks: ${tasks.join(' | ') || 'n/a'}`);
+  };
+
   for (const p of PAGES) {
     for (const ff of ['mobile', 'desktop']) {
       const url = BASE + p.url;
@@ -196,6 +238,7 @@ async function main() {
       };
       summary.push(row);
       progress(JSON.stringify(row));
+      collectDiag(lhr, p.slug, ff);
 
       // Fake-coverage guard: an authed page redirected to /login is a wrong-page
       // measurement and must never be reported as coverage (amendment A3).
@@ -235,6 +278,17 @@ async function main() {
   const compact = summary.map(r =>
     `${r.page}/${r.formFactor}: perf=${r.perf} lcp=${r.lcpMs} tti=${r.ttiMs} cls1000=${r.clsX1000}`).join(' ;; ');
   console.log(`::notice title=lighthouse-matrix-summary::${compact.slice(0, 2000)}`);
+
+  // Directive 4 R1 diagnosis + R2(2) API split + R4 console-error identity.
+  if (diagNotes[0]) console.log(`::notice title=lcp-element-phases::${diagNotes[0].slice(0, 2000)}`);
+  if (diagNotes[1]) console.log(`::notice title=lcp-network-longtasks::${diagNotes[1].slice(0, 2000)}`);
+  if (apiLatency.length) console.log(`::notice title=recommend-api-observed::${apiLatency.join(' ;; ').slice(0, 1500)}`);
+  if (consoleErrs.size) {
+    const errsTxt = [...consoleErrs]
+      .map(([k, cells]) => `${k} [${cells.length} cell(s): ${cells.slice(0, 3).join(',')}${cells.length > 3 ? ',…' : ''}]`)
+      .join(' ;; ');
+    console.log(`::notice title=console-errors::${errsTxt.slice(0, 2000)}`);
+  }
 
   if (failures.length) {
     console.error(`\n${failures.length} gate failure(s).`);
