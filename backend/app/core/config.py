@@ -30,6 +30,14 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
     FERNET_KEY: str = ""
 
+    # ---- Designer quota (Stage 1 — T-1.1) ----
+    #: Fallback project quota for a designer whose plan is missing from
+    #: ``seed_data/subscription_plans.json`` or lacks ``limits.projects``.
+    #: The real quotas live in the dataset (designer_free=2, designer_studio=20,
+    #: designer_agency=-1); this knob only covers the "dataset is wrong"
+    #: failure mode and fails CLOSED (1) by design.
+    DESIGNER_PROJECT_QUOTA_FALLBACK: int = 1
+
     # ---- Demo / seed accounts (Stage 03 — IR-001, blocker B-1) ----
     #: Opt-in, default OFF, and **ignored in production**. Historically both
     #: seed entrypoints created `admin@smartdecor.dev / Admin123!` on every run,
@@ -100,6 +108,13 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = "gpt-4o-mini"
     EMBEDDING_BACKEND: Literal["clip", "hash"] = "hash"
     EMBEDDING_DIM: int = 512
+    # Stage 1 (T-1.2): active recommender weight profile. Must name a profile
+    # in ai/recommender_config.json (validated at import — a typo refuses to
+    # boot rather than silently ranking with the wrong weights). The default
+    # ("current") is the ADR-005 baseline; "client-ad" is the normalised
+    # client-advertisement profile (see docs/reports/weights_profiles.md and
+    # client decision C-6).
+    RECOMMENDER_WEIGHT_PROFILE: str = "current"
 
     # ---- Storage ----
     STORAGE_BACKEND: Literal["s3", "local"] = "local"

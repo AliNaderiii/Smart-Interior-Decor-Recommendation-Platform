@@ -1,0 +1,26 @@
+=== npm run lint ===
+    :                 ^^^^^^^^^^^
+ 32 |   before: Record<string, Json>,
+    `----
+
+Found 12 warnings and 0 errors.
+Finished in 95ms on 68 files with 116 rules using 2 threads.
+=== npm test ===
+ [32m✓[39m tests/unit/authStore.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 15[2mms[22m[39m
+ [32m✓[39m tests/unit/safeUrl.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 6[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m      Tests [22m [1m[32m58 passed[39m[22m[90m (58)[39m
+[2m   Start at [22m 19:24:17
+[2m   Duration [22m 8.41s[2m (transform 266ms, setup 739ms, import 594ms, tests 1.75s, environment 4.46s)[22m
+
+=== tsc tests ===
+tsc rc=0
+=== playwright --list ===
+  [chromium-admin] › journey-admin.spec.ts:143:3 › admin journey › subscription management loads
+Total: 30 tests in 6 files
+
+Found 12 warnings and 0 errors.
+Finished in 85ms on 68 files with 116 rules using 2 threads.
+TSC_CLEAN
+Total: 30 tests in 6 files

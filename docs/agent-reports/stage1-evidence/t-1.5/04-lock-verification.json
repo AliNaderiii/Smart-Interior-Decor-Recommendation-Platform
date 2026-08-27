@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-08-26T11:46:47.353111+00:00",
+  "lockfile": "/home/user/Smart-Interior-Decor-Recommendation-Platform/backend/requirements.lock.txt",
+  "python": "3.11.2 (main, Apr  8 2026, 01:58:00) [GCC 12.2.0]",
+  "counts": {
+    "locked": 64,
+    "installed": 64,
+    "missing": 0,
+    "mismatched": 0,
+    "extra": 0
+  },
+  "missing": {},
+  "mismatched": [],
+  "extra": {},
+  "result": "pass"
+}

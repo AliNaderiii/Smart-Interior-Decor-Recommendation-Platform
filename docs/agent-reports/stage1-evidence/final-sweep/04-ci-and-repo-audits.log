@@ -1,0 +1,49 @@
+# Stage 1 final sweep — CI YAML + repo audits
+# Date: 2026-08-26T12:01:18Z
+
+### CI workflow parse + job/step inventory
+YAML parsed OK. jobs: 7
+  backend: 18 steps — Backend — pytest vs Postgres16+pgvector & Redis
+  multi-worker: 5 steps — Multi-worker shared-Redis verification
+  frontend: 10 steps — Frontend — install, lint, typecheck, test, build
+  e2e: 12 steps — E2E — Playwright (auth negatives + three-role journeys)
+  security-scans: 6 steps — Security & docs gates
+  docker: 6 steps — Docker — compose config and image builds
+  lighthouse: 13 steps — Lighthouse CI — performance and accessibility
+
+### remaining un-locked python installs in CI (expect none)
+(none)
+
+### secret & hygiene scan
+
+[FINDINGS]                0
+
+[FORBIDDEN TRACKED PATHS] 0
+
+[OVERSIZED TRACKED FILES] 0
+
+[ACKNOWLEDGED PLACEHOLDERS] 88 (expected, non-failing — see JSON report for the full list)
+
+RESULT: PASS
+
+### docs link / file-reference audit
+audit reports excluded from the file-reference check: 9 (use --include-reports to audit them too)
+
+[BROKEN LINKS] 0
+
+[MISSING FILE REFERENCES] 1
+  CHANGELOG.md:32 -> docs/agent-reports/stage1-report.md
+
+RESULT: FAIL
+
+### static dead-keys audit
+(no findings)
+
+TOTAL: 0 DEAD, 0 PARTIAL, 0 OK-DISABLED
+RESULT: PASS — 0 DEAD
+
+### git status
+ M README.md
+ M integration-request.md
+?? docs/agent-reports/stage1-evidence/final-sweep/
+?? docs/agent-reports/stage1-evidence/spec-delta.md

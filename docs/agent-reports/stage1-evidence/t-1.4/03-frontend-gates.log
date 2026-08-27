@@ -1,0 +1,5 @@
+# T-1.4 — full frontend gate state after T-1.4 (captured 2026-08-26T09:06:01Z)
+- npx vitest run: 53 passed in 7 files (43 from T-1.3 + 10 new: requireAuth x6, loginPage x4)
+- npx tsc -p tsconfig.tests.json (strict over src+tests+config): exit 0
+- npm run lint (oxlint): 12 warnings (pre-existing), 0 errors
+- npm run build: exit 0

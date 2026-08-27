@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { post } from "@/lib/api";
+import { ApiError, post } from "@/lib/api";
 import type { AuthPayload } from "@/lib/types";
 import { useAuthStore } from "@/stores/authStore";
 import { Button, Card, Input } from "@/components/ui";
@@ -34,8 +34,12 @@ export default function LoginPage() {
         : (location.state?.from ?? "/quiz");
       navigate(dest);
     } catch (e: unknown) {
-      const err = e as { response?: { data?: { error?: string } } };
-      setError(err.response?.data?.error ?? "Login failed");
+      // Stage 1 (T-1.4): ApiError carries the server envelope in `.body` and
+      // the server's error string as `.message` (the old code read an
+      // axios-shaped `.response` this fetch-based client never produced, so
+      // users always saw the generic "Login failed" instead of
+      // "Invalid credentials").
+      setError(e instanceof ApiError ? e.message : "Login failed");
     } finally {
       setBusy(false);
     }

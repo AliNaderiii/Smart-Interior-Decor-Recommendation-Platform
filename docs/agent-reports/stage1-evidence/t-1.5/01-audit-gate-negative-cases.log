@@ -1,0 +1,93 @@
+# Stage 1, T-1.5 — dependency audit gate: adversarial / negative cases
+# Date: 2026-08-26T11:44:58Z
+# Proves the gate refuses each failure mode, not just that it passes when clean.
+# Expected exit codes: A=1 B=0 C=1 D=1 E=1 F=1
+
+########## CASE A: vulnerable pin (setuptools 66.1.1), EMPTY allowlist -> expect FAIL(1)
+Dependency audit — 2026-08-26
+  requirements: /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/requirements.lock.txt
+  allowlist:    /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/security/pip-audit-allowlist.yml
+
+Allowlist entries (valid, unexpired): 0
+
+$ /tmp/lockcheck/bin/python -m pip_audit --requirement /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/requirements.lock.txt --format json --progress-spinner off
+pip-audit findings: 5
+  VULNERABLE PYSEC-2025-49  setuptools==66.1.1 -> fix in: 78.1.1
+  VULNERABLE PYSEC-2025-49  setuptools==66.1.1 -> fix in: 78.1.1
+  VULNERABLE PYSEC-2026-1918  setuptools==66.1.1 -> fix in: 70.0.0
+  VULNERABLE PYSEC-2026-3447  setuptools==66.1.1 -> fix in: 83.0.0
+  VULNERABLE PYSEC-2026-3447  setuptools==66.1.1 -> fix in: 83.0.0
+
+FAIL: 5 unsuppressed vulnerability(ies).
+Fix by raising the pin in requirements.lock.txt (preferred), or add an
+expiring, justified entry to security/pip-audit-allowlist.yml.
+EXIT_A=1
+
+########## CASE B: same finding, VALID unexpired allowlist -> expect PASS(0)
+Dependency audit — 2026-08-26
+  requirements: /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/requirements.lock.txt
+  allowlist:    /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/security/pip-audit-allowlist.yml
+
+Allowlist entries (valid, unexpired): 3
+  - PYSEC-2025-49 / setuptools: expires 2026-10-01 (36d) — owner probe
+  - PYSEC-2026-1918 / setuptools: expires 2026-10-01 (36d) — owner probe
+  - PYSEC-2026-3447 / setuptools: expires 2026-10-01 (36d) — owner probe
+
+$ /tmp/lockcheck/bin/python -m pip_audit --requirement /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/requirements.lock.txt --format json --progress-spinner off
+pip-audit findings: 5
+  ACCEPTED  PYSEC-2025-49  setuptools==66.1.1 (expires 2026-10-01, owner probe)
+  ACCEPTED  PYSEC-2025-49  setuptools==66.1.1 (expires 2026-10-01, owner probe)
+  ACCEPTED  PYSEC-2026-1918  setuptools==66.1.1 (expires 2026-10-01, owner probe)
+  ACCEPTED  PYSEC-2026-3447  setuptools==66.1.1 (expires 2026-10-01, owner probe)
+  ACCEPTED  PYSEC-2026-3447  setuptools==66.1.1 (expires 2026-10-01, owner probe)
+
+PASS: no unsuppressed vulnerabilities in the locked dependency set.
+EXIT_B=0
+
+########## CASE C: EXPIRED allowlist entry (expires 2026-08-01 < today) -> expect FAIL(1)
+ALLOWLIST INVALID:
+pip-audit-allowlist.yml[0]: acceptance of PYSEC-2025-49 (setuptools) EXPIRED on 2026-08-01 — fix the dependency or re-justify with a new expiry
+pip-audit-allowlist.yml[1]: acceptance of PYSEC-2026-1918 (setuptools) EXPIRED on 2026-08-01 — fix the dependency or re-justify with a new expiry
+pip-audit-allowlist.yml[2]: acceptance of PYSEC-2026-3447 (setuptools) EXPIRED on 2026-08-01 — fix the dependency or re-justify with a new expiry
+Dependency audit — 2026-08-26
+  requirements: /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/requirements.lock.txt
+  allowlist:    /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/security/pip-audit-allowlist.yml
+
+EXIT_C=1
+
+########## CASE D: expiry beyond the 180-day ceiling -> expect FAIL(1)
+ALLOWLIST INVALID:
+pip-audit-allowlist.yml[0]: 'expires' 2028-01-01 is more than 180 days out (max 2027-02-22) — acceptances must be revisited
+pip-audit-allowlist.yml[1]: 'expires' 2028-01-01 is more than 180 days out (max 2027-02-22) — acceptances must be revisited
+pip-audit-allowlist.yml[2]: 'expires' 2028-01-01 is more than 180 days out (max 2027-02-22) — acceptances must be revisited
+Dependency audit — 2026-08-26
+  requirements: /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/requirements.lock.txt
+  allowlist:    /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/security/pip-audit-allowlist.yml
+
+EXIT_D=1
+
+########## CASE E: entry missing required fields (reason, owner) -> expect FAIL(1)
+ALLOWLIST INVALID:
+pip-audit-allowlist.yml[0]: missing required field(s): reason, owner
+Dependency audit — 2026-08-26
+  requirements: /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/requirements.lock.txt
+  allowlist:    /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/security/pip-audit-allowlist.yml
+
+EXIT_E=1
+
+########## CASE F: clean lock + STALE entry under --strict-stale -> expect FAIL(1)
+Dependency audit — 2026-08-26
+  requirements: /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/requirements.lock.txt
+  allowlist:    /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/security/pip-audit-allowlist.yml
+
+Allowlist entries (valid, unexpired): 1
+  - PYSEC-2025-49 / setuptools: expires 2026-10-01 (36d) — owner probe
+
+$ /tmp/lockcheck/bin/python -m pip_audit --requirement /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/requirements.lock.txt --format json --progress-spinner off
+pip-audit findings: 0
+
+STALE allowlist entries (no matching finding — remove them):
+  - PYSEC-2025-49 / setuptools
+
+FAIL: 1 stale allowlist entry(ies) under --strict-stale.
+EXIT_F=1

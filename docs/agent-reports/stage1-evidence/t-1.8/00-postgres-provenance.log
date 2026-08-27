@@ -1,0 +1,18 @@
+# T-1.8 — local PostgreSQL provenance (how the PG evidence was produced)
+# Date: 2026-08-26T13:27:20Z
+
+## Server
+PostgreSQL 16.2 on x86_64-pc-linux-gnu, compiled by gcc (GCC) 10.2.1 20210130 (Red Hat 10.2.1-11), 64-bit
+pgvector extension available: [('vector', '0.6.2')]
+default isolation: read committed
+
+## Provisioning
+pgserver 0.1.4 (pip), data dir /tmp/pgdata_race, unix socket.
+Databases decor_test + decor_pgvector_test, alembic upgrade head, CI env vars.
+NOTE: a throwaway local server, NOT the CI service container. It is the same
+major version (16) with pgvector, and it reproduces the READ COMMITTED
+semantics that caused the CI failure — see 03-negative-control.log.
+
+## Not covered locally
+Redis-gated tests still skip (13 skips vs 22 on SQLite); the CI job also runs
+the migration round-trip and the no-skips real-services gate.

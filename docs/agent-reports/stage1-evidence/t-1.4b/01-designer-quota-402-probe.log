@@ -1,0 +1,13 @@
+# T-1.4 close-out: designer quota 402 protocol probe (live app, seeded designer)
+# Date: 2026-08-26T11:35:28Z
+# Proves the backend emits the Persian 402 the journey spec asserts on.
+
+--- create #1
+{"success":false,"data":null,"error":"سهمیهٔ پروژه‌های شما در پلن «طراح - رایگان» به پایان رسیده است (حداکثر 2 پروژه). برای ایجاد پروژه‌های بیشتر، اشتراک خود را ارتقا دهید."}
+HTTP=402
+--- create #2
+{"success":false,"data":null,"error":"سهمیهٔ پروژه‌های شما در پلن «طراح - رایگان» به پایان رسیده است (حداکثر 2 پروژه). برای ایجاد پروژه‌های بیشتر، اشتراک خود را ارتقا دهید."}
+HTTP=402
+--- create #3
+{"success":false,"data":null,"error":"سهمیهٔ پروژه‌های شما در پلن «طراح - رایگان» به پایان رسیده است (حداکثر 2 پروژه). برای ایجاد پروژه‌های بیشتر، اشتراک خود را ارتقا دهید."}
+HTTP=402

@@ -1,0 +1,9 @@
+== stage1 evidence: baseline environment ==
+Wed Aug 26 07:32:25 UTC 2026
+branch: arena/01a03cf5-smart-interior-decor-recommend @ 91cc6fe9da603c1c765e1d767d7ccbbf51fc39b8
+?? docs/agent-reports/stage1-evidence/
+Python 3.11.2
+v22.22.3
+10.9.8
+Python 3.11.2
+pip 26.2.1 from /home/user/venv-stage1/lib/python3.11/site-packages/pip (python 3.11)

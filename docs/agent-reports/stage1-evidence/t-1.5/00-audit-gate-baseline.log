@@ -1,0 +1,17 @@
+# Stage 1, T-1.5 — dependency audit gate behavioural proof
+# Date: 2026-08-26T11:44:33Z
+# Each case mutates requirements.lock.txt / the allowlist, runs the gate, and restores.
+# Expected: A=1 B=0 C=1 D=1 E=1 F=1  (0 = pass, 1 = gate correctly refused)
+
+### baseline: clean lock, empty allowlist
+Dependency audit — 2026-08-26
+  requirements: /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/requirements.lock.txt
+  allowlist:    /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/security/pip-audit-allowlist.yml
+
+Allowlist entries (valid, unexpired): 0
+
+$ /tmp/lockcheck/bin/python -m pip_audit --requirement /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/requirements.lock.txt --format json --progress-spinner off
+pip-audit findings: 0
+
+PASS: no unsuppressed vulnerabilities in the locked dependency set.
+EXIT_BASELINE=0

@@ -1,0 +1,28 @@
+# Stage 1, T-1.6 — RELEASE_CHECKLIST re-audit probes at HEAD
+# Date: 2026-08-26T11:51:40Z
+# HEAD: d2c63469a5740fd5a0eda4e08dc39591e844daeb
+
+=== A: secret scan ===
+[OVERSIZED TRACKED FILES] 0
+
+[ACKNOWLEDGED PLACEHOLDERS] 88 (expected, non-failing — see JSON report for the full list)
+
+RESULT: FAIL
+EXIT=0
+
+=== A: forbidden tracked paths ===
+(none)
+
+=== A: oversized tracked files (>2MiB) ===
+(scan done)
+
+=== A: files ignored-but-tracked ===
+(empty)
+
+=== B: docs link audit ===
+[BROKEN LINKS] 0
+
+[MISSING FILE REFERENCES] 0
+
+RESULT: PASS
+EXIT=0

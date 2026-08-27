@@ -1,0 +1,24 @@
+Recommender scenario harness — environment: SQLite + hash embeddings, cache off
+Weight profile: current (weights {"style": 0.3, "color": 0.3, "budget": 0.2, "material": 0.15, "pattern": 0.05})
+AI stack: "2026-08-26.1" | review gate auto-accept threshold: 0.8 | max_results: 5
+------------------------------------------------------------------------------
+[ PASS] 01 default_quiz_results        7 categories
+[ PASS] 02 hard_budget_filter          26 prices within window
+[ PASS] 03 impossible_budget           all 7 categories reported empty in meta
+[ PASS] 04 no_padding_out_of_budget    no out-of-budget items
+[ PASS] 05 deterministic_order         identical ordering across runs
+[ PASS] 06 deterministic_score_ties    ties resolved by stable product id
+[ PASS] 07 style_pref_ranks_first      boho top in 7/7 categories
+[ PASS] 08 explanation_fidelity        35 explanations match score components
+[ PASS] 09 matched_materials_real      28 matched_materials entries verified against real products
+[ PASS] 10 duplicate_suppression       2/6 near-duplicates kept (suppression active)
+[ PASS] 11 style_cap_diversity         4/4 same-style cap respected
+[ PASS] 12 unverified_excluded         unverified product excluded
+[ PASS] 13 empty_category_reported     'decor' reported in meta.empty_categories
+[ PASS] 14 few_results_no_padding      single candidate returned as-is (no padding)
+[ PASS] 15 feedback_changes_order      thumbs-down demoted below un-rated items
+[ PASS] 16 weights_versioned_and_valid weights sum to 1; profile=current; weights_version=2026-08-26.1; recommender=2026-08-26.1
+[ PASS] 17 embeddings_dim_and_norm     100 embeddings are 512-d and unit-norm
+[ PASS] 18 unknown_pattern_rejected    unknown pattern rejected at schema boundary
+------------------------------------------------------------------------------
+18/18 scenarios passed

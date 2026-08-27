@@ -1,0 +1,109 @@
+# Stage 1, T-1.5 — locked-install proof (the CI 'pip freeze diff' artifact)
+# Date: 2026-08-26T11:46:46Z
+# Venv: /tmp/pristine, built with ONLY: pip install -r requirements.lock.txt
+# Expected exit codes: 1=0(pass) 2=1(drift) 3=1(strict-extra) 4=0(extra tolerated)
+
+########## CASE 1: pristine locked venv -> expect PASS(0), zero drift
+========================================================================
+Locked-dependency install verification
+  lockfile:  /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/requirements.lock.txt
+  python:    3.11.2 (/tmp/pristine/bin/python)
+  timestamp: 2026-08-26T11:46:47.353072+00:00
+========================================================================
+packages pinned in lockfile: 64
+packages resolved in env:    64
+
+--- requirements.lock.txt (pinned)
++++ pip freeze (resolved)
+(no differences)
+
+MISSING:  0
+MISMATCH: 0
+EXTRA:    0 (tolerated unless --strict-extra)
+
+report written to /tmp/pristine-lockver.json
+
+PASS: the installed environment matches requirements.lock.txt.
+EXIT_1=0
+
+########## CASE 2: same venv, one package deliberately downgraded -> expect FAIL(1)
+========================================================================
+Locked-dependency install verification
+  lockfile:  /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/requirements.lock.txt
+  python:    3.11.2 (/tmp/pristine/bin/python)
+  timestamp: 2026-08-26T11:46:48.204702+00:00
+========================================================================
+packages pinned in lockfile: 64
+packages resolved in env:    64
+
+--- requirements.lock.txt (pinned)
++++ pip freeze (resolved)
+- orjson==3.12.0      # MISMATCH: lockfile
++ orjson==3.11.0      # MISMATCH: installed
+
+MISSING:  0
+MISMATCH: 1
+EXTRA:    0 (tolerated unless --strict-extra)
+
+FAIL: the installed environment does not match the lockfile.
+EXIT_2=1
+
+########## CASE 3: extra tooling installed, --strict-extra -> expect FAIL(1)
+========================================================================
+Locked-dependency install verification
+  lockfile:  /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/requirements.lock.txt
+  python:    3.11.2 (/tmp/pristine/bin/python)
+  timestamp: 2026-08-26T11:46:49.847913+00:00
+========================================================================
+packages pinned in lockfile: 64
+packages resolved in env:    65
+
+--- requirements.lock.txt (pinned)
++++ pip freeze (resolved)
++ ruff==0.16.4      # EXTRA: installed, not in lockfile
+
+MISSING:  0
+MISMATCH: 0
+EXTRA:    1 (tolerated unless --strict-extra)
+
+FAIL: the installed environment does not match the lockfile.
+EXIT_3=1
+
+########## CASE 4: same venv, tooling explicitly tolerated -> expect PASS(0)
+========================================================================
+Locked-dependency install verification
+  lockfile:  /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/requirements.lock.txt
+  python:    3.11.2 (/tmp/pristine/bin/python)
+  timestamp: 2026-08-26T11:46:50.096639+00:00
+========================================================================
+packages pinned in lockfile: 64
+packages resolved in env:    65
+
+--- requirements.lock.txt (pinned)
++++ pip freeze (resolved)
+(no differences)
+
+MISSING:  0
+MISMATCH: 0
+EXTRA:    0 (tolerated unless --strict-extra)
+
+PASS: the installed environment matches requirements.lock.txt.
+EXIT_4=0
+
+########## JSON artifact produced in CASE 1
+{
+  "timestamp": "2026-08-26T11:46:47.353111+00:00",
+  "lockfile": "/home/user/Smart-Interior-Decor-Recommendation-Platform/backend/requirements.lock.txt",
+  "python": "3.11.2 (main, Apr  8 2026, 01:58:00) [GCC 12.2.0]",
+  "counts": {
+    "locked": 64,
+    "installed": 64,
+    "missing": 0,
+    "mismatched": 0,
+    "extra": 0
+  },
+  "missing": {},
+  "mismatched": [],
+  "extra": {},
+  "result": "pass"
+}

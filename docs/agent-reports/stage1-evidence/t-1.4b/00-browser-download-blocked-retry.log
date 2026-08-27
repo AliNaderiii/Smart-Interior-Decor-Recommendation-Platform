@@ -1,0 +1,70 @@
+# Stage 1 T-1.4 close-out: Playwright browser download re-attempt
+# Date: 2026-08-26T11:33:15Z  (sandbox was reset since the first attempt)
+# Command: npx playwright install chromium
+
+Downloading Chrome for Testing 151.0.7922.34 (playwright chromium v1234) from https://cdn.playwright.dev/builds/cft/151.0.7922.34/linux64/chrome-linux64.zip
+Error: Client network socket disconnected before secure TLS connection was established
+    at TLSSocket.onConnectEnd (node:internal/tls/wrap:1754:19)
+    at TLSSocket.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21) {
+  code: 'ECONNRESET',
+  path: null,
+  host: '150.171.110.146',
+  port: 443,
+  localAddress: undefined
+}
+Downloading Chrome for Testing 151.0.7922.34 (playwright chromium v1234) from https://cdn.playwright.dev/builds/cft/151.0.7922.34/linux64/chrome-linux64.zip
+Error: Client network socket disconnected before secure TLS connection was established
+    at TLSSocket.onConnectEnd (node:internal/tls/wrap:1754:19)
+    at TLSSocket.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21) {
+  code: 'ECONNRESET',
+  path: null,
+  host: '150.171.110.146',
+  port: 443,
+  localAddress: undefined
+}
+Downloading Chrome for Testing 151.0.7922.34 (playwright chromium v1234) from https://cdn.playwright.dev/builds/cft/151.0.7922.34/linux64/chrome-linux64.zip
+Error: Client network socket disconnected before secure TLS connection was established
+    at TLSSocket.onConnectEnd (node:internal/tls/wrap:1754:19)
+    at TLSSocket.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21) {
+  code: 'ECONNRESET',
+  path: null,
+  host: '150.171.110.146',
+  port: 443,
+  localAddress: undefined
+}
+Downloading Chrome for Testing 151.0.7922.34 (playwright chromium v1234) from https://cdn.playwright.dev/builds/cft/151.0.7922.34/linux64/chrome-linux64.zip
+Error: Client network socket disconnected before secure TLS connection was established
+    at TLSSocket.onConnectEnd (node:internal/tls/wrap:1754:19)
+    at TLSSocket.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21) {
+  code: 'ECONNRESET',
+  path: null,
+  host: '150.171.110.146',
+  port: 443,
+  localAddress: undefined
+}
+Downloading Chrome for Testing 151.0.7922.34 (playwright chromium v1234) from https://cdn.playwright.dev/builds/cft/151.0.7922.34/linux64/chrome-linux64.zip
+Error: Client network socket disconnected before secure TLS connection was established
+    at TLSSocket.onConnectEnd (node:internal/tls/wrap:1754:19)
+    at TLSSocket.emit (node:events:531:35)
+    at endReadableNT (node:internal/streams/readable:1698:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:89:21) {
+  code: 'ECONNRESET',
+  path: null,
+  host: '13.107.253.70',
+  port: 443,
+  localAddress: undefined
+}
+Failed to install browsers
+Error: Failed to download Chrome for Testing 151.0.7922.34 (playwright chromium v1234), caused by
+Error: Download failure, code=1
+    at ChildProcess.<anonymous> (/home/user/Smart-Interior-Decor-Recommendation-Platform/frontend/node_modules/playwright-core/lib/coreBundle.js:32015:32)
+    at ChildProcess.emit (node:events:519:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:293:12)

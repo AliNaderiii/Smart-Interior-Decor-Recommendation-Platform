@@ -1,0 +1,60 @@
+# Stage 1, T-1.6 — RELEASE_CHECKLIST re-audit probes at HEAD (rerun after JWT redaction)
+# Date: 2026-08-26T11:52:16Z
+# HEAD: d2c63469a5740fd5a0eda4e08dc39591e844daeb
+
+=== A: secret scan ===
+
+[FINDINGS]                0
+
+[FORBIDDEN TRACKED PATHS] 0
+
+[OVERSIZED TRACKED FILES] 0
+
+[ACKNOWLEDGED PLACEHOLDERS] 88 (expected, non-failing — see JSON report for the full list)
+
+RESULT: PASS
+
+=== A: forbidden tracked paths ===
+(none)
+
+=== A: ignored-but-tracked ===
+(empty)
+
+=== B: docs link + file-reference audit ===
+external links (not fetched): 6
+audit reports excluded from the file-reference check: 9 (use --include-reports to audit them too)
+
+[BROKEN LINKS] 0
+
+[MISSING FILE REFERENCES] 0
+
+RESULT: PASS
+
+=== C: backend lint ===
+All checks passed!
+RUFF_EXIT=0
+
+=== C: backend lint incl. tests (CI runs this) ===
+All checks passed!
+RUFF_TESTS_EXIT=0
+
+=== C: python deps pinned? ===
+requirements.lock.txt pins: 64
+
+=== E: npm audit ===
+found 0 vulnerabilities
+
+=== E: pip-audit on the locked set ===
+$ /tmp/lockcheck/bin/python -m pip_audit --requirement /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/requirements.lock.txt --format json --progress-spinner off
+pip-audit findings: 0
+
+PASS: no unsuppressed vulnerabilities in the locked dependency set.
+
+=== H: CI workflow parses ===
+jobs: ['backend', 'multi-worker', 'frontend', 'e2e', 'security-scans', 'docker', 'lighthouse']
+
+=== D: static dead-keys audit ===
+(no findings)
+
+TOTAL: 0 DEAD, 0 PARTIAL, 0 OK-DISABLED
+RESULT: PASS — 0 DEAD

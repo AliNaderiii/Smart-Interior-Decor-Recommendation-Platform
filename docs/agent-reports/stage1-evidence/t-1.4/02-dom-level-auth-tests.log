@@ -1,0 +1,4 @@
+ ✓ tests/unit/loginPage.test.tsx (4 tests) 671ms
+ ✓ tests/unit/requireAuth.test.tsx (6 tests) 64ms
+ Test Files  2 passed (2)
+      Tests  10 passed (10)

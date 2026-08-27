@@ -1,0 +1,20 @@
+# T-1.8 — full backend suite vs REAL PostgreSQL 16.2, CI-equivalent configuration
+# Date: 2026-08-26T13:23:23Z
+#
+# Replicates the CI 'backend' job locally with a pip-installed PostgreSQL 16.2
+# (pgserver 0.1.4), FRESH databases + alembic upgrade head, CI env vars:
+#   DATABASE_URL      -> decor_test
+#   TEST_DATABASE_URL -> decor_pgvector_test
+#   AI_PROVIDER=mock EMBEDDING_BACKEND=hash APP_ENV=test SEED_DEMO_ACCOUNTS=true
+# Command: pytest tests/ --tb=short
+
+........................................................................ [ 12%]
+........................................................................ [ 25%]
+........................................................................ [ 37%]
+........................................................................ [ 50%]
+........................................................................ [ 63%]
+..........................................sssss......................sss [ 75%]
+sssss................................................................... [ 88%]
+...................................................................      [100%]
+558 passed, 13 skipped in 86.50s (0:01:26)
+PYTEST_EXIT=0

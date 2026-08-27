@@ -60,7 +60,10 @@ class TestSingleFlight:
 
         calls: list[float] = []
 
-        def slow_compute(db, quiz, categories, feedback=None):
+        def slow_compute(db, quiz, categories, feedback=None, **kw):
+            # Stage 1 (T-1.2): _compute gained weight-profile parameters
+            # (weights, profile_name) — the single-flight behaviour under test
+            # is profile-agnostic, so absorb them.
             calls.append(time.perf_counter())
             time.sleep(0.2)  # stand in for five pgvector searches
             return {"categories": {"sofa": []}, "cached": False}
@@ -110,7 +113,7 @@ class TestSingleFlight:
             def setex(self, k, ttl, v):
                 store[k] = v
 
-        monkeypatch.setattr(rec, "_compute", lambda db, q, c, f=None: {"categories": {}, "cached": False})
+        monkeypatch.setattr(rec, "_compute", lambda db, q, c, f=None, **kw: {"categories": {}, "cached": False})
         monkeypatch.setattr(rec, "get_redis", lambda: FakeRedis())
         monkeypatch.setattr(rec, "load_feedback", lambda db, uid: {})
         rec._INFLIGHT.clear()
@@ -122,7 +125,7 @@ class TestSingleFlight:
 
         seen = []
         monkeypatch.setattr(
-            rec, "_compute", lambda db, q, c, f=None: seen.append(1) or {"categories": {}, "cached": False}
+            rec, "_compute", lambda db, q, c, f=None, **kw: seen.append(1) or {"categories": {}, "cached": False}
         )
         monkeypatch.setattr(rec, "get_redis", lambda: None)
         monkeypatch.setattr(rec, "load_feedback", lambda db, uid: {})

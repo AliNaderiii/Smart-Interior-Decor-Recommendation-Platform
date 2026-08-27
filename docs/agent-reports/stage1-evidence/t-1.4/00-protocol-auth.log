@@ -1,0 +1,22 @@
+# T-1.4 — protocol-level auth evidence (transport twin of tests/e2e/auth-negative.spec.ts)
+Captured 2026-08-26T09:05:41Z against the RUNNING app:
+  backend: uvicorn app.main:app :8000 (sqlite /tmp/e2e_decor.sqlite3, SEED_DEMO_ACCOUNTS=true, COOKIE_SECURE=false, USE_COOKIE_AUTH default=true)
+  frontend: vite dev :5173 (proxy /api -> :8000)
+
+command: node /tmp/protocol-harness.mjs  (source preserved in 05-protocol-harness.mjs)
+PASS  valid login -> 200  — status=200
+PASS  envelope {success,data,error} + user
+PASS  httpOnly access_token cookie issued  — access_token=<JWT-REDACTED: header.payload.signature, 3 dot-separated base64url segments>, refresh_token=<JWT-REDACTED: header.payload.signature, 3 dot-separated base64url segments>, csrf_token=AKSAjpWlgW7NPeKHsvMWBI4wOCU2w7mHVetFN4Q-Qv8
+PASS  httpOnly refresh_token cookie issued
+PASS  readable csrf_token cookie issued (double-submit)
+PASS  cookies are httpOnly+SameSite=Strict
+PASS  no redirect on login (no Location header)  — location=null
+PASS  XSS-payload login -> 401  — status=401
+PASS  generic error, no reflection of the payload  — {"success":false,"data":null,"error":"Invalid credentials"}
+PASS  no credential cookies on failed login  — (none)
+PASS  no redirect (no Location header)
+PASS  wrong password -> 401 + generic message  — status=401 error=Invalid credentials
+PASS  no credentials issued on wrong password  — (none)
+PASS  anonymous GET /admin/users -> 401 (no admin data)  — status=401
+
+14/14 protocol checks passed

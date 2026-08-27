@@ -5,11 +5,17 @@ moodboards, a 2D floorplan preview, validated shopping lists, a designer (B2B2C)
 portal, an admin portal with human-in-the-loop AI feature extraction, and a
 Zarinpal-based Pro paywall. **MVP scope: living_room only.**
 
-> **Release baseline.** This tree was audited at commit `f97bfad` on 2026-08-21.
-> Verified-at-HEAD: backend 97/97 tests, frontend strict build, secret scan clean.
-> Not verified at HEAD: Postgres+pgvector parity, real-model AI accuracy, seller-link
-> liveness, Lighthouse. Read [`docs/RELEASE_BASELINE.md`](docs/RELEASE_BASELINE.md)
-> before quoting any number from this repository to a client.
+> **Release baseline.** The tree was first audited at commit `f97bfad` on
+> 2026-08-21 ([`docs/RELEASE_BASELINE.md`](docs/RELEASE_BASELINE.md)) and
+> re-audited at the Stage-1 HEAD on 2026-08-26
+> ([`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)).
+> Verified at the Stage-1 HEAD: backend **549 passed / 22 skipped**, frontend
+> **58** unit tests, strict build and lint clean, secret scan clean, dependency
+> audit clean on the locked set.
+> Not verified at HEAD: Postgres+pgvector parity and real-Redis runs (CI only),
+> Playwright E2E execution (CI only — blocker IR-S1-001), real-model AI
+> accuracy, seller-link liveness, Lighthouse. Read the checklist before quoting
+> any number from this repository to a client.
 
 ## Stack
 
@@ -64,7 +70,8 @@ the separate no-Docker path documented under *Local development*.)
 
 Postgres parity was demonstrated on **2026-08-19 at commit `a847ad5`**, when the
 suite contained 45 tests (`docs/reports/postgres_parity.md`). The suite has since
-grown to **97 tests** and that Postgres run has **not** been repeated — the
+grown to **571 collected** (549 passed / 22 skipped at the Stage-1 HEAD) and
+that Postgres run has **not** been repeated locally — the
 baseline audit environment has no Docker or PostgreSQL binary. Treat Postgres
 parity as *previously evidenced, currently unverified at HEAD*; re-run it before
 release:
@@ -98,39 +105,101 @@ npm run dev
 
 ## Tests & acceptance gates
 
-Counts below were measured at commit `f97bfad` on 2026-08-21 — see
-[`docs/RELEASE_BASELINE.md`](docs/RELEASE_BASELINE.md) for the full evidence trail.
+Counts below were measured at the Stage-1 HEAD on 2026-08-26; raw logs live in
+[`docs/agent-reports/stage1-evidence/final-sweep/`](docs/agent-reports/stage1-evidence/final-sweep/).
+See [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md) for the full gate
+status and [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md) for the dependency
+policy.
+
+### Backend
 
 ```bash
 cd backend
-pytest tests/ -v                          # 97 passed (see breakdown below)
+pip install -r requirements.lock.txt      # the lockfile is the contract, not requirements.txt
+pytest                                    # 549 passed, 22 skipped (SQLite + fakeredis + mock AI)
+ruff check app ai scripts tests           # 0 errors
+
+python scripts/verify_lock_install.py     # installed env == requirements.lock.txt
+python scripts/audit_dependencies.py      # pip-audit the LOCKED set + expiring allowlist
 python scripts/evaluate_extraction.py     # 50-image benchmark, >=80% required — MOCK mode, 100%
-python -m ai.embedding_service            # backend=hash dim=512, load+embed <10s sanity check
+python scripts/evaluate_recommender.py --compare-profiles   # weight-profile comparison (C-6)
+python -m ai.embedding_service            # backend=hash dim=512 sanity check
+```
 
-cd ../frontend
-npm run build                             # tsc strict + vite, 0 errors
-npm run lint                              # oxlint — 0 errors, 12 warnings at f97bfad
+The 22 skips are the PostgreSQL- and real-Redis-gated tests, which run in the
+CI `backend` job against Postgres 16 + pgvector.
 
-python ../scripts/audit_docs_links.py     # documentation link / file-reference audit
-python ../scripts/audit_secrets.py        # tracked-file secret & hygiene scan
-python ../scripts/check_links.py          # seller links must answer 200 — needs public internet egress
+### Frontend
+
+```bash
+cd frontend
+npm ci                                    # not npm install: package-lock.json is the lock of record
+
+npm test                                  # Vitest + Testing Library — 58 tests, 8 files
+npm run lint                              # oxlint — 0 errors, 12 warnings
+npm run build                             # tsc strict + vite — 0 errors
+npx tsc -p tsconfig.tests.json            # type-check the test suites too (tsconfig.app.json covers only src/)
+```
+
+### End-to-end (Playwright)
+
+The browser is a separate download and is **not** installed by `npm ci`:
+
+```bash
+cd frontend
+npx playwright install chromium           # first run only (~150 MB, cached outside the repo)
+
+# The suite expects the app to be running: backend on :8000, vite on :5173.
+npm run e2e                               # 29 tests, 6 files, 4 role-scoped projects
+npm run e2e -- --project=chromium-homeowner   # one role only
+```
+
+PowerShell (Windows):
+
+```powershell
+cd frontend
+npm ci
+npx playwright install chromium           # `--with-deps` is Linux-only; omit it here
+
+$env:E2E_BASE_URL = "http://localhost:5173"
+npm run e2e
+```
+
+`globalSetup` logs in through the real UI as the seeded demo accounts and saves
+one `storageState` per role, so the journey specs start authenticated. That
+requires the backend to have been seeded with `SEED_DEMO_ACCOUNTS=true`
+(never possible in production — see `docs/security/DEMO_ACCOUNTS.md`).
+
+> **Known blocker (IR-S1-001).** Some sandboxes cannot reach
+> `cdn.playwright.dev` (TLS `ECONNRESET`), so the browser cannot be downloaded
+> and the suite cannot run locally there. It runs in the CI `e2e` job. See
+> `docs/DEPENDENCIES.md` §7.
+
+### Repository-wide audits
+
+```bash
+python scripts/audit_docs_links.py        # documentation link / file-reference audit
+python scripts/audit_secrets.py           # tracked-file secret & hygiene scan
+python scripts/check_links.py             # seller links must answer 200 — needs public internet egress
+npx tsx scripts/auditDeadKeys.ts          # every interactive control must do something
 npx lighthouse http://localhost:4173/ --view   # >=80 target (npm run preview first) — needs Chrome
 ```
 
-| Test file | Tests |
-|---|---:|
-| `backend/tests/test_recommender.py` | 30 |
-| `backend/tests/test_security_v2.py` | 26 (22 functions, 4 parametrised) |
-| `backend/tests/test_feedback_v2.py` | 16 |
-| `backend/tests/test_auth.py` | 13 |
-| `backend/tests/test_perf_v2.py` | 10 |
-| `backend/tests/test_rate_limit.py` | 2 |
-| **Total** | **97** |
+### Test breakdown
 
-Measured against the SQLite + fakeredis dev fallback. The frontend has no unit
-test runner at this commit; `frontend/tests/e2e/deadKeys.spec.ts` is a Playwright
-spec and `package.json` exposes no `test` script — see
-[`docs/RELEASE_BASELINE.md`](docs/RELEASE_BASELINE.md) §7 (B-4).
+| Suite | Tests |
+|---|---:|
+| `backend/tests/` (full suite) | **571 collected** — 549 passed, 22 skipped |
+| ↳ `test_recommender.py` | 30 (spec floor: ≥28) |
+| ↳ `test_security_v2.py` | 26 |
+| ↳ `test_feedback_v2.py` | 16 |
+| ↳ `test_auth.py` | 13 |
+| ↳ `test_projects_quota.py` | 13 (designer quota, Stage 1) |
+| ↳ `test_weights_profiles.py` | 13 (weight profiles, Stage 1) |
+| ↳ `test_perf_v2.py` | 10 |
+| ↳ `test_rate_limit.py` | 2 |
+| `frontend/tests/unit/` (Vitest) | **58** across 8 files |
+| `frontend/tests/e2e/` (Playwright) | **29** across 6 files — CI only |
 
 ## Repository layout
 
@@ -146,15 +215,19 @@ backend/
   alembic/           migrations (pgvector extension + HNSW index)
   scripts/           seed_products.py · load_realistic_products.py · evaluate_extraction.py
                      seed_perf_products.py · dev_postgres.py
-  tests/             test_recommender.py (30) · test_security_v2.py (26) · test_feedback_v2.py (16)
-                     test_auth.py (13) · test_perf_v2.py (10) · test_rate_limit.py (2)
+  tests/             571 collected — test_recommender.py (30) · test_security_v2.py (26)
+                     test_feedback_v2.py (16) · test_auth.py (13) · test_projects_quota.py (13)
+                     test_weights_profiles.py (13) · test_perf_v2.py (10) · test_rate_limit.py (2)
                      benchmark_50_images.json
+  security/          pip-audit-allowlist.yml (expiring, justified CVE acceptances)
 frontend/
   src/pages/         quiz · recommendations · moodboards · floorplan · shopping-list
                      upgrade · share · designer/* · admin/*
   src/stores/        authStore · quizStore · moodboardStore (Zustand)
   src/lib/           api (fetch + JWT refresh + CSRF double-submit) · constants (i18n-ready) · types
-  tests/e2e/         deadKeys.spec.ts (Playwright; no `npm test` script wired yet)
+  tests/unit/        Vitest + Testing Library — 58 tests, 8 files (`npm test`)
+  tests/e2e/         Playwright — 29 tests, 6 files (`npm run e2e`): deadKeys · auth-negative
+                     auth-smoke · journey-homeowner · journey-designer · journey-admin
 datasets/            products_realistic*.json · style_taxonomy · questionnaire · subscription_plans
 docs/                RELEASE_BASELINE · RELEASE_CHECKLIST · ROLLBACK_AND_VERSIONING · REPRODUCIBILITY
                      ARCHITECTURE · DESIGN_SYSTEM · DEPLOYMENT · API · WALKTHROUGH
