@@ -57,13 +57,33 @@ def build_csp(cfg=None) -> str:
     deployment guide (IR-005). ``https://images.unsplash.com`` stays because the
     committed demo catalog references it; it is a documented demo dependency,
     not a production requirement.
+
+    Stage 2 (T-2.4, B-11): this function is the SINGLE SOURCE OF TRUTH for the
+    CSP. The Caddyfile carries a byte-identical copy for defence in depth;
+    ``tests/test_csp_alignment.py`` fails whenever the two drift, and
+    ``scripts/print_csp.py`` regenerates the proxy copy after a config change.
+    Image origins come from, in order: ``S3_PUBLIC_BASE_URL``, ``S3_ENDPOINT``
+    (plus its ``https://*.host`` variant for virtual-hosted buckets),
+    ``IMAGE_CDN_BASE_URL`` and ``IMAGE_EXTRA_ORIGINS``.
     """
     cfg = cfg or settings
     img_sources = ["'self'", "data:", "blob:", "https://images.unsplash.com"]
-    for candidate in (cfg.S3_PUBLIC_BASE_URL, cfg.S3_ENDPOINT):
-        origin = _origin_of(candidate)
+
+    def _add(origin: str) -> None:
         if origin and origin not in img_sources:
             img_sources.append(origin)
+
+    _add(_origin_of(cfg.S3_PUBLIC_BASE_URL))
+    endpoint_origin = _origin_of(cfg.S3_ENDPOINT)
+    _add(endpoint_origin)
+    if endpoint_origin:
+        # Virtual-hosted buckets resolve as <bucket>.<endpoint-host>; the
+        # Caddyfile always allowed that pattern, the app copy did not (B-11).
+        scheme, _, host = endpoint_origin.partition("://")
+        _add(f"{scheme}://*.{host}")
+    _add(_origin_of(getattr(cfg, "IMAGE_CDN_BASE_URL", "")))
+    for extra in (getattr(cfg, "IMAGE_EXTRA_ORIGINS", "") or "").split(","):
+        _add(_origin_of(extra.strip()))
 
     directives = [
         "default-src 'self'",

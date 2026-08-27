@@ -106,6 +106,40 @@ The default Docker seed now loads `backend/seed_data/products_realistic_150.json
    python backend/scripts/seed_products.py --real-embeddings
    ```
 3. Configure Arvan/Liara/AWS with `STORAGE_BACKEND=s3` and `S3_*`; use licensed product images and a CDN base URL.
+
+### Product-image hosts & CSP (Stage 2, T-2.4 — closes B-11)
+
+The Content-Security-Policy's `img-src` decides which image hosts the browser
+will render. **`build_csp()` in `backend/app/core/security_headers.py` is the
+single source of truth**; the Caddyfile carries a generated, byte-identical
+copy for defence in depth, and `backend/tests/test_csp_alignment.py` fails CI
+whenever the two drift (the test also proves every committed catalog
+`image_url` origin is allowed — so a catalog/CDN change that would blank the
+product images fails before it deploys).
+
+Image origins are derived from, in order:
+
+| Setting | Contributes to `img-src` |
+|---|---|
+| `S3_PUBLIC_BASE_URL` | its origin |
+| `S3_ENDPOINT` | its origin **plus** `https://*.<host>` (virtual-hosted buckets) |
+| `IMAGE_CDN_BASE_URL` | its origin — use for a CDN zone in front of the bucket |
+| `IMAGE_EXTRA_ORIGINS` | each comma-separated origin (multi-CDN escape hatch) |
+
+`https://images.unsplash.com` is always present: the committed demo catalog
+and quiz imagery reference it (documented demo dependency, not a production
+requirement).
+
+**After changing any of these settings:**
+
+```bash
+# regenerate the proxy copy and paste it into the Caddyfile header block
+python backend/scripts/print_csp.py               # your environment
+python backend/scripts/print_csp.py --reference   # the committed reference
+# verify alignment + catalog coverage
+cd backend && python -m pytest tests/test_csp_alignment.py -q
+```
+
 4. Set `PAYMENT_PROVIDER=zarinpal`, the merchant ID and HTTPS callback. Card data is never stored; only gateway authority/reference IDs are persisted.
 5. Set `EMAIL_PROVIDER=resend`, `RESEND_API_KEY` and a verified `EMAIL_FROM` domain.
 6. Generate strong `SECRET_KEY` and `FERNET_KEY`, set production origins/cookies, and store all values in the platform secret manager.

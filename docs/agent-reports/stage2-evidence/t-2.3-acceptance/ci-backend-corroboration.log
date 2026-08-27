@@ -1,0 +1,41 @@
+# T-2.3 CI corroboration (Supervisor amendment A2)
+
+Run:        33071779249  (push of 4b9a6836 — the T-2.3 evidence commit)
+Job:        98515602253  "Backend — pytest vs Postgres16+pgvector & Redis"
+Status:     completed / SUCCESS
+Started:    2026-08-27T12:25:24Z   Completed: 2026-08-27T12:28:04Z
+Environment: ubuntu-latest runner (4 vCPU / 16 GB), service containers
+             pgvector/pgvector:pg16 + redis (real, not fakeredis)
+
+Step conclusions (all success):
+  Checkout / Set up Python / Install dependencies (lockfile)
+  Verify locked install (pip freeze diff) / Upload locked-install proof
+  Install CI-only tooling / Create dedicated pgvector database
+  Migrate — upgrade head / Migration round-trip (downgrade base -> upgrade head)
+  Run backend test suite                     <- includes tests/test_recommender.py (30)
+                                                 and tests/test_perf_v2.py (10)
+  Run real-service AI modules without skips
+  Lint / Dependency audit / Security probes x2 / Extraction benchmarks x2
+
+NOTE ON RAW LOG ACCESS (environment honesty): the sandbox can reach the
+GitHub API (proxied) but the job-log download redirects to
+productionresultssa0.blob.core.windows.net, which the sandbox egress
+policy blocks. Command + verbatim behaviour:
+
+  $ gh api .../actions/jobs/98515602253/logs
+  Get "https://productionresultssa0.blob.core.windows.net/actions-results/..."
+  (connection blocked; no bytes returned)
+
+Per Directive 2 Step 3 the fallback record above (run id + job conclusion +
+per-step conclusions from the check-run API) is the corroboration artifact.
+The job runs `pytest tests/` — the full suite containing both scoped files —
+so a green job is only possible if all 30 + 10 scoped tests passed against
+real Postgres 16 + pgvector + real Redis.
+
+Same-run context: Frontend success, Multi-worker success, Lighthouse success
+(waived/advisory), Docker success; "Security & docs gates" FAILED on the
+Documentation link audit — docs/reports/recommender_acceptance.md references
+docs/reports/perf_head.md before that file existed (T-2.2 deliverable).
+Remediation: perf_head.md created in the same follow-up commit as this file;
+audit re-verified locally (RESULT: PASS) before push. E2E was in_progress at
+capture time; run-level conclusion tracked in the Stage-2 report gate table.

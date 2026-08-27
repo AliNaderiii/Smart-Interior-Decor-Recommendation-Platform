@@ -1,0 +1,22 @@
+# CSP source-of-truth proof. 2026-08-27T13:15:30Z @ 1b727ef
+$ python backend/scripts/print_csp.py --reference
+default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://images.unsplash.com https://s3.ir-thr-at1.arvanstorage.ir https://*.s3.ir-thr-at1.arvanstorage.ir; connect-src 'self' https://generativelanguage.googleapis.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests
+
+$ grep Content-Security-Policy Caddyfile (generated copy)
+Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://images.unsplash.com https://s3.ir-thr-at1.arvanstorage.ir https://*.s3.ir-thr-at1.arvanstorage.ir; connect-src 'self' https://generativelanguage.googleapis.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; worker-src 'self' blob:; manifest-src 'self'; upgrade-insecure-requests"
+
+$ pytest tests/test_csp_alignment.py (alignment + catalog coverage + knobs)
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 9 items
+
+tests/test_csp_alignment.py::test_caddyfile_csp_is_byte_identical_to_build_csp_reference PASSED [ 11%]
+tests/test_csp_alignment.py::test_reference_csp_keeps_the_virtual_hosted_bucket_wildcard PASSED [ 22%]
+tests/test_csp_alignment.py::test_every_catalog_image_origin_is_allowed_by_the_default_csp PASSED [ 33%]
+tests/test_csp_alignment.py::test_every_catalog_image_origin_is_allowed_by_the_reference_csp PASSED [ 44%]
+tests/test_csp_alignment.py::test_image_cdn_base_url_feeds_img_src PASSED [ 55%]
+tests/test_csp_alignment.py::test_image_extra_origins_feed_img_src PASSED [ 66%]
+tests/test_csp_alignment.py::test_s3_endpoint_implies_virtual_hosted_wildcard PASSED [ 77%]
+tests/test_csp_alignment.py::test_empty_image_settings_add_nothing PASSED [ 88%]
+tests/test_csp_alignment.py::test_wildcard_matcher_rejects_lookalike_hosts PASSED [100%]
+
+============================== 9 passed in 0.94s ===============================

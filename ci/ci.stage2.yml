@@ -656,7 +656,7 @@ jobs:
           # Stage 2 (T-2.1/A3): seed the REAL 150-product catalog (images,
           # retailer links) instead of the tiny demo set, so the measured
           # /recommendations page renders representative content.
-          python scripts/load_realistic_products.py --realistic --if-empty
+          python scripts/load_realistic_products.py --realistic --if-empty --expand-to 150
 
       - name: Start backend
         working-directory: backend
@@ -939,7 +939,7 @@ jobs:
         working-directory: backend
         run: |
           alembic upgrade head
-          python scripts/load_realistic_products.py --realistic --if-empty
+          python scripts/load_realistic_products.py --realistic --if-empty --expand-to 150
           python scripts/seed_perf_products.py
           # MANDATORY (T-2.2 finding): without fresh statistics the planner
           # estimated 564 rows in the 20 150-row table and chose a Seq Scan
@@ -1070,7 +1070,7 @@ jobs:
         working-directory: backend
         run: |
           alembic upgrade head
-          python scripts/load_realistic_products.py --realistic --if-empty
+          python scripts/load_realistic_products.py --realistic --if-empty --expand-to 150
 
       - name: "Check every seller link — polite 1 req/s, retry network errors"
         run: |

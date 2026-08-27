@@ -1,0 +1,62 @@
+# T-2.4 header dump — runtime evidence. 2026-08-27T13:15:30Z @ 1b727ef
+# Backend: uvicorn 127.0.0.1:8010, APP_ENV=test, S3_ENDPOINT=https://s3.ir-thr-at1.arvanstorage.ir (reference-like config)
+# Host: sandbox 2 vCPU Xeon 2.60GHz / 3.8GB, Debian 12
+
+$ curl -sD - -o /dev/null http://127.0.0.1:8010/api/v1/health
+HTTP/1.1 200 OK
+date: Thu, 27 Aug 2026 13:15:30 GMT
+server: uvicorn
+content-length: 65
+content-type: application/json
+content-security-policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://images.unsplash.com https://s3.ir-thr-at1.arvanstorage.ir https://*.s3.ir-thr-at1.arvanstorage.ir; connect-src 'self' https://generativelanguage.googleapis.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; worker-src 'self' blob:; manifest-src 'self'
+x-frame-options: DENY
+x-content-type-options: nosniff
+referrer-policy: strict-origin-when-cross-origin
+permissions-policy: camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=(), usb=(), magnetometer=(), accelerometer=()
+cross-origin-opener-policy: same-origin
+cross-origin-resource-policy: same-site
+x-permitted-cross-domain-policies: none
+server: Smart Decor
+cache-control: no-store
+pragma: no-cache
+vary: Cookie, Authorization, Origin
+x-request-id: 3bd195ccc14743b7b19931c443276bef
+
+$ curl -sD - -o /dev/null -H 'X-Forwarded-Proto: https' http://127.0.0.1:8010/api/v1/health   # TLS-terminated -> +HSTS
+HTTP/1.1 200 OK
+date: Thu, 27 Aug 2026 13:15:30 GMT
+server: uvicorn
+content-length: 65
+content-type: application/json
+content-security-policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://images.unsplash.com https://s3.ir-thr-at1.arvanstorage.ir https://*.s3.ir-thr-at1.arvanstorage.ir; connect-src 'self' https://generativelanguage.googleapis.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; worker-src 'self' blob:; manifest-src 'self'
+x-frame-options: DENY
+x-content-type-options: nosniff
+referrer-policy: strict-origin-when-cross-origin
+permissions-policy: camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=(), usb=(), magnetometer=(), accelerometer=()
+cross-origin-opener-policy: same-origin
+cross-origin-resource-policy: same-site
+x-permitted-cross-domain-policies: none
+strict-transport-security: max-age=63072000; includeSubDomains; preload
+server: Smart Decor
+cache-control: no-store
+pragma: no-cache
+vary: Cookie, Authorization, Origin
+x-request-id: 607e2fbbcf3d4a99925c1b9476dbef23
+
+$ curl -sD - -o /dev/null http://127.0.0.1:8010/nonexistent   # error path keeps headers (H-01)
+HTTP/1.1 404 Not Found
+date: Thu, 27 Aug 2026 13:15:30 GMT
+server: uvicorn
+content-length: 49
+content-type: application/json
+content-security-policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://images.unsplash.com https://s3.ir-thr-at1.arvanstorage.ir https://*.s3.ir-thr-at1.arvanstorage.ir; connect-src 'self' https://generativelanguage.googleapis.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; worker-src 'self' blob:; manifest-src 'self'
+x-frame-options: DENY
+x-content-type-options: nosniff
+referrer-policy: strict-origin-when-cross-origin
+permissions-policy: camera=(), microphone=(), geolocation=(), interest-cohort=(), payment=(), usb=(), magnetometer=(), accelerometer=()
+cross-origin-opener-policy: same-origin
+cross-origin-resource-policy: same-site
+x-permitted-cross-domain-policies: none
+server: Smart Decor
+x-request-id: 121c0598b1814beabfd40171b1d2a35a
+

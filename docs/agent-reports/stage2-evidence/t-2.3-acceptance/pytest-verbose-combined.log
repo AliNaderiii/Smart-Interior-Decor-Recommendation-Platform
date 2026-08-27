@@ -1,0 +1,60 @@
+$ python -m pytest tests/test_recommender.py tests/test_perf_v2.py -v -o addopts=''
+============================= test session starts ==============================
+platform linux -- Python 3.11.2, pytest-9.1.1, pluggy-1.6.0 -- /home/user/.venv-stage2/bin/python
+cachedir: .pytest_cache
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /home/user/Smart-Interior-Decor-Recommendation-Platform/backend
+configfile: pyproject.toml
+plugins: anyio-4.14.2, benchmark-5.2.3, asyncio-1.4.0
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 40 items
+
+tests/test_recommender.py::test_01_returns_results_for_default_quiz PASSED [  2%]
+tests/test_recommender.py::test_02_budget_hard_filter_respected PASSED   [  5%]
+tests/test_recommender.py::test_03_low_budget_industrial PASSED          [  7%]
+tests/test_recommender.py::test_04_high_budget_scandinavian_large_room PASSED [ 10%]
+tests/test_recommender.py::test_05_only_verified_products_recommended PASSED [ 12%]
+tests/test_recommender.py::test_06_impossible_budget_returns_empty PASSED [ 15%]
+tests/test_recommender.py::test_07_results_capped_between_3_and_5 PASSED [ 17%]
+tests/test_recommender.py::test_08_results_sorted_by_final_score PASSED  [ 20%]
+tests/test_recommender.py::test_09_style_preference_ranks_matching_style_first PASSED [ 22%]
+tests/test_recommender.py::test_10_walnut_wood_material_preference PASSED [ 25%]
+tests/test_recommender.py::test_11_minimal_style_white_palette PASSED    [ 27%]
+tests/test_recommender.py::test_12_classic_persian_rug_pattern PASSED    [ 30%]
+tests/test_recommender.py::test_13_weights_sum_to_one PASSED             [ 32%]
+tests/test_recommender.py::test_14_budget_score_midpoint_is_one PASSED   [ 35%]
+tests/test_recommender.py::test_15_budget_score_edges_are_zero PASSED    [ 37%]
+tests/test_recommender.py::test_16_color_distance_identical_is_zero PASSED [ 40%]
+tests/test_recommender.py::test_17_color_distance_black_white_is_high PASSED [ 42%]
+tests/test_recommender.py::test_18_color_score_close_palettes_high PASSED [ 45%]
+tests/test_recommender.py::test_19_jaccard_math PASSED                   [ 47%]
+tests/test_recommender.py::test_20_explanation_contains_all_components PASSED [ 50%]
+tests/test_recommender.py::test_21_explanation_percentages_in_range PASSED [ 52%]
+tests/test_recommender.py::test_22_explanation_summary_format PASSED     [ 55%]
+tests/test_recommender.py::test_23_matched_materials_listed PASSED       [ 57%]
+tests/test_recommender.py::test_24_calculate_score_final_is_weighted_sum PASSED [ 60%]
+tests/test_recommender.py::test_25_cache_key_stable_and_order_independent PASSED [ 62%]
+tests/test_recommender.py::test_26_second_call_served_from_cache PASSED  [ 65%]
+tests/test_recommender.py::test_27_cache_has_ttl PASSED                  [ 67%]
+tests/test_recommender.py::test_28_empty_optional_fields_do_not_crash PASSED [ 70%]
+tests/test_recommender.py::test_29_all_categories_covered_with_wide_budget PASSED [ 72%]
+tests/test_recommender.py::test_30_p95_latency_under_2s PASSED           [ 75%]
+tests/test_perf_v2.py::TestCacheKeyScoping::test_same_quiz_different_users_get_different_keys PASSED [ 77%]
+tests/test_perf_v2.py::TestCacheKeyScoping::test_key_is_stable_for_same_user_and_quiz PASSED [ 80%]
+tests/test_perf_v2.py::TestCacheKeyScoping::test_key_ignores_dict_ordering PASSED [ 82%]
+tests/test_perf_v2.py::TestCacheKeyScoping::test_key_is_namespaced_by_user PASSED [ 85%]
+tests/test_perf_v2.py::TestCacheKeyScoping::test_anonymous_key_stays_unscoped PASSED [ 87%]
+tests/test_perf_v2.py::TestCacheKeyScoping::test_different_quiz_same_user_differs PASSED [ 90%]
+tests/test_perf_v2.py::TestSingleFlight::test_concurrent_misses_compute_once PASSED [ 92%]
+tests/test_perf_v2.py::TestSingleFlight::test_inflight_registry_is_drained PASSED [ 95%]
+tests/test_perf_v2.py::TestSingleFlight::test_compute_still_runs_when_cache_disabled PASSED [ 97%]
+tests/test_perf_v2.py::TestHnswRecall::test_ef_search_is_raised_above_pgvector_default PASSED [100%]
+
+=============================== warnings summary ===============================
+../../.venv-stage2/lib/python3.11/site-packages/fastapi/testclient.py:1
+  /home/user/.venv-stage2/lib/python3.11/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 40 passed, 1 warning in 3.08s =========================
+EXIT=0

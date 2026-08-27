@@ -1,0 +1,54 @@
+$ DATABASE_URL=postgresql+psycopg://postgres:@/postgres?host=/tmp/pg-stage2 python scripts/bench_pgvector.py --sizes 20150 --json raw/bench-local-20150.json
+# LOCAL ITERATION RUN (A1: diagnosis only, not contract evidence). 2026-08-27T12:28:24Z @ 4b9a683
+
+===== catalog size 20150 =====
+catalog_size: 20150
+rows_total: 20150
+rows_verified: 20150
+plan:
+  Limit  (cost=327.11..327.36 rows=98 width=41) (actual time=14.107..14.130 rows=100 loops=1)
+    Buffers: shared hit=13030
+    ->  Sort  (cost=327.11..327.36 rows=98 width=41) (actual time=14.107..14.112 rows=100 loops=1)
+          Sort Key: ((style_embedding <=> '[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0.258199,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0.258199,0,0,0,0,0,0]'::vector)), id
+          Sort Method: top-N heapsort  Memory: 36kB
+          Buffers: shared hit=13030
+          ->  Bitmap Heap Scan on products  (cost=25.15..323.87 rows=98 width=41) (actual time=0.279..13.430 rows=4108 loops=1)
+                Recheck Cond: ((category)::text = 'sofa'::text)
+                Filter: (is_verified AND (style_embedding IS NOT NULL) AND (price_toman >= 1000000) AND (price_toman <= 150000000) AND ((room_type)::text = 'living_room'::text))
+                Rows Removed by Filter: 20
+                Heap Blocks: exact=671
+                Buffers: shared hit=13024
+                ->  Bitmap Index Scan on ix_products_category  (cost=0.00..25.12 rows=113 width=0) (actual time=0.143..0.143 rows=4128 loops=1)
+                      Index Cond: ((category)::text = 'sofa'::text)
+                      Buffers: shared hit=5
+  Planning:
+    Buffers: shared hit=58
+  Planning Time: 0.145 ms
+  Execution Time: 14.158 ms
+plan_uses_hnsw: False
+plan_uses_seq_scan: False
+cold_p50_ms: 0.4
+cold_p95_ms: 11.7
+cold_max_ms: 12.2
+cold_mean_rows_per_query: 51.4
+warm_p50_ms: 0.4
+warm_p95_ms: 9.6
+warm_max_ms: 13.5
+warm_mean_rows_per_query: 51.4
+exact_candidates_sofa: 100
+ann_candidates_sofa: 100
+recall_at_limit_sofa: 1.0
+no_result_ms: 0.4
+hnsw_probe: {'ef40': {'rows_returned': 100, 'latency_ms': 34.4}, 'ef400': {'rows_returned': 100, 'latency_ms': 36.2}}
+hnsw_probe_plan_uses_index: False
+hnsw_probe_plan: Limit  (cost=708.61..708.86 rows=100 width=41) (actual time=37.197..37.207 rows=100 loops=1)
+  ->  Sort  (cost=708.61..710.02 rows=564 width=41) (actual time=37.196..37.201 rows=100 loops=1)
+        Sort Key: ((style_embedding <=> '[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0.258199,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0.258199,0,0,0,0,0,0]'::vector))
+        Sort Method: top-N heapsort  Memory: 36kB
+        ->  Seq Scan on products  (cost=0.00..687.05 rows=564 width=41) (actual time=0.008..34.386 rows=20150 loops=1)
+              Filter: (style_embedding IS NOT NULL)
+Planning Time: 0.033 ms
+Execution Time: 37.224 ms
+
+json written: ../docs/agent-reports/stage2-evidence/t-2.2-p95/raw/bench-local-20150.json
+EXIT=0
