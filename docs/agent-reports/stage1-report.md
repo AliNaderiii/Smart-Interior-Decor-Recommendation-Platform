@@ -478,12 +478,38 @@ skipped by it. Rationale and restore conditions: **IR-S1-013**.
 
 **Tests**
 `backend/tests/test_projects_quota.py` (13) · `backend/tests/test_weights_profiles.py` (13) ·
-`frontend/tests/unit/` (8 files, 58 tests) · `frontend/tests/e2e/` (6 files, 29 tests) ·
+`frontend/tests/unit/` (8 files, 58 tests) · `frontend/tests/e2e/` (6 files, **30 tests**) ·
 `frontend/vitest.config.ts` · `frontend/playwright.config.ts` · `frontend/tsconfig.tests.json`
+
+**E2E close-out (iterations 1–5, after the suite's first real browser run)**
+`frontend/tests/e2e/statePaths.ts` (new — one absolute storageState path for
+writer and reader) · `frontend/tests/e2e/users.ts` (new — disposable per-role
+accounts) · `frontend/tests/e2e/ciAnnotationReporter.ts` (new — failures as
+`::error::` annotations, the only way to read CI failures from the sandbox) ·
+`globalSetup.ts` (API health-wait, disposable registration, loud login failure)
 
 **CI**
 `.github/workflows/ci.yml` — new `e2e` job; all Python installs on the lockfile;
-lock-verification + audit steps with uploaded artifacts; test typecheck; e2e seeding and report upload
+lock-verification + audit steps with uploaded artifacts; test typecheck; e2e seeding and report upload.
+Three human-applied edits during close-out: lighthouse waiver (§10b, IR-S1-010),
+e2e rate limits + `ACCESS_TOKEN_EXPIRE_MINUTES` (§10c, IR-S1-012), and the
+blocking/advisory step split (§10d, IR-S1-013).
+
+### E2E convergence record
+
+The suite had never executed in a browser before this stage (IR-S1-001: the
+sandbox cannot download Chromium). Five CI iterations took it from 5 failures to
+green, and **every fix was a harness correction or a genuine finding filed as an
+IR — no assertion was skipped or weakened, and the test count went up**.
+
+| Run | Head | Result | Root cause found |
+|---|---|---|---|
+| `32988827678` | `1812247` | 24/29 | storageState written to `config.rootDir` (= testDir) but read from `process.cwd()`; sweep clicked the 1x1 `sr-only` skip link; overlays never dismissed; palette locator matched a placeholder that never existed |
+| `33005106968` | `3ad5387` | sweep ~182 → 8 verdicts | modal Escape is focus-scoped (**IR-S1-011**); nav self-links reported DEAD |
+| `33045931573` | `09e83a0` | designer journey green | shared demo accounts — the sweep consumed the designer quota the journey asserts on; fixed with disposable users |
+| `33050628874` | `77a85eb` | auth-smoke green | **IR-S1-012**: refresh-token rotation vs a storageState snapshot shared across contexts |
+| `33052458093` | `78444a7` | quiz + designer green | bare `click()` has no timeout; framer-motion `whileHover` springs never satisfy the stability check |
+| `33054378499` | `9d01451` | Stage-1 specs green | `/recommend` needs `quiz_id` (`quiz.py:103`); the serial journey now threads the `?quiz=` id |
 
 **Docs**
 `CHANGELOG.md` · `docs/DEPENDENCIES.md` · `docs/RELEASE_CHECKLIST.md` (re-audit) ·
