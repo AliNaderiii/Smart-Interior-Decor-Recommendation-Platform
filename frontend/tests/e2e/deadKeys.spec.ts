@@ -33,18 +33,61 @@
  * the same routes. `scripts/clickAudit.mts` and `docs/DEADKEYS_CLICK_LOG.md`
  * hold the earlier jsdom click-by-click log of all 89 controls.
  */
+import fs from "node:fs";
+import path from "node:path";
 import { test, expect, type Page, type ConsoleMessage } from "@playwright/test";
+import { STATE_DIR } from "./statePaths";
+import { DEMO_ACCOUNTS, type TestUser } from "./users";
 
 const BASE = process.env.E2E_BASE_URL ?? "http://localhost:5173";
 
-const ACCOUNTS = {
-  homeowner: { email: "demo@smartdecor.dev", password: "Demo1234!" },
-  designer: { email: "designer@smartdecor.dev", password: "Design123!" },
-  admin: { email: "admin@smartdecor.dev", password: "Admin123!" },
-};
+/**
+ * Accounts for the sweep.
+ *
+ * The sweep clicks EVERY control on EVERY route, so it mutates whatever it
+ * touches: it consumes the designer's project quota, dirties the quiz, toggles
+ * the theme, and so on. Sharing accounts with the journeys meant that mutation
+ * leaked across specs and produced a different failure set on every run
+ * (32988827678 / 33005106968 / 33008122154). globalSetup therefore registers
+ * dedicated disposable users for the sweep and drops them here.
+ *
+ * `admin` is the documented exception: self-registration cannot grant the
+ * admin role (backend/app/schemas/auth.py:26), so the sweep shares the seeded
+ * admin with the admin journey. Those two never contend — the admin sweep
+ * routes are read-only listings, and the destructive controls are in SKIP.
+ */
+type Credentials = { email: string; password: string };
+
+let cachedAccounts: Record<"homeowner" | "designer" | "admin", Credentials> | null = null;
+
+/** Read the sweep's credentials, lazily.
+ *
+ *  Deliberately NOT read at module scope: `playwright test --list` imports
+ *  every spec without running globalSetup, so a top-level read would throw
+ *  during collection and report "0 tests in 0 files". */
+function accounts(): Record<"homeowner" | "designer" | "admin", Credentials> {
+  if (cachedAccounts) return cachedAccounts;
+
+  const file = path.join(STATE_DIR, "sweep-users.json");
+  if (!fs.existsSync(file)) {
+    throw new Error(
+      `deadKeys: ${file} is missing — globalSetup did not run, or it failed ` +
+        `before registering the sweep's disposable users.`,
+    );
+  }
+  const users = JSON.parse(fs.readFileSync(file, "utf8")) as Record<string, TestUser>;
+  cachedAccounts = {
+    homeowner: users.homeowner,
+    designer: users.designer,
+    admin: DEMO_ACCOUNTS.admin,
+  };
+  return cachedAccounts;
+}
 
 /** Routes to sweep, per role. */
-const ROUTES: Record<keyof typeof ACCOUNTS, string[]> = {
+type SweepRole = "homeowner" | "designer" | "admin";
+
+const ROUTES: Record<SweepRole, string[]> = {
   homeowner: ["/", "/quiz", "/recommendations", "/moodboards", "/floorplan", "/shopping-list", "/upgrade"],
   designer: ["/designer/dashboard"],
   admin: ["/admin/products", "/admin/users", "/admin/subscriptions"],
@@ -142,8 +185,8 @@ async function dismissOverlay(page: Page): Promise<void> {
   await page.waitForTimeout(150);
 }
 
-async function login(page: Page, who: keyof typeof ACCOUNTS) {
-  const { email, password } = ACCOUNTS[who];
+async function login(page: Page, who: SweepRole) {
+  const { email, password } = accounts()[who];
   await page.goto(`${BASE}/login`);
   await page.getByLabel(/email/i).fill(email);
   await page.getByLabel(/password/i).fill(password);

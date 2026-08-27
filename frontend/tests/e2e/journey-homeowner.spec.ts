@@ -48,9 +48,18 @@ async function waitForStep(page: Page, index: number) {
   ).toHaveAttribute("aria-current", "step", { timeout: 20_000 });
 }
 
-/** Select the first tile of the current step and confirm the store took it. */
+/** Select the first tile of the current step and confirm the store took it.
+ *
+ *  IMPORTANT — the locator is scoped to `<main>`. `button[aria-pressed]` is
+ *  NOT unique to the quiz: the header's dark-mode toggle
+ *  (Layout.tsx:62, inside `<header>`) also carries aria-pressed and precedes
+ *  the quiz tiles in DOM order. An unscoped `.first()` therefore clicked the
+ *  THEME TOGGLE, flipped its aria-pressed to "true" — so the assertion below
+ *  passed — while no style was ever selected, leaving `Next` disabled. That is
+ *  the real cause of the "24 x unexpected value disabled" failures in runs
+ *  33005106968 and 33008122154, and it is a selector bug, not shared state. */
 async function pickFirstTile(page: Page) {
-  const tile = page.locator("button[aria-pressed]").first();
+  const tile = page.locator("main button[aria-pressed]").first();
   await expect(tile).toBeVisible({ timeout: 20_000 });
   await tile.click();
   // The button is the source of truth: aria-pressed flips only once the store
@@ -87,7 +96,7 @@ async function completeQuiz(page: Page) {
   // Step 4 — budget. The preset range buttons are the resilient control (the
   // histogram is a custom drag surface). Any preset gives max > min.
   await waitForStep(page, 3);
-  await page.getByRole("button", { name: /تومان|میلیون/ }).first().click().catch(() => {
+  await page.locator("main").getByRole("button", { name: /تومان|میلیون/ }).first().click().catch(() => {
     /* presets are dataset-driven; the store default is already a valid range */
   });
   await expect(next).toBeEnabled();

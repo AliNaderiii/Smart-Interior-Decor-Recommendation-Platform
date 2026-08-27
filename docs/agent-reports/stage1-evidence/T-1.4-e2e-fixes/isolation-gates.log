@@ -1,0 +1,16 @@
+=== lint ===
+Found 12 warnings and 0 errors.
+Finished in 90ms on 69 files with 116 rules using 2 threads.
+=== unit tests ===
+[2m Test Files [22m [1m[32m8 passed[39m[22m[90m (8)[39m
+[2m      Tests [22m [1m[32m58 passed[39m[22m[90m (58)[39m
+[2m   Start at [22m 06:25:53
+[2m   Duration [22m 9.55s[2m (transform 277ms, setup 862ms, import 643ms, tests 1.91s, environment 5.14s)[22m
+
+=== tsc ===
+TSC_CLEAN
+=== collect ===
+Total: 30 tests in 6 files
+=== build ===
+
+✓ built in 646ms

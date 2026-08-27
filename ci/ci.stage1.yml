@@ -397,6 +397,15 @@ jobs:
       APP_ENV: test
       SEED_DEMO_ACCOUNTS: "true"
       COOKIE_SECURE: "false"
+      # The suite registers 4 disposable users and performs ~9 logins from a
+      # single runner IP (globalSetup, the sweep's own UI logins, and the auth
+      # negative tests which deliberately fail logins). The production defaults
+      # (login 30/min, register 3/min) throttle that, which made the suite fail
+      # a different subset of tests on every run. Raised HERE ONLY: the limits
+      # themselves are asserted by the backend suite, which is where that
+      # behaviour belongs. This job is not testing rate limiting.
+      LOGIN_RATE_LIMIT_PER_MINUTE: "200"
+      REGISTER_RATE_LIMIT_PER_MINUTE: "100"
 
     steps:
       - name: Checkout
