@@ -1,0 +1,37 @@
+{
+  "generated_utc": "2026-08-27T12:31:08.667732+00:00",
+  "commit": "4b9a6836035c6fd413cfa2d3b38457355bdc0bd5",
+  "base_url": "http://127.0.0.1:8000",
+  "samples_per_cell": 250,
+  "concurrency": 20,
+  "host": {
+    "platform": "Linux-6.1.158+-x86_64-with-glibc2.36",
+    "cpu_count": 2,
+    "python": "3.11.2"
+  },
+  "cold": {
+    "n": 250,
+    "mean_ms": 1124.6,
+    "p50_ms": 1168.1,
+    "p95_ms": 1481.8,
+    "p99_ms": 1536.2,
+    "max_ms": 1570.9,
+    "errors": 0,
+    "error_samples": []
+  },
+  "warm": {
+    "n": 250,
+    "mean_ms": 84.5,
+    "p50_ms": 83.0,
+    "p95_ms": 119.7,
+    "p99_ms": 131.7,
+    "max_ms": 137.4,
+    "errors": 0,
+    "error_samples": []
+  },
+  "gate": {
+    "p95_lt_ms": 2000,
+    "cold_pass": true,
+    "warm_pass": true
+  }
+}

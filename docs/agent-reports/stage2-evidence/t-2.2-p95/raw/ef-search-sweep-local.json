@@ -1,0 +1,42 @@
+{
+  "generated_utc": "2026-08-27T12:40:30.133511+00:00",
+  "commit": "4b9a6836035c6fd413cfa2d3b38457355bdc0bd5",
+  "configured_ef_search": 400,
+  "candidate_limit": 100,
+  "row_count": 20150,
+  "explain_analyze_ef400": "Limit  (cost=985.86..986.11 rows=100 width=20) (actual time=16.320..16.333 rows=100 loops=1)\n  Buffers: shared hit=13030\n  ->  Sort  (cost=985.86..996.12 rows=4102 width=20) (actual time=16.319..16.325 rows=100 loops=1)\n        Sort Key: ((style_embedding <=> '[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0.258199,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,-0.258199,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,-0.258199,0,0.258199,0,0,0,0,0,0]'::vector)), id\n        Sort Method: top-N heapsort  Memory: 36kB\n        Buffers: shared hit=13030\n        ->  Bitmap Heap Scan on products  (cost=56.27..829.09 rows=4102 width=20) (actual time=0.328..15.605 rows=4108 loops=1)\n              Recheck Cond: ((category)::text = 'sofa'::text)\n              Filter: (is_verified AND (style_embedding IS NOT NULL) AND (price_toman >= 1000000) AND (price_toman <= 150000000) AND ((room_type)::text = 'living_room'::text))\n              Rows Removed by Filter: 20\n              Heap Blocks: exact=671\n              Buffers: shared hit=13024\n              ->  Bitmap Index Scan on ix_products_category  (cost=0.00..55.25 rows=4128 width=0) (actual time=0.189..0.189 rows=4128 loops=1)\n                    Index Cond: ((category)::text = 'sofa'::text)\n                    Buffers: shared hit=5\nPlanning:\n  Buffers: shared hit=63\nPlanning Time: 0.180 ms\nExecution Time: 16.362 ms",
+  "ef_search_sweep": {
+    "100": {
+      "n_lat": 48,
+      "lat_p50_ms": 9.95,
+      "lat_p95_ms": 12.0,
+      "lat_mean_ms": 7.4,
+      "recall_at_limit_mean": 1.0,
+      "recall_at_limit_min": 1.0
+    },
+    "200": {
+      "n_lat": 48,
+      "lat_p50_ms": 10.25,
+      "lat_p95_ms": 13.13,
+      "lat_mean_ms": 7.61,
+      "recall_at_limit_mean": 1.0,
+      "recall_at_limit_min": 1.0
+    },
+    "400": {
+      "n_lat": 48,
+      "lat_p50_ms": 9.57,
+      "lat_p95_ms": 11.55,
+      "lat_mean_ms": 7.11,
+      "recall_at_limit_mean": 1.0,
+      "recall_at_limit_min": 1.0
+    },
+    "800": {
+      "n_lat": 48,
+      "lat_p50_ms": 9.62,
+      "lat_p95_ms": 12.06,
+      "lat_mean_ms": 7.07,
+      "recall_at_limit_mean": 1.0,
+      "recall_at_limit_min": 1.0
+    }
+  }
+}

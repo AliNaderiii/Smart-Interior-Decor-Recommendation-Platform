@@ -1,0 +1,4 @@
+# Redis (fakeredis local) hit-path check — two identical POST /recommend calls, same user; compare server timing + meta. 2026-08-27T12:41:11Z @ 4b9a683
+call 1: 132 ms  meta: {"recommender_version": "2026-08-26.1", "weights_version": "2026-08-26.1", "weights_profile": "current", "taxonomy_version": "2.1"}
+call 2: 21 ms  meta: {"recommender_version": "2026-08-26.1", "weights_version": "2026-08-26.1", "weights_profile": "current", "taxonomy_version": "2.1"}
+call 3: 22 ms  meta: {"recommender_version": "2026-08-26.1", "weights_version": "2026-08-26.1", "weights_profile": "current", "taxonomy_version": "2.1"}
