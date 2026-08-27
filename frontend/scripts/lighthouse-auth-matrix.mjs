@@ -233,7 +233,7 @@ async function main() {
         lcpMs: Math.round(lhr.audits['largest-contentful-paint']?.numericValue ?? -1),
         ttiMs: Math.round(lhr.audits['interactive']?.numericValue ?? -1),
         clsX1000: Math.round((lhr.audits['cumulative-layout-shift']?.numericValue ?? -1) * 1000),
-        consoleErrors: lhr.audits['errors-in-console']?.score,
+        consoleErrorsScore: lhr.audits['errors-in-console']?.score,
         runWarnings: lhr.runWarnings,
       };
       summary.push(row);
