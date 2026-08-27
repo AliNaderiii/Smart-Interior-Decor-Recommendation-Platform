@@ -90,6 +90,16 @@ def main() -> int:
         print(f"classifications: {dict(by_class)}")
         print(f"result : {len(products) - dead}/{len(products)} links valid")
 
+        # Annotation-readable summary + the not-ok URL list (CI artifacts are
+        # not downloadable from the supervising sandbox; annotations are).
+        not_ok = [f"{d['classification']}:{u}" for u, d in detailed.items()
+                  if not d["ok"]]
+        compact = (f"{len(products) - dead}/{len(products)} valid | "
+                   f"classes={dict(by_class)} | domains={dict(domains)}")
+        print(f"::notice title=link-liveness-summary::{compact[:2000]}")
+        if not_ok:
+            print(f"::notice title=link-liveness-not-ok::{' ;; '.join(not_ok)[:2000]}")
+
         import datetime
         import json
 

@@ -161,6 +161,19 @@ async def main() -> int:
     if args.json_out:
         with open(args.json_out, "w") as f:
             json.dump(result, f, indent=2)
+    # Annotation-readable summary: the supervising sandbox cannot download CI
+    # artifacts (Azure blob egress blocked); check-run annotations are the
+    # only machine-readable channel back.
+    compact = (
+        f"n={args.samples}/cell conc={args.concurrency} | "
+        f"cold p50={cold.get('p50_ms')} p95={cold.get('p95_ms')} "
+        f"p99={cold.get('p99_ms')} err={cold['errors']} | "
+        f"warm p50={warm.get('p50_ms')} p95={warm.get('p95_ms')} "
+        f"p99={warm.get('p99_ms')} err={warm['errors']} | "
+        f"gate<2000ms cold_pass={result['gate']['cold_pass']} "
+        f"warm_pass={result['gate']['warm_pass']}"
+    )
+    print(f"::notice title=p95-cells::{compact}")
     ok = result["gate"]["cold_pass"] and result["gate"]["warm_pass"]
     return 0 if ok else 1
 

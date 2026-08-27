@@ -130,6 +130,14 @@ def main() -> None:
         print(f"ef_search={ef}: {sweep[str(ef)]}")
     out["ef_search_sweep"] = sweep
 
+    # Annotation-readable summary (CI artifacts are not downloadable from the
+    # supervising sandbox; annotations are).
+    plan_first = out["explain_analyze_ef400"].splitlines()[0][:300]
+    compact = " ;; ".join(
+        f"ef={ef}: p50={v['lat_p50_ms']} p95={v['lat_p95_ms']} "
+        f"recall={v['recall_at_limit_mean']}" for ef, v in sweep.items())
+    print(f"::notice title=ef-search-sweep::rows={out['row_count']} | {compact} | plan: {plan_first}")
+
     if args.json_out:
         Path(args.json_out).write_text(json.dumps(out, indent=2))
         print("json written:", args.json_out)
