@@ -79,7 +79,20 @@ async function waitForStep(page: Page, index: number) {
 async function pickFirstTile(page: Page) {
   const tile = page.locator("main button[aria-pressed]").first();
   await expect(tile).toBeVisible({ timeout: 20_000 });
-  await tile.click();
+
+  // The tiles are framer-motion buttons with `whileHover={{ y: -2 }}` on a
+  // spring (QuizPage.tsx:145-147). Playwright hovers before clicking, which
+  // starts that animation, and its actionability check waits for the element
+  // to hold a stable bounding box. A bare `click()` has NO timeout, so when
+  // the spring kept the box moving the call hung until the 120s test budget
+  // expired and blamed whatever assertion was pending — the "Received:
+  // undefined" failures in runs 33045931573 / 33047836194 / 33050628874.
+  //
+  // `force: true` skips the stability wait. It is safe precisely here: the
+  // element is already asserted visible, and the assertion below proves the
+  // click was really delivered rather than swallowed.
+  await tile.click({ timeout: 15_000, force: true });
+
   // The button is the source of truth: aria-pressed flips only once the store
   // has the answer, which is exactly the precondition for `Next` enabling.
   await expect(tile).toHaveAttribute("aria-pressed", "true", { timeout: 10_000 });
@@ -95,13 +108,13 @@ async function completeQuiz(page: Page) {
   await waitForStep(page, 0);
   await pickFirstTile(page);
   await expect(next).toBeEnabled();
-  await next.click();
+  await next.click({ timeout: 15_000 });
 
   // Step 2 — colour palette (same aria-pressed button pattern).
   await waitForStep(page, 1);
   await pickFirstTile(page);
   await expect(next).toBeEnabled();
-  await next.click();
+  await next.click({ timeout: 15_000 });
 
   // Step 3 — room dimensions. Defaults are already valid; set them explicitly
   // so the journey does not depend on the store's initial values.
@@ -109,22 +122,27 @@ async function completeQuiz(page: Page) {
   await page.getByLabel(/room width/i).fill("400", { timeout: 15_000 });
   await page.getByLabel(/room length/i).fill("500", { timeout: 15_000 });
   await expect(next).toBeEnabled();
-  await next.click();
+  await next.click({ timeout: 15_000 });
 
   // Step 4 — budget. The preset range buttons are the resilient control (the
   // histogram is a custom drag surface). Any preset gives max > min.
   await waitForStep(page, 3);
-  await page.locator("main").getByRole("button", { name: /تومان|میلیون/ }).first().click().catch(() => {
+  await page
+    .locator("main")
+    .getByRole("button", { name: /تومان|میلیون/ })
+    .first()
+    .click({ timeout: 15_000, force: true })
+    .catch(() => {
     /* presets are dataset-driven; the store default is already a valid range */
   });
   await expect(next).toBeEnabled();
-  await next.click();
+  await next.click({ timeout: 15_000 });
 
   // Step 5 — materials (optional). Submit.
   await waitForStep(page, 4);
   const submit = page.getByRole("button", { name: /get my recommendations/i });
   await expect(submit).toBeVisible();
-  await submit.click();
+  await submit.click({ timeout: 15_000 });
 
   await page.waitForURL(/\/recommendations/, { timeout: 60_000 });
 }
@@ -187,7 +205,7 @@ test.describe.serial("homeowner journey", () => {
     await page.goto(`${BASE}/recommendations`);
     const chip = page.getByRole("button", { name: /why we matched/i }).first();
     await expect(chip).toBeVisible({ timeout: 60_000 });
-    await chip.click();
+    await chip.click({ timeout: 15_000 });
     // Radix HoverCard content: the per-signal breakdown the engine promises.
     await expect(page.getByText(/match breakdown/i)).toBeVisible();
     for (const signal of [/^Style$/, /^Colour$/, /^Budget$/, /^Material$/]) {
@@ -199,19 +217,19 @@ test.describe.serial("homeowner journey", () => {
     await page.goto(`${BASE}/recommendations`);
     const addButton = page.getByRole("button", { name: /^add to moodboard$/i }).first();
     await expect(addButton).toBeVisible({ timeout: 60_000 });
-    await addButton.click();
+    await addButton.click({ timeout: 15_000 });
     // The button flips to its "already picked" state.
     await expect(page.getByRole("button", { name: /added/i }).first()).toBeVisible();
 
     // The header CTA counts the picks and navigates to /moodboards.
     const createCta = page.getByRole("button", { name: /create moodboard \(\d+\)/i });
     await expect(createCta).toBeEnabled();
-    await createCta.click();
+    await createCta.click({ timeout: 15_000 });
     await page.waitForURL(/\/moodboards/);
 
     // Name the board and create it; MoodboardsPage navigates to the editor.
     await page.getByLabel(/moodboard title/i).fill(BOARD_TITLE);
-    await page.getByRole("button", { name: /^create moodboard$/i }).click();
+    await page.getByRole("button", { name: /^create moodboard$/i }).click({ timeout: 15_000 });
 
     await page.waitForURL(/\/moodboard\/[0-9a-f-]+/i, { timeout: 30_000 });
     await expect(page.getByRole("heading", { name: BOARD_TITLE })).toBeVisible();
@@ -230,10 +248,10 @@ test.describe.serial("homeowner journey", () => {
       .getByRole("heading", { name: BOARD_TITLE })
       .locator("xpath=ancestor::*[self::div][1]")
       .getByRole("link", { name: /^open$/i })
-      .click();
+      .click({ timeout: 15_000 });
     await page.waitForURL(/\/moodboard\/[0-9a-f-]+/i);
 
-    await page.getByRole("button", { name: /add all to shopping list/i }).click();
+    await page.getByRole("button", { name: /add all to shopping list/i }).click({ timeout: 15_000 });
 
     await page.goto(`${BASE}/shopping-list`);
     await expect(page.getByRole("heading", { name: /shopping list/i })).toBeVisible({
@@ -255,13 +273,13 @@ test.describe.serial("homeowner journey", () => {
 
     // Increasing a quantity must move the total — a list whose total ignores
     // the stepper is worse than no total.
-    await page.getByRole("button", { name: /increase quantity of/i }).first().click();
+    await page.getByRole("button", { name: /increase quantity of/i }).first().click({ timeout: 15_000 });
     await expect(totalValue).not.toHaveText(before ?? "", { timeout: 10_000 });
   });
 
   test("logout returns the browser to a logged-out state", async ({ page }) => {
     await page.goto(`${BASE}/`);
-    await page.getByRole("button", { name: /log out/i }).click();
+    await page.getByRole("button", { name: /log out/i }).click({ timeout: 15_000 });
     await page.waitForURL(/\/login/, { timeout: 20_000 });
     await expect(page.getByRole("heading", { name: /welcome back/i })).toBeVisible();
 

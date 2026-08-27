@@ -44,7 +44,7 @@ test.describe("auth negatives (anonymous)", () => {
     const uniqueEmail = `xss-probe-${Date.now()}@example.com`;
     await page.getByLabel(/email/i).fill(uniqueEmail);
     await page.getByLabel(/password/i).fill(XSS_PAYLOAD);
-    await page.getByRole("button", { name: /sign in/i }).click();
+    await page.getByRole("button", { name: /sign in/i }).click({ timeout: 15_000 });
 
     // A safe, generic error is shown (server: "Invalid credentials").
     await expect(
@@ -74,7 +74,7 @@ test.describe("auth negatives (anonymous)", () => {
 
     await page.getByLabel(/email/i).fill("demo@smartdecor.dev");
     await page.getByLabel(/password/i).fill("DefinitelyWrong1!");
-    await page.getByRole("button", { name: /sign in/i }).click();
+    await page.getByRole("button", { name: /sign in/i }).click({ timeout: 15_000 });
 
     await expect(page.locator("p", { hasText: /invalid credentials|login failed/i }).first()).toBeVisible({
       timeout: 15_000,

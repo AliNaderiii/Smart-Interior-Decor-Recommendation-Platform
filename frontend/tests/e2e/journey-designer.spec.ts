@@ -41,12 +41,15 @@ const RUN = Date.now();
 /** Create a project through the real dashboard modal. Returns after the
  *  mutation settles (either the modal closes on success, or a toast appears). */
 async function createProjectViaUi(page: Page, name: string) {
-  await page.getByRole("button", { name: /^new project$/i }).click();
+  // The accessible name is "New project ⌘K" — the button embeds a <kbd>
+  // shortcut hint (DashboardPage.tsx:117-120), so an anchored /^new project$/
+  // never matched and the whole designer journey failed on its first assert.
+  await page.getByRole("button", { name: /^new project\b/i }).click({ timeout: 15_000 });
   const dialog = page.getByRole("dialog", { name: /create project/i });
   await expect(dialog).toBeVisible();
   await dialog.getByLabel(/project name/i).fill(name);
   await dialog.getByLabel(/^client name$/i).fill("E2E Client");
-  await dialog.getByRole("button", { name: /^create$/i }).click();
+  await dialog.getByRole("button", { name: /^create$/i }).click({ timeout: 15_000 });
 }
 
 /** Delete every project this run created, straight through the API using the
@@ -89,7 +92,7 @@ test.describe.serial("designer journey", () => {
     // Not the login wall — the designer role really passes RequireAuth.
     await expect(page.locator("h1", { hasText: /welcome back/i })).toHaveCount(0);
     // The primary action of the portal is present.
-    await expect(page.getByRole("button", { name: /^new project$/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^new project\b/i })).toBeVisible();
 
     // Start from a known state so the quota assertions below are meaningful.
     await cleanup(page, request);
@@ -97,7 +100,7 @@ test.describe.serial("designer journey", () => {
 
   test("creates projects up to the free-plan quota (201 path)", async ({ page }) => {
     await page.goto(`${BASE}/designer/dashboard`);
-    await expect(page.getByRole("button", { name: /^new project$/i })).toBeVisible({
+    await expect(page.getByRole("button", { name: /^new project\b/i })).toBeVisible({
       timeout: 30_000,
     });
 
@@ -121,7 +124,7 @@ test.describe.serial("designer journey", () => {
     page,
   }) => {
     await page.goto(`${BASE}/designer/dashboard`);
-    await expect(page.getByRole("button", { name: /^new project$/i })).toBeVisible({
+    await expect(page.getByRole("button", { name: /^new project\b/i })).toBeVisible({
       timeout: 30_000,
     });
 

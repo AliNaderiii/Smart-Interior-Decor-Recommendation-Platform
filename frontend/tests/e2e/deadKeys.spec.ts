@@ -190,7 +190,7 @@ async function login(page: Page, who: SweepRole) {
   await page.goto(`${BASE}/login`);
   await page.getByLabel(/email/i).fill(email);
   await page.getByLabel(/password/i).fill(password);
-  await page.getByRole("button", { name: /sign in/i }).click();
+  await page.getByRole("button", { name: /sign in/i }).click({ timeout: 15_000 });
   await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15_000 });
 }
 
@@ -232,8 +232,30 @@ for (const role of Object.keys(ROUTES) as (keyof typeof ROUTES)[]) {
           const beforeReqs = watch.requestCount;
           const beforeHtml = await page.locator("body").innerHTML();
           const beforeUrl = page.url();
+          // Some controls legitimately mutate state OUTSIDE <body>. The theme
+          // toggle sets `class="dark"` and `style.colorScheme` on
+          // <html> (themeStore.ts:15-16), so diffing body alone declared it
+          // DEAD on every route of every role. Capture the root attributes too.
+          const beforeRoot = await page.evaluate(
+            () => document.documentElement.className + "|" + document.documentElement.style.colorScheme,
+          );
 
+          // Scroll the control clear of the sticky header BEFORE clicking.
+          //
+          // Layout.tsx:112 renders `<header class="sticky top-0 z-40">`. Playwright
+          // scrolls a control just into the viewport, which frequently parks it
+          // UNDER that header; the click then lands on the header and retries
+          // until the 5s timeout. That single interaction produced the bulk of
+          // the "click threw: Timeout 5000ms exceeded" verdicts across all
+          // three roles — controls a human can click perfectly well.
+          await el
+            .evaluate((node) => node.scrollIntoView({ block: "center", inline: "center" }))
+            .catch(() => {});
+          await page.waitForTimeout(60);
+
+          let clicked = true;
           await el.click({ timeout: 5_000, trial: false }).catch((e: Error) => {
+            clicked = false;
             failures.push({
               route,
               control: name,
@@ -243,8 +265,12 @@ for (const role of Object.keys(ROUTES) as (keyof typeof ROUTES)[]) {
           await page.waitForTimeout(220); // let optimistic UI + toasts settle
 
           const afterHtml = await page.locator("body").innerHTML();
+          const afterRoot = await page.evaluate(
+            () => document.documentElement.className + "|" + document.documentElement.style.colorScheme,
+          );
           const changed =
             afterHtml !== beforeHtml ||
+            afterRoot !== beforeRoot ||
             page.url() !== beforeUrl ||
             watch.requestCount > beforeReqs;
 
@@ -267,7 +293,11 @@ for (const role of Object.keys(ROUTES) as (keyof typeof ROUTES)[]) {
           const selfLink =
             href !== null && new URL(href, page.url()).pathname === new URL(beforeUrl).pathname;
 
-          if (!changed && !selfLink) {
+          // Only a click that actually LANDED can prove a control is dead. When
+          // the click itself threw, "nothing changed" is a restatement of that
+          // failure, not independent evidence — reporting both doubled every
+          // verdict and made the sweep look twice as broken as it was.
+          if (clicked && !changed && !selfLink) {
             failures.push({ route, control: name, reason: "DEAD — no DOM/URL/network change" });
           }
 
@@ -307,7 +337,7 @@ test.describe("dead keys — specific known suspects", () => {
 
     const totalNode = page.locator("text=/Total/i").locator("xpath=following::p[1]");
     const before = await totalNode.innerText();
-    await plus.click();
+    await plus.click({ timeout: 15_000 });
     await expect(totalNode).not.toHaveText(before);
   });
 
@@ -315,7 +345,7 @@ test.describe("dead keys — specific known suspects", () => {
     await login(page, "homeowner");
     await page.goto(`${BASE}/floorplan`);
     const downloadPromise = page.waitForEvent("download", { timeout: 20_000 });
-    await page.getByRole("button", { name: /export png/i }).click();
+    await page.getByRole("button", { name: /export png/i }).click({ timeout: 15_000 });
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toMatch(/floorplan.*\.png$/);
   });
@@ -325,7 +355,7 @@ test.describe("dead keys — specific known suspects", () => {
     await page.goto(`${BASE}/admin/products`);
     await page.waitForLoadState("networkidle");
     const firstBefore = await page.locator("tbody tr").first().innerText();
-    await page.getByRole("button", { name: /confidence/i }).click();
+    await page.getByRole("button", { name: /confidence/i }).click({ timeout: 15_000 });
     await page.waitForTimeout(300);
     const firstAfter = await page.locator("tbody tr").first().innerText();
     expect(firstAfter).not.toBe(firstBefore);
@@ -338,13 +368,13 @@ test.describe("dead keys — specific known suspects", () => {
     await page.waitForLoadState("networkidle");
     const firstProject = page.locator("ul li a").first();
     test.skip(!(await firstProject.count()), "no projects");
-    await firstProject.click();
+    await firstProject.click({ timeout: 15_000 });
 
     const shareBtn = page.getByRole("button", { name: /share with client/i }).first();
     test.skip(!(await shareBtn.count()), "no quizzes to share");
-    await shareBtn.click();
+    await shareBtn.click({ timeout: 15_000 });
 
-    await page.getByRole("button", { name: /copy link/i }).click();
+    await page.getByRole("button", { name: /copy link/i }).click({ timeout: 15_000 });
     await expect(page.getByText(/copied to clipboard/i)).toBeVisible();
     const clip = await page.evaluate(() => navigator.clipboard.readText());
     expect(clip).toContain("/share/");

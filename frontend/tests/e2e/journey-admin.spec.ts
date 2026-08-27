@@ -88,19 +88,19 @@ test.describe.serial("admin journey", () => {
     });
 
     // Filter to what is awaiting human review — the upload above landed here.
-    await page.getByRole("button", { name: /^pending$/i }).click();
+    await page.getByRole("button", { name: /^pending$/i }).click({ timeout: 15_000 });
     const pendingRow = page.locator("tbody tr").first();
     await expect(pendingRow).toBeVisible({ timeout: 30_000 });
     await expect(pendingRow.getByText(/pending review/i)).toBeVisible();
 
     // The review surface: the JSON editor with the diff-vs-AI panel.
-    await pendingRow.getByRole("button", { name: /^edit$/i }).click();
+    await pendingRow.getByRole("button", { name: /^edit$/i }).click({ timeout: 15_000 });
     const reviewDialog = page.getByRole("dialog", { name: /edit product/i });
     await expect(reviewDialog).toBeVisible();
     await expect(reviewDialog.getByText(/review ai extraction/i)).toBeVisible();
     await expect(reviewDialog.getByLabel(/product json/i)).toBeVisible();
     await expect(reviewDialog.getByText(/changes vs ai extraction/i)).toBeVisible();
-    await reviewDialog.getByRole("button", { name: /^cancel$/i }).click();
+    await reviewDialog.getByRole("button", { name: /^cancel$/i }).click({ timeout: 15_000 });
     await expect(reviewDialog).toHaveCount(0);
 
     // Approve it. The verify call is the human-in-the-loop gate.
@@ -108,11 +108,11 @@ test.describe.serial("admin journey", () => {
       (r) => /\/api\/v1\/products\/[^/]+\/verify/.test(r.url()) && r.request().method() === "POST",
       { timeout: 30_000 },
     );
-    await page.locator("tbody tr").first().getByRole("button", { name: /^verify$/i }).click();
+    await page.locator("tbody tr").first().getByRole("button", { name: /^verify$/i }).click({ timeout: 15_000 });
     expect((await verifyResponse).status()).toBeLessThan(300);
 
     // It now shows up under "verified" and no longer as pending.
-    await page.getByRole("button", { name: /^verified$/i }).click();
+    await page.getByRole("button", { name: /^verified$/i }).click({ timeout: 15_000 });
     const verifiedRow = page.locator("tbody tr").first();
     await expect(verifiedRow).toBeVisible({ timeout: 30_000 });
     await expect(verifiedRow.getByText(/^verified$/i)).toBeVisible();
@@ -121,13 +121,13 @@ test.describe.serial("admin journey", () => {
   test("style taxonomy is available to the reviewer", async ({ page }) => {
     await page.goto(`${BASE}/admin/products`);
     await expect(page.locator("tbody tr").first()).toBeVisible({ timeout: 30_000 });
-    await page.locator("tbody tr").first().getByRole("button", { name: /^edit$/i }).click();
+    await page.locator("tbody tr").first().getByRole("button", { name: /^edit$/i }).click({ timeout: 15_000 });
     const reviewDialog = page.getByRole("dialog", { name: /edit product/i });
     await expect(reviewDialog.getByRole("group", { name: /style taxonomy/i })).toBeVisible();
     // The taxonomy chips are toggleable (assigning a style to a product).
     const chips = reviewDialog.getByRole("group", { name: /style taxonomy/i }).locator("button");
     expect(await chips.count()).toBeGreaterThan(0);
-    await reviewDialog.getByRole("button", { name: /^cancel$/i }).click();
+    await reviewDialog.getByRole("button", { name: /^cancel$/i }).click({ timeout: 15_000 });
   });
 
   test("user management loads", async ({ page }) => {
