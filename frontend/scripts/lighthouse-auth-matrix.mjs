@@ -136,12 +136,31 @@ async function main() {
   // Session sanity probe THROUGH the preview proxy before measuring anything.
   const me = await page.evaluate(async (base) => {
     const r = await fetch(`${base}/api/v1/auth/me`, { credentials: 'include' });
-    return { status: r.status, body: (await r.text()).slice(0, 200) };
+    return { status: r.status, body: (await r.text()).slice(0, 2000) };
   }, BASE);
   if (me.status !== 200) {
     throw new Error(`session probe /api/v1/auth/me returned ${me.status}: ${me.body}`);
   }
   progress(`session probe ok status=${me.status}`);
+
+  // Run 33077288932 root cause: RequireAuth is SYNCHRONOUS on the zustand
+  // auth store, which rehydrates `user` from localStorage["sd_auth"]
+  // (persist middleware, profile-only partialize). Cookies alone are not
+  // enough — a fresh Lighthouse page has user===null and <Navigate to=/login>
+  // fires before any cookie is consulted. Seed the exact persist envelope
+  // from the app origin; localStorage is NOT in Lighthouse v12's default
+  // clearStorageTypes (file_systems/shader_cache/service_workers/
+  // cache_storage) and disableStorageReset is set besides, so it survives
+  // every navigation. The csrf_token cookie keeps usingCookieAuth() true.
+  const envelope = me.body ? JSON.parse(me.body) : null;
+  const user = envelope && envelope.data ? envelope.data : null;
+  if (!user || !user.id) {
+    throw new Error(`session probe returned no user profile: ${me.body.slice(0, 300)}`);
+  }
+  await page.evaluate((u) => {
+    localStorage.setItem('sd_auth', JSON.stringify({ state: { user: u }, version: 0 }));
+  }, user);
+  progress(`auth store seeded user id=${user.id} role=${user.role || 'n/a'}`);
   await page.close();
 
   const summary = [];
