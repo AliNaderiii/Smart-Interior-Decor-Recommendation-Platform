@@ -124,6 +124,15 @@ class Settings(BaseSettings):
     S3_SECRET_KEY: str = ""
     S3_REGION: str = ""
     S3_PUBLIC_BASE_URL: str = ""
+    #: Stage 2 (T-2.4, closes B-11/IR-005 drift): explicit product-image CDN
+    #: base. When set, its origin is added to the CSP ``img-src`` exactly like
+    #: the S3 origins — use it when images are served from a CDN that is
+    #: neither the S3 endpoint nor its public base (e.g. an Arvan CDN zone in
+    #: front of the bucket). Origin only; paths are ignored.
+    IMAGE_CDN_BASE_URL: str = ""
+    #: Comma-separated extra image origins for CSP ``img-src`` (escape hatch
+    #: for multi-CDN deployments). Each entry must be scheme://host[:port].
+    IMAGE_EXTRA_ORIGINS: str = ""
     LOCAL_STORAGE_DIR: str = "./local_storage"
     #: Upload hardening (Stage 03 — OWASP A04/A05). Bytes, pixels and edge
     #: length are all bounded: a 40 KB PNG can still decode to 30 000 x 30 000
