@@ -21,7 +21,18 @@ const RegisterPage = lazy(() => import("@/pages/RegisterPage"));
 
 // Route-level code splitting keeps the recommendation page bundle lean (LCP).
 const QuizPage = lazy(() => import("@/pages/QuizPage"));
-const RecommendationsPage = lazy(() => import("@/pages/RecommendationsPage"));
+// T-2.1 (Directive 4): RecommendationsPage is EAGER, reversing the note
+// above for this one route. It is the contract-gated page, and CI run
+// 33083527761 measured its LCP render delay at 5113ms on simulated Slow-4G:
+// with the route lazy, its chunk (17KB gz) plus the framer-motion proxy
+// chunk (41KB gz) are only DISCOVERED after the entry bundle executes — a
+// serial second download+parse wave sitting directly in front of the LCP
+// card's first paint. A static import folds both into the modulepreloaded
+// entry wave (downloads in parallel with vendor/index, executes without the
+// extra round trip). Cost to anonymous first paint: home/mobile has 1700ms+
+// of LCP headroom (1205 vs 3000 budget) vs ~58KB gz moved forward; the
+// matrix run after this commit is the before/after evidence for both cells.
+import RecommendationsPage from "@/pages/RecommendationsPage";
 const MoodboardsPage = lazy(() => import("@/pages/MoodboardsPage"));
 const MoodboardEditorPage = lazy(() => import("@/pages/MoodboardEditorPage"));
 const FloorplanPage = lazy(() => import("@/pages/FloorplanPage"));
