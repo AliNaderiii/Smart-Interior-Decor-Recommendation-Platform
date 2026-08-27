@@ -56,10 +56,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -85,7 +85,7 @@ jobs:
 
       - name: Upload locked-install proof
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: backend-lock-verification
           path: |
@@ -179,7 +179,7 @@ jobs:
 
       - name: Upload dependency audit report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: backend-dependency-audit
           path: |
@@ -261,10 +261,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -294,10 +294,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: npm
@@ -351,7 +351,7 @@ jobs:
           test "$HITS" -eq 0
 
       - name: Upload frontend artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: frontend-dist
           path: frontend/dist
@@ -418,10 +418,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
@@ -449,7 +449,7 @@ jobs:
           python scripts/seed_products.py
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "22"
           cache: npm
@@ -521,7 +521,7 @@ jobs:
       # not only when something breaks.
       - name: Upload e2e report (JSON + HTML) and traces
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: e2e-report
           path: frontend/test-results
@@ -532,15 +532,15 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "22"
 
@@ -567,7 +567,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Provide placeholder environment
         run: |
@@ -611,26 +611,28 @@ jobs:
   lighthouse:
     name: Lighthouse CI — performance and accessibility
     runs-on: ubuntu-latest
-    # WAIVED FOR STAGE 1 (IR-S1-010). The perf budget currently fails on TTI
-    # (interactive 6727ms vs a 4000ms budget); performance tuning is Stage 2
-    # scope, so this job reports but does not block. Stage-2 task G-2.6
-    # removes this line and restores it as a required check.
-    continue-on-error: true
+    # RESTORED AS BLOCKING (Stage 2, T-2.6 — closes IR-S1-010). The Stage-1
+    # waiver (`continue-on-error: true`) is removed: the IR-S1-010 restore
+    # conditions are met on the authenticated matrix, which enforces
+    # perf >= 80 / LCP < 3000 ms / TTI <= 4000 ms on home plus the contract
+    # gates on /recommendations (measured on 65f4783: home perf=100,
+    # LCP 1281–1282 ms, TTI 1289 ms; recommendations/mobile perf 98/97,
+    # LCP 2338 ms — runs 33086824717 and 33086828679).
     needs:
       - frontend
       - backend
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: "22"
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -656,7 +658,7 @@ jobs:
           # Stage 2 (T-2.1/A3): seed the REAL 150-product catalog (images,
           # retailer links) instead of the tiny demo set, so the measured
           # /recommendations page renders representative content.
-          python scripts/load_realistic_products.py --realistic --if-empty
+          python scripts/load_realistic_products.py --realistic --if-empty --expand-to 150
 
       - name: Start backend
         working-directory: backend
@@ -782,12 +784,23 @@ jobs:
         with:
           # Stage 2 (A3): the anonymous /recommendations URL was removed — it
           # measured the RequireAuth login redirect, not the page (wrong-page
-          # artifact behind the IR-S1-010 numbers). The budget is asserted on
-          # the public home page; /recommendations is measured AUTHENTICATED
-          # by the matrix step below.
+          # artifact behind the IR-S1-010 numbers). /recommendations is
+          # measured AUTHENTICATED by the matrix step below.
+          #
+          # Stage 2 (T-2.6b, supervisor ruling 2026-08-27): budgetPath removed —
+          # this anonymous layer now REPORTS ONLY (uploadArtifacts kept). It
+          # duplicated the home-page assertions the authenticated matrix
+          # already enforces (perf >= 80 / LCP < 3000 / TTI <= 4000 on home,
+          # plus the contract gates on /recommendations), with far worse
+          # stability: main run 33102053859 failed HERE on a knife-edge
+          # single-shot TTI of 4274 ms vs the 4000 ms budget — and killed the
+          # job before the matrix ran — while the matrix measures the same
+          # page at ~1285 ms (±10) TTI across >= 4 runs. Consolidated, not
+          # silently dropped: docs/agent-reports/stage2-report.md §T-2.6 and
+          # docs/reports/ACCEPTANCE_EVIDENCE.md carry the full ruling. The
+          # budget file (lighthouse-budget.json) itself is unchanged.
           urls: |
             http://127.0.0.1:4173/
-          budgetPath: ./lighthouse-budget.json
           uploadArtifacts: true
           temporaryPublicStorage: false
 
@@ -860,7 +873,7 @@ jobs:
 
       - name: Upload Lighthouse matrix (JSON + HTML, all cells)
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: lighthouse-matrix
           path: /tmp/lighthouse-matrix/
@@ -921,10 +934,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -939,7 +952,7 @@ jobs:
         working-directory: backend
         run: |
           alembic upgrade head
-          python scripts/load_realistic_products.py --realistic --if-empty
+          python scripts/load_realistic_products.py --realistic --if-empty --expand-to 150
           python scripts/seed_perf_products.py
           # MANDATORY (T-2.2 finding): without fresh statistics the planner
           # estimated 564 rows in the 20 150-row table and chose a Seq Scan
@@ -1020,7 +1033,7 @@ jobs:
 
       - name: Upload p95 evidence artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: p95-evidence
           path: /tmp/p95-evidence/
@@ -1053,10 +1066,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -1070,7 +1083,7 @@ jobs:
         working-directory: backend
         run: |
           alembic upgrade head
-          python scripts/load_realistic_products.py --realistic --if-empty
+          python scripts/load_realistic_products.py --realistic --if-empty --expand-to 150
 
       - name: "Check every seller link — polite 1 req/s, retry network errors"
         run: |
@@ -1083,7 +1096,7 @@ jobs:
 
       - name: Upload link-liveness artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: link-liveness
           path: /tmp/link-liveness/
