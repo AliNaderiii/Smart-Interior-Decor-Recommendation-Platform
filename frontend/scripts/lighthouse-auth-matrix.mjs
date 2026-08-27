@@ -125,6 +125,14 @@ async function main() {
   }
   progress('cookies set');
 
+  // The probe fetch must run FROM the app origin: on about:blank the page
+  // origin is "null" and fetch(BASE/api/...) is a cross-origin request the
+  // API will not answer with CORS headers for -> "TypeError: Failed to fetch"
+  // (exactly run 33076489388's failure). /login is public, so this navigation
+  // cannot itself depend on the session being probed.
+  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded' });
+  progress('navigated to app origin');
+
   // Session sanity probe THROUGH the preview proxy before measuring anything.
   const me = await page.evaluate(async (base) => {
     const r = await fetch(`${base}/api/v1/auth/me`, { credentials: 'include' });
