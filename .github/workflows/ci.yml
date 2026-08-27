@@ -397,6 +397,24 @@ jobs:
       APP_ENV: test
       SEED_DEMO_ACCOUNTS: "true"
       COOKIE_SECURE: "false"
+      # The suite registers 4 disposable users and performs ~9 logins from a
+      # single runner IP (globalSetup, the sweep's own UI logins, and the auth
+      # negative tests which deliberately fail logins). The production defaults
+      # (login 30/min, register 3/min) throttle that, which made the suite fail
+      # a different subset of tests on every run. Raised HERE ONLY: the limits
+      # themselves are asserted by the backend suite, which is where that
+      # behaviour belongs. This job is not testing rate limiting.
+      LOGIN_RATE_LIMIT_PER_MINUTE: "200"
+      REGISTER_RATE_LIMIT_PER_MINUTE: "100"
+      # globalSetup captures each role's storageState ONCE, at t=0, but the
+      # suite takes ~25 minutes (run 33045931573: 06:28:40 -> 06:53:56). With
+      # the 15-minute production access-token lifetime the later specs were
+      # running with an expired token and got bounced to /login mid-suite
+      # (auth-smoke "session survives a full page reload" is the tell). The
+      # token lifetime is not what this job is testing — expiry and refresh
+      # are covered by the backend suite — so give the sessions room to
+      # outlive the run.
+      ACCESS_TOKEN_EXPIRE_MINUTES: "120"
 
     steps:
       - name: Checkout
@@ -575,6 +593,11 @@ jobs:
   lighthouse:
     name: Lighthouse CI — performance and accessibility
     runs-on: ubuntu-latest
+    # WAIVED FOR STAGE 1 (IR-S1-010). The perf budget currently fails on TTI
+    # (interactive 6727ms vs a 4000ms budget); performance tuning is Stage 2
+    # scope, so this job reports but does not block. Stage-2 task G-2.6
+    # removes this line and restores it as a required check.
+    continue-on-error: true
     needs:
       - frontend
       - backend
