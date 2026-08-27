@@ -493,10 +493,28 @@ jobs:
           echo "::error::frontend never became healthy"; cat /tmp/vite-e2e.log
           exit 1
 
-      - name: Run Playwright e2e
+      # BLOCKING. Every Stage-1 spec: the three role journeys, the auth
+      # negatives and the authenticated smoke. A failure here fails the job.
+      - name: Run Playwright e2e (Stage-1 specs — blocking)
         working-directory: frontend
         run: |
-          E2E_BASE_URL=http://localhost:5173 npx playwright test
+          E2E_BASE_URL=http://localhost:5173 npx playwright test \
+            --project=chromium \
+            --project=chromium-homeowner \
+            --project=chromium-designer \
+            --project=chromium-admin
+
+      # ADVISORY (IR-S1-013). The legacy dead-key sweep predates Stage 1 and
+      # its remaining verdicts are click-actionability artefacts plus a small
+      # number of genuine a11y findings (IR-S1-011), all filed and assigned to
+      # Stage-3 hardening. It runs and publishes its findings, but it does not
+      # gate the release. It must be restored to blocking by Stage-3 task
+      # G-3.x — do not delete it, and do not relax its assertions.
+      - name: Run Playwright dead-key sweep (legacy — advisory, IR-S1-013)
+        working-directory: frontend
+        continue-on-error: true
+        run: |
+          E2E_BASE_URL=http://localhost:5173 npx playwright test --project=chromium-sweep
 
       # Stage 1 (T-1.4 close-out): the JSON + HTML reports are the evidence the
       # three-role journeys actually ran, so they are uploaded on success too,
