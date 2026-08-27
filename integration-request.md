@@ -1239,6 +1239,10 @@ work is committed locally and is not at risk.
 **Blocker ID:** none — accepted deviation, not a blocker
 **Raised:** 2026-08-26, Stage 1 close-out
 **Decision:** WAIVED for Stage 1 by supervisor ruling.
+**Status: CLOSED — 2026-08-27, Stage 2 close-out (T-2.6). Restore conditions met; the
+`continue-on-error: true` line is removed in `ci/ci.stage2.yml` (see the closure section at
+the end of this entry). Final confirmation — the job blocking AND green in ≥ 2 consecutive
+runs at the Stage-2 final HEAD — is appended below once the activated workflow has run (T5).**
 
 ### Evidence
 
@@ -1291,6 +1295,31 @@ The ACTIVE `.github/workflows/ci.yml` cannot be pushed by the agent token
 (IR-S1-009). Apply this one-line change via the GitHub web UI — see the
 "Human hand-off" section of `docs/agent-reports/stage1-report.md` for the exact
 edit.
+
+### Closure (Stage 2, T-2.6 — 2026-08-27)
+
+The restore conditions are measured on the **authenticated Lighthouse matrix** (the
+Stage-2 layer that measures the real pages — the Stage-1 anonymous number behind this IR
+partly measured the RequireAuth login redirect, see amendment A3), at the frozen perf
+commit `65f4783`, CI runs **33086824717** (push) and **33086828679** (pull_request), both
+green end to end:
+
+1. **`interactive` ≤ 4000 ms on `http://127.0.0.1:4173/`, consecutively** — home TTI
+   **1289 ms / 1289 ms** in the two runs above (287/285 ms desktop); supervisor-verified at
+   ~1285 ± 10 ms across ≥ 4 runs. Condition met with 2.7 s of headroom.
+2. **LCP < 3 s on the same page** — **1281 / 1282 ms**. Met.
+3. **Lighthouse performance ≥ 80** — **100 / 100** on home; worst matrix cell anywhere is
+   97 (`/recommendations` mobile, whose LCP 2338 ms also satisfies the client metric). Met.
+
+Implementation: `ci/ci.stage2.yml` commit `ci(T-2.6a)` deletes the `continue-on-error: true`
+line — the job is a required check again once the staged workflow is activated (stage2-report
+§H-3). The budget numbers were never relaxed; T-2.6b consolidates the *redundant anonymous
+assertion layer* into the matrix by supervisor ruling (evidence: run 33102053859 failed on a
+knife-edge anonymous single-shot TTI of 4274 ms while the matrix holds ~1285 ms ± 10 — full
+ruling in `docs/agent-reports/stage2-report.md` §3), with `lighthouse-budget.json` unchanged.
+
+**Pending T5 addendum:** citation of the ≥ 2 consecutive runs at the final HEAD in which the
+lighthouse job is blocking and SUCCESS, to be appended after the human activates the workflow.
 
 ---
 
