@@ -15,6 +15,8 @@ verifies again with `resolve=True`.
 from __future__ import annotations
 
 import logging
+import time
+from dataclasses import dataclass, field
 
 import httpx
 
@@ -27,18 +29,64 @@ _HEADERS = {"User-Agent": "SmartDecorLinkChecker/1.0"}
 _MAX_REDIRECTS = 5
 
 
-def check_url(url: str, timeout: float = 10.0) -> bool:
-    """Return True if the URL answers 2xx/3xx to HEAD (GET fallback).
+@dataclass
+class LinkCheckResult:
+    """Detailed outcome of one seller-link probe (Stage 2, T-2.5).
 
-    Never follows a redirect into a private, loopback or link-local address.
+    ``classification`` is the operator-facing verdict:
+      * ``ok``        — direct 2xx;
+      * ``redirect``  — 2xx/3xx reached through 1+ validated redirects;
+      * ``blocked``   — the host answered but refused the probe
+                        (403/429 after the GET fallback: bot wall, not a dead
+                        product page — needs a human/egress-host re-check);
+      * ``dead``      — 4xx/5xx or a broken redirect chain;
+      * ``unsafe``    — URL failed SSRF validation (never fetched);
+      * ``error``     — network-level failure (DNS/TLS/timeout), with detail.
+    """
+
+    url: str
+    ok: bool
+    classification: str
+    http_status: int | None = None
+    latency_ms: float | None = None
+    redirect_chain: list[str] = field(default_factory=list)
+    error: str = ""
+
+    def as_dict(self) -> dict:
+        return {
+            "url": self.url,
+            "ok": self.ok,
+            "classification": self.classification,
+            "http_status": self.http_status,
+            "latency_ms": self.latency_ms,
+            "redirect_chain": self.redirect_chain,
+            "error": self.error,
+        }
+
+
+def check_url_detailed(url: str, timeout: float = 10.0) -> LinkCheckResult:
+    """Probe ``url`` and return the full evidence record.
+
+    Same protocol as the original ``check_url`` (HEAD with GET fallback on
+    405/403/501, every redirect hop re-validated against SSRF, max 5 hops) —
+    the boolean behaviour is unchanged; this variant additionally records
+    status, latency, redirect chain and a classification.
     """
     if not url:
-        return False
+        return LinkCheckResult(url=url, ok=False, classification="dead",
+                               error="empty url")
     try:
         target = validate_public_url(url, resolve=True, field="seller_link")
     except UnsafeUrl as exc:
         logger.warning("refusing to fetch unsafe seller link: %s", exc)
-        return False
+        return LinkCheckResult(url=url, ok=False, classification="unsafe",
+                               error=str(exc))
+
+    chain: list[str] = []
+    started = time.perf_counter()
+
+    def _elapsed() -> float:
+        return round((time.perf_counter() - started) * 1000.0, 1)
 
     try:
         with httpx.Client(follow_redirects=False, timeout=timeout, headers=_HEADERS) as client:
@@ -49,7 +97,11 @@ def check_url(url: str, timeout: float = 10.0) -> bool:
                 if resp.status_code in (301, 302, 303, 307, 308):
                     location = resp.headers.get("location", "")
                     if not location:
-                        return False
+                        return LinkCheckResult(
+                            url=url, ok=False, classification="dead",
+                            http_status=resp.status_code, latency_ms=_elapsed(),
+                            redirect_chain=chain,
+                            error="redirect without Location header")
                     nxt = str(httpx.URL(target).join(location))
                     try:
                         target = validate_public_url(
@@ -57,14 +109,42 @@ def check_url(url: str, timeout: float = 10.0) -> bool:
                         )
                     except UnsafeUrl as exc:
                         logger.warning("blocked SSRF redirect: %s", exc)
-                        return False
+                        return LinkCheckResult(
+                            url=url, ok=False, classification="unsafe",
+                            http_status=resp.status_code, latency_ms=_elapsed(),
+                            redirect_chain=chain, error=f"unsafe redirect: {exc}")
+                    chain.append(nxt)
                     continue
-                return 200 <= resp.status_code < 400
+                ok = 200 <= resp.status_code < 400
+                if ok:
+                    cls = "redirect" if chain else "ok"
+                elif resp.status_code in (403, 429):
+                    cls = "blocked"
+                else:
+                    cls = "dead"
+                return LinkCheckResult(
+                    url=url, ok=ok, classification=cls,
+                    http_status=resp.status_code, latency_ms=_elapsed(),
+                    redirect_chain=chain)
         logger.warning("too many redirects while checking a seller link")
-        return False
+        return LinkCheckResult(url=url, ok=False, classification="dead",
+                               latency_ms=_elapsed(), redirect_chain=chain,
+                               error="too many redirects")
     except httpx.HTTPError as exc:
         logger.warning("link check failed: %s", exc)
-        return False
+        return LinkCheckResult(url=url, ok=False, classification="error",
+                               latency_ms=_elapsed(), redirect_chain=chain,
+                               error=f"{type(exc).__name__}: {exc}")
+
+
+def check_url(url: str, timeout: float = 10.0) -> bool:
+    """Return True if the URL answers 2xx/3xx to HEAD (GET fallback).
+
+    Never follows a redirect into a private, loopback or link-local address.
+    Thin boolean facade over :func:`check_url_detailed` (behaviour unchanged).
+    """
+    return check_url_detailed(url, timeout=timeout).ok
+
 
 
 def check_product_link(product_id: str) -> None:
