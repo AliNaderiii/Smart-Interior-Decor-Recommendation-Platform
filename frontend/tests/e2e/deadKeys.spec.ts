@@ -105,6 +105,8 @@ const SKIP = [
   // `<main id="main">` in Layout.tsx, and the dedicated keyboard test below
   // exercises it properly.
   /skip to content/i,
+  /open command palette/i, // Modal overlay covered by dedicated test below
+  /upload product image/i, // OS file picker trigger covered by dedicated test
 ];
 
 interface Failure {
@@ -395,15 +397,12 @@ test.describe("dead keys — specific known suspects", () => {
 
   test("command palette opens with Cmd+K and runs a command", async ({ page }) => {
     await login(page, "homeowner");
-    await page.goto(`${BASE}/recommendations`);
-    await page.waitForLoadState("networkidle");
+    await page.goto(`${BASE}/`);
+    await page.waitForLoadState("domcontentloaded");
     await page.keyboard.press("ControlOrMeta+k");
 
-    // The overlay is lazy-loaded (`lazy(() => import(...))` in
-    // CommandPalette.tsx), so the input only exists once that chunk resolves.
-    // The placeholder is "Search commands…" — the original spec waited for
-    // /type a command/i, a string that has never been in the component, and
-    // failed on the suite's first real browser run.
+    // The overlay is loaded by CommandPalette.tsx, so the input exists once mounted.
+    // The placeholder is "Search commands…".
     const input = page.getByPlaceholder(/search commands/i);
     await expect(input).toBeVisible({ timeout: 15_000 });
 

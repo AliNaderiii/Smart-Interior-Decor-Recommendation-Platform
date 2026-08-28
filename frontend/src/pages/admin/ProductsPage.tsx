@@ -161,6 +161,7 @@ export default function AdminProductsPage() {
   const [uploadResult, setUploadResult] = useState<string>("");
 
   const [sortLowConfidence, setSortLowConfidence] = useState(false);
+  const [sortPrice, setSortPrice] = useState<"asc" | "desc" | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [zoom, setZoom] = useState<{ src: string; title: string } | null>(null);
 
@@ -174,9 +175,17 @@ export default function AdminProductsPage() {
 
   const items = useMemo(() => {
     const rows = data?.items ?? [];
-    if (!sortLowConfidence) return rows;
-    return [...rows].sort((a, b) => a.extraction_confidence - b.extraction_confidence);
-  }, [data, sortLowConfidence]);
+    const sorted = [...rows];
+    if (sortLowConfidence) {
+      sorted.sort((a, b) => a.extraction_confidence - b.extraction_confidence);
+    }
+    if (sortPrice === "asc") {
+      sorted.sort((a, b) => a.price_toman - b.price_toman);
+    } else if (sortPrice === "desc") {
+      sorted.sort((a, b) => b.price_toman - a.price_toman);
+    }
+    return sorted;
+  }, [data, sortLowConfidence, sortPrice]);
 
   const verify = useMutation({
     mutationFn: (id: string) => post(`/products/${id}/verify`),
@@ -476,7 +485,16 @@ export default function AdminProductsPage() {
                     Confidence {sortLowConfidence ? "↑" : "·"}
                   </button>
                 </th>
-                <th className="px-4 py-3">Price</th>
+                <th className="px-4 py-3">
+                  <button
+                    onClick={() => setSortPrice((s) => (s === "asc" ? "desc" : s === "desc" ? null : "asc"))}
+                    className="uppercase tracking-wide hover:text-[var(--color-ink)]"
+                    title="Sort by price"
+                    aria-label="Sort by price"
+                  >
+                    Price {sortPrice === "asc" ? "↑" : sortPrice === "desc" ? "↓" : "·"}
+                  </button>
+                </th>
                 <th className="px-4 py-3">Status / Seller Link</th>
                 <th className="px-4 py-3">Actions</th>
               </tr>
