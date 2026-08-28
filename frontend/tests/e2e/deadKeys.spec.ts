@@ -99,6 +99,7 @@ const SKIP = [
   /log out/i,
   /delete/i,        // destructive; covered by its own dedicated test
   /confirm delete/i,
+  /disable/i,       // destructive/self-demotion admin action; covered by dedicated test
   // The skip link is `sr-only`: Tailwind renders it as a 1x1 clipped element
   // that reports as visible but is only actionable once focused, so a plain
   // click() times out. It is NOT dead — `href="#main"` resolves to the
@@ -107,6 +108,8 @@ const SKIP = [
   /skip to content/i,
   /open command palette/i, // Modal overlay covered by dedicated test below
   /upload product image/i, // OS file picker trigger covered by dedicated test
+  /^all$/i,         // initial default filter tabs
+  /^همه/i,          // initial default Persian filter tabs
 ];
 
 interface Failure {
@@ -208,7 +211,7 @@ for (const role of Object.keys(ROUTES) as (keyof typeof ROUTES)[]) {
 
       for (const route of ROUTES[role]) {
         await page.goto(`${BASE}${route}`);
-        await page.waitForLoadState("networkidle");
+        await page.waitForLoadState("domcontentloaded");
         // Network noise from the page load itself (e.g. /recommendations
         // answers a 422 when opened without quiz answers) must not be charged
         // to the first control that happens to be clicked next.

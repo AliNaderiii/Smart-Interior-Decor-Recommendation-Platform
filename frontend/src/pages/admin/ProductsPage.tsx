@@ -177,7 +177,7 @@ export default function AdminProductsPage() {
     const rows = data?.items ?? [];
     const sorted = [...rows];
     if (sortLowConfidence) {
-      sorted.sort((a, b) => a.extraction_confidence - b.extraction_confidence);
+      sorted.sort((a, b) => a.extraction_confidence - b.extraction_confidence || b.id.localeCompare(a.id));
     }
     if (sortPrice === "asc") {
       sorted.sort((a, b) => a.price_toman - b.price_toman);
