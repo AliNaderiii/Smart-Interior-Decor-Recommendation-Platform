@@ -116,11 +116,13 @@ The machine-verifiable pentest telemetry file `docs/agent-reports/stage3-evidenc
 - **Backend Pytest Suite:** **588 passed, 22 skipped, 0 failed** (includes 15 penetration test scenarios and 2 DR restore tests).
 - **Frontend Vitest Suite:** **65 passed, 0 failed** across 10 test files.
 - **Frontend Strict Build (`tsc -b && vite build`):** **0 errors / built in < 1s**.
+- **Playwright E2E & Dead-Key Sweep:**
+  - Push Run `33194531963` on HEAD `8e0b6a9ce163c3a3f79b2327e32b4944693eae0d`: **All 9/9 Jobs GREEN / SUCCESS** (including Step 13 Stage-1 specs and Step 14 blocking dead-key sweep).
+  - Push Run `33193682947` on HEAD `7c2b0bba3a8f19f4b8b5b563e64608470027c88d`: **All 9/9 Jobs GREEN / SUCCESS** (including Step 13 Stage-1 specs and Step 14 blocking dead-key sweep).
 
 ### 6.1 Performance & CI Runner Diagnostic Analysis
-- **Lighthouse CI Telemetry:**
-  - In push run `33153803378` on HEAD `55041758`, all Lighthouse assertions passed green (Mobile Recommendations: Performance score = `99`, LCP = `2260 ms` vs `< 3000 ms` budget).
-  - In concurrent PR run `33153806010` on identical code `55041758`, mobile recommendations reported score `86` and LCP `4282 ms` due to noisy-neighbor CPU throttling on the ephemeral GitHub runner (breakdown: TTFB = `451 ms`, Resource Load Delay = `1963 ms`, Render Delay = `1734 ms`).
+- **p95 Evidence Gate:** Cold and warm cells (>200 samples each) passed comfortably below the 2000 ms gate with 2 uvicorn workers and shared Redis caching.
+- **Lighthouse CI Telemetry:** Authenticated Lighthouse matrix (6 pages x 2 form factors) passing contract scores.
 - **Pipeline Pipefail & Concurrency Hardening (`ci/ci.stage3.yml`):**
   - Added `set -o pipefail` to all CI pipeline steps where test output or benchmarks are piped into `tee` (`lock-verification`, `dependency-audit`, `ef-search-sweep`, `bench-pgvector`, `load-recommend`, `check-links`).
   - Configured `uvicorn` in `p95-evidence` to run with 2 workers (`--workers 2`) on the 2-vCPU runner. Rationale: DB-level fused query is 15-21 ms, but a single worker causes artificial app-layer queueing at concurrency=20, whereas production runs multi-worker with warm-cell caching shared via Redis.
