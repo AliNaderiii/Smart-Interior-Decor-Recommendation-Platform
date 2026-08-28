@@ -140,9 +140,15 @@ def migrated(engine):
 
 class TestSchema:
     def test_migration_head_creates_vector_column(self, migrated, engine):
+        from alembic.config import Config
+        from alembic.script import ScriptDirectory
+
+        cfg = Config("alembic.ini")
+        expected_head = ScriptDirectory.from_config(cfg).get_current_head()
+
         with engine.connect() as c:
             version = c.execute(text("SELECT version_num FROM alembic_version")).scalar_one()
-            assert version == "0003"
+            assert version == expected_head
             col = c.execute(text(
                 "SELECT atttypmod FROM pg_attribute a JOIN pg_class r ON a.attrelid = r.oid "
                 "WHERE r.relname = 'products' AND a.attname = 'style_embedding'"

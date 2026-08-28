@@ -27,10 +27,13 @@ from __future__ import annotations
 import hashlib
 import hmac
 import ipaddress
+import logging
 
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
+
+logger = logging.getLogger(__name__)
 
 from app.api.deps import get_current_user
 from app.core.config import settings
@@ -222,11 +225,21 @@ def gdpr_delete_me(
         from app.core.redis_client import get_redis
 
         redis = get_redis()
+        # Recommendation cache keys
         for key in list(redis.scan_iter(f"rec:{uid}:*")):
             redis.delete(key)
+        # Export rate-limit key and recommendation throttle buckets
         redis.delete(f"export:{uid}")
-    except Exception:
-        pass
+        redis.delete(f"rl:rec:{uid}")
+        redis.delete(f"rl:export:{uid}")
+        for key in list(redis.scan_iter(f"rl:*{uid}*")):
+            redis.delete(key)
+    except Exception as exc:
+        logger.warning(
+            "Failed to purge Redis cache/rate-limit keys for erased user %s: %s",
+            pseudonym,
+            exc,
+        )
 
     return ok({
         "message": "All your data has been permanently deleted.",

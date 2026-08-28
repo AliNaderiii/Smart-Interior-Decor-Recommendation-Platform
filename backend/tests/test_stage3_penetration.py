@@ -394,6 +394,26 @@ def test_attack_class_7_rbac_and_privilege_escalation(client: TestClient, db):
     assert r_self_demote.status_code == 409
     record_attack_step("RBAC", f"/api/v1/admin/users/{admin.id}", "PATCH", "Admin self-demotion prevention", 409, "PASS")
 
+    # Attack 4: Self-registration with role "admin" must be rejected (422)
+    fake_admin_email = f"e2e-fake-admin-{uuid.uuid4().hex[:8]}@example.com"
+    r_reg_admin = client.post(
+        "/api/v1/auth/register",
+        json={"email": fake_admin_email, "password": "Pass1234!Secure", "role": "admin"},
+    )
+    assert r_reg_admin.status_code == 422
+    assert db.scalar(db.query(User).filter_by(email=fake_admin_email)) is None
+    record_attack_step("RBAC", "/api/v1/auth/register", "POST", "Self-registration as 'admin' role rejection", 422, "PASS")
+
+    # Attack 5: Self-registration with role "superuser" must be rejected (422)
+    fake_su_email = f"e2e-fake-su-{uuid.uuid4().hex[:8]}@example.com"
+    r_reg_su = client.post(
+        "/api/v1/auth/register",
+        json={"email": fake_su_email, "password": "Pass1234!Secure", "role": "superuser"},
+    )
+    assert r_reg_su.status_code == 422
+    assert db.scalar(db.query(User).filter_by(email=fake_su_email)) is None
+    record_attack_step("RBAC", "/api/v1/auth/register", "POST", "Self-registration as 'superuser' role rejection", 422, "PASS")
+
 
 # ============================================================================
 # 8. PAYMENT TAMPERING & CALLBACK REPLAY

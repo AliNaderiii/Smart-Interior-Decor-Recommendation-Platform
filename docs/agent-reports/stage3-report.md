@@ -3,8 +3,11 @@
 
 **تاریخ ارزیابی (Date):** 2026-08-28 (UTC)  
 **شاخه کاری (Branch):** `arena/01a04519-smart-interior-decor-recommend` (ثبت شده به عنوان انحراف پلتفرم **D-0**)  
-**پایه (Base):** `main` = `7071968d` = انتشار `v0.6.0` (پایان مرحله ۲)  
+**پایه (Base):** `main` = `7071968db455ce34d623d535f63fea0a5b1853dd` = انتشار `v0.6.0` (پایان مرحله ۲)  
 **شناسه روابط یکپارچه‌سازی (PR):** Pull Request #17  
+**انحراف‌های ثبت‌شده (Deviations):**
+- **D-0:** قفل بودن شاخه و توکن گیت‌هاب برای تغییر مستقیم ورک‌فلوها (استفاده از `ci/ci.stage3.yml`).
+- **D-2:** اجرای یکپارچه بدون توقف در گیت تایید اولیه سرپرست ناشی از اختلال رله پیام (ثبت و مستند شد).  
 **تیم امنیتی (Squad):** SA-1 (مدیر برنامه و هماهنگ‌کننده), SA-2 (تیم قرمز / مهاجم اخلاقی), SA-3 (مهندس امنیت کد / اصلاح), SA-4 (مهندس امنیت زیرساخت), SA-5 (ممیز حریم خصوصی و GDPR), SA-6 (مهندس پایداری و بازیابی بحران), SA-7 (تیم آبی / اعتبارسنج مخالف)
 
 ---
@@ -61,7 +64,7 @@
 | **4** | IDOR — Moodboards | `/api/v1/moodboards/*` | Cross-tenant read, update, and delete attempts on foreign moodboards. | 404 Not Found | **PASS** |
 | **5** | IDOR — Projects | `/api/v1/projects/*`<br>`POST /api/v1/quiz` | Cross-tenant read/delete on projects and unauthorized quiz association. | 404 Not Found | **PASS (Fixed)** |
 | **6** | Share Token Security | `GET /api/v1/share/{token}` | Token enumeration, expired token access, checking for PII leaks (emails/hashes). | 200 (valid) / 404 (fake) / 410 (expired) | **PASS** |
-| **7** | RBAC & Escalation | `/api/v1/admin/*` | Homeowner/Designer access to admin APIs; Admin self-demotion/deactivation. | 403 Forbidden / 409 Conflict | **PASS** |
+| **7** | RBAC & Escalation | `/api/v1/admin/*`<br>`POST /api/v1/auth/register` | Homeowner/Designer access to admin APIs; Admin self-demotion/deactivation; Self-registration as 'admin'/'superuser' (422 rejection). | 403 Forbidden / 409 Conflict / 422 Unprocessable | **PASS** |
 | **8** | Payment Replay | `POST /api/v1/payment/verify` | Replaying verified authority, cross-user authority claiming, invalid authority. | 200 (safe) / 404 (cross/invalid) | **PASS** |
 | **9** | Malicious Uploads | `POST /api/v1/products/upload` | SVG with `<script>`, disguised executable binary (`MZ` header), empty files, decompression bombs. | 415 (type) / 422 (empty) / 413 (bomb) | **PASS** |
 | **10** | SSRF Protection | `validate_public_url`<br>`link_checker` | Loopback `127.0.0.1`, cloud metadata `169.254.169.254`, IPv6 `[::1]`, dangerous schemes (`file://`, `gopher://`). | UnsafeUrl / Refused | **PASS** |
