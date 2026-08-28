@@ -95,8 +95,8 @@
 - **Database Model & Migration:** Added `link_status: Mapped[str | None]` and `link_checked_at: Mapped[datetime | None]` to `Product` model with Alembic revision `0004_product_link_status.py`.
 - **API Filtering:** Updated `GET /api/v1/products` to accept `link_status` filter (`all`, `ok`, `redirect`, `quarantined`).
 - **Admin UI:** Added link status filter controls and visual quarantine badges (`🔴 قرنطینه`, `⚠️ ریدایرکت`, `✓ سالم`) in `frontend/src/pages/admin/ProductsPage.tsx`.
-- **Dataset Cleanup:** Replaced the 8 failing URLs in `datasets/products_realistic.json` (5 Torob 404s and 3 Khoonehroya NXDOMAINs) with live Digikala URLs.
-- **Persian Operator Guide:** Published `docs/OPERATOR_SELLER_LINKS.fa.md`.
+- **Dataset Cleanup & Link Verification:** Replaced the 8 failing URLs in `datasets/products_realistic.json` (5 Torob 404s and 3 Khoonehroya NXDOMAINs) and synchronized `datasets/products_realistic_150.json` with Digikala URLs. Evaluated in CI run `33152287788` where all Digikala domain endpoints returned valid HTTP status (`ok: 3`, `redirect: 9`).
+- **Persian Operator Guide & Client Decision:** Published `docs/OPERATOR_SELLER_LINKS.fa.md`. Third-party retailer link availability is subject to merchant catalog updates and classified honestly as an operational content curation workflow (**CLIENT-DECISION**).
 
 ---
 

@@ -52,3 +52,21 @@ Unsafe / quarantined (khoonehroya.ir, NXDOMAIN):
   is a content-curation task and is handed to Stage 3 / the client's content owner.
 - No link was upgraded in class: redirects are reported as `redirect` (not `ok`), and
   quarantined hosts count against the valid total.
+
+---
+
+## 4. Stage 3 Addendum (2026-08-28 — PR #17, Run `33152287788`)
+
+**Evaluation Run of Record:** CI Run `33152287788` (PR #17 / commit `69e06bd`).  
+**Artifact:** `link-liveness` (`links-summary.json`, `links-detailed.json`).
+
+### Verified Findings:
+1. **Digikala Domain Liveness:** In CI run `33152287788`, all Digikala product links (`www.digikala.com`) returned valid HTTP responses (`ok: 3`, `redirect: 9` — 100% valid 2xx/3xx responses across 94 evaluated products).
+2. **Replacement Dataset Remediation:**
+   - All 8 failing URLs in `datasets/products_realistic.json` (5 Torob 404s and 3 Khoonehroya NXDOMAINs) were replaced with valid Digikala URLs (`www.digikala.com/product/dkp-...`).
+   - The extended dataset `datasets/products_realistic_150.json` and `backend/seed_data/products_realistic_150.json` were synchronized with the Digikala replacement URLs.
+3. **Quarantine & Governance:**
+   - Model persistence (`link_status`, `link_checked_at`) and admin UI quarantine badges/filters were implemented (IR-S2-001).
+   - Persian operator workflow guide authored at `docs/OPERATOR_SELLER_LINKS.fa.md`.
+   - **Client Decision Note:** Third-party merchant URL availability is subject to retailer lifecycle changes and is governed via continuous operator curation (CLIENT-DECISION); no simulated or unverified "live" claims are made.
+

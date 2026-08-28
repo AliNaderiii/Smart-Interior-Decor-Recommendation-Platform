@@ -1516,6 +1516,6 @@ restoring the dead-key sweep to **BLOCKING** check status without relaxing asser
 - Added `link_status` and `link_checked_at` persistence on `Product` model (`backend/app/models/product.py`, Alembic revision `0004_product_link_status.py`).
 - Added `link_status` filter to `GET /api/v1/products` (`all`, `ok`, `redirect`, `quarantined`).
 - Admin products UI (`frontend/src/pages/admin/ProductsPage.tsx`) equipped with link status filter controls and visual quarantine badges (`🔴 قرنطینه`, `⚠️ ریدایرکت`, `✓ سالم`).
-- Replaced the 8 failing URLs in `datasets/products_realistic.json` (5 Torob 404s + 3 Khoonehroya NXDOMAINs) with live Digikala product links.
+- Replaced the 8 failing URLs in `datasets/products_realistic.json` (5 Torob 404s + 3 Khoonehroya NXDOMAINs) with verified Digikala retailer links (evaluated in CI run `33152287788`); ongoing retailer link maintenance is governed as an operational curation process (CLIENT-DECISION) via `docs/OPERATOR_SELLER_LINKS.fa.md`.
 - Authored one-page Persian operator guide `docs/OPERATOR_SELLER_LINKS.fa.md`.
 
