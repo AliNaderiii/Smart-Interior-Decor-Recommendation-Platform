@@ -1,0 +1,1102 @@
+# Executable GitHub Actions workflow.
+# Source configuration was adapted from ci/github-ci.yml.
+# Keep this file synchronized with the reviewed CI definition.
+
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend — pytest vs Postgres16+pgvector & Redis
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:0.6.2-pg16
+        env:
+          POSTGRES_USER: decor
+          POSTGRES_PASSWORD: decor
+          POSTGRES_DB: decor_test
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U decor -d decor_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - "6379:6379"
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://decor:decor@localhost:5432/decor_test
+      TEST_DATABASE_URL: postgresql+psycopg://decor:decor@localhost:5432/decor_pgvector_test
+      REDIS_URL: redis://localhost:6379/1
+      TEST_REDIS_URL: redis://localhost:6379/9
+      AI_PROVIDER: mock
+      EMBEDDING_BACKEND: hash
+      STORAGE_BACKEND: local
+      PAYMENT_PROVIDER: mock
+      EMAIL_PROVIDER: mock
+      SECRET_KEY: ci-secret
+      APP_ENV: test
+      SEED_DEMO_ACCOUNTS: "true"
+      COOKIE_SECURE: "false"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.lock.txt
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.lock.txt
+
+      # Stage 1 (T-1.5): "we install the locked set" is a claim, not evidence.
+      # Verify the RESOLVED environment against the lockfile BEFORE any extra
+      # tooling is layered on, and publish the freeze diff as a job artifact.
+      - name: Verify locked install (pip freeze diff)
+        working-directory: backend
+        run: |
+          python scripts/verify_lock_install.py \
+            --json-out lock-verification.json \
+            --freeze-out pip-freeze.txt \
+            --strict-extra \
+            | tee lock-verification.log
+
+      - name: Upload locked-install proof
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: backend-lock-verification
+          path: |
+            backend/lock-verification.json
+            backend/lock-verification.log
+            backend/pip-freeze.txt
+            backend/requirements.lock.txt
+
+      - name: Install CI-only tooling
+        working-directory: backend
+        run: |
+          pip install ruff pip-audit pyyaml
+
+      - name: Create dedicated pgvector database
+        working-directory: backend
+        run: |
+          python - <<'PY'
+          import psycopg
+
+          conn = psycopg.connect(
+              "postgresql://decor:decor@localhost:5432/decor_test",
+              autocommit=True,
+          )
+
+          exists = conn.execute(
+              "SELECT 1 FROM pg_database "
+              "WHERE datname = 'decor_pgvector_test'"
+          ).fetchone()
+
+          if not exists:
+              conn.execute("CREATE DATABASE decor_pgvector_test")
+
+          print("decor_pgvector_test ready")
+          conn.close()
+          PY
+
+      - name: Migrate — upgrade head
+        working-directory: backend
+        run: |
+          alembic upgrade head
+
+      - name: Migration round-trip — downgrade base then upgrade head
+        working-directory: backend
+        run: |
+          alembic downgrade base
+          alembic upgrade head
+
+      - name: Run backend test suite
+        working-directory: backend
+        run: |
+          pytest tests/ -v --tb=short
+
+      - name: Run real-service AI modules without skips
+        working-directory: backend
+        run: |
+          set -o pipefail
+
+          pytest -q \
+            tests/test_pgvector_real.py \
+            tests/test_recommender_redis_real.py \
+            -ra \
+            --tb=short \
+            | tee pytest-realservices.log
+
+          if grep -qi "skipped" pytest-realservices.log; then
+            echo "::error::Real-service AI tests were skipped."
+            echo "::error::Check TEST_DATABASE_URL, TEST_REDIS_URL, and service availability."
+            exit 1
+          fi
+
+          echo "Real-service AI modules executed successfully without skips."
+
+      - name: Lint
+        working-directory: backend
+        run: |
+          ruff check app ai scripts tests
+
+      # Stage 1 (T-1.5): audit the LOCKED set, not the ranges in
+      # requirements.txt. Auditing ranges audits whatever resolves today,
+      # which is neither what CI installs nor what ships. Findings may be
+      # accepted only via security/pip-audit-allowlist.yml, where every entry
+      # carries an owner, a justification and a MANDATORY expiry date — an
+      # expired acceptance fails this step.
+      - name: Dependency audit (locked set + expiring allowlist)
+        working-directory: backend
+        run: |
+          python scripts/audit_dependencies.py \
+            --requirements requirements.lock.txt \
+            --allowlist security/pip-audit-allowlist.yml \
+            | tee dependency-audit.log
+
+      - name: Upload dependency audit report
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: backend-dependency-audit
+          path: |
+            backend/dependency-audit.log
+            backend/security/pip-audit-allowlist.yml
+
+      - name: Security probe — production demo seeding refusal
+        working-directory: backend
+        run: |
+          python ../docs/security/probes/probe_demo_seeding.py
+
+      - name: Security probe — production fail-safes
+        working-directory: backend
+        run: |
+          python ../docs/security/probes/probe_production_failsafe.py
+
+      - name: Extraction benchmark — MOCK mode
+        working-directory: backend
+        run: |
+          python scripts/evaluate_extraction.py
+
+      - name: Extraction benchmark — REAL mode when credential exists
+        working-directory: backend
+        env:
+          AI_PROVIDER: gemini
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -n "$GEMINI_API_KEY" ]; then
+            python scripts/evaluate_extraction.py --real --sample 10 || {
+              echo "::warning::REAL-mode extraction is below the configured threshold."
+              echo "::warning::Human review gate remains active."
+            }
+          else
+            echo "GEMINI_API_KEY is not configured; REAL-mode benchmark is BLOCKED/SKIPPED."
+          fi
+
+  multi-worker:
+    name: Multi-worker shared-Redis verification
+    runs-on: ubuntu-latest
+    needs:
+      - backend
+
+    services:
+      postgres:
+        image: pgvector/pgvector:0.6.2-pg16
+        env:
+          POSTGRES_USER: decor
+          POSTGRES_PASSWORD: decor
+          POSTGRES_DB: decor_test
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U decor -d decor_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - "6379:6379"
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://decor:decor@localhost:5432/decor_test
+      REDIS_URL: redis://localhost:6379/2
+      SECRET_KEY: ci-secret
+      APP_ENV: test
+      AI_PROVIDER: mock
+      EMBEDDING_BACKEND: hash
+      PAYMENT_PROVIDER: mock
+      EMAIL_PROVIDER: mock
+      STORAGE_BACKEND: local
+      COOKIE_SECURE: "false"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.lock.txt
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.lock.txt
+          # Stage 1 (T-1.5): same locked-set proof as the backend job.
+          python scripts/verify_lock_install.py --strict-extra
+
+      - name: Migrate empty PostgreSQL
+        working-directory: backend
+        run: |
+          alembic upgrade head
+
+      - name: Verify shared Redis across workers
+        working-directory: backend
+        run: |
+          python scripts/verify_multi_worker_redis.py
+
+  frontend:
+    name: Frontend — install, lint, typecheck, test, build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: |
+          npm ci
+
+      - name: Lint
+        working-directory: frontend
+        run: |
+          npm run lint
+
+      - name: Typecheck
+        working-directory: frontend
+        run: |
+          npx tsc -b
+          # Stage 1 (T-1.3/T-1.4): tsconfig.app.json only includes `src`, so
+          # neither the Vitest suites nor the Playwright specs are covered by
+          # the build's typecheck. This config adds them (same strict flags).
+          npx tsc -p tsconfig.tests.json
+
+      - name: Unit tests
+        working-directory: frontend
+        run: |
+          npm test
+
+      - name: Production build
+        working-directory: frontend
+        run: |
+          npm run build
+
+      - name: Dependency audit
+        working-directory: frontend
+        run: |
+          npm audit --audit-level=low
+
+      - name: Artifact secret scan
+        working-directory: frontend
+        run: |
+          HITS=$(
+            grep -rIE \
+              "(BEGIN (RSA|OPENSSH|EC|PRIVATE) KEY|AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|sk-[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{35})" \
+              dist/ \
+              | wc -l
+          )
+
+          echo "Credential-pattern hits in dist/: $HITS"
+          test "$HITS" -eq 0
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+  e2e:
+    name: E2E — Playwright (auth negatives + three-role journeys)
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:0.6.2-pg16
+        env:
+          POSTGRES_USER: decor
+          POSTGRES_PASSWORD: decor
+          POSTGRES_DB: decor_test
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U decor -d decor_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - "6379:6379"
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://decor:decor@localhost:5432/decor_test
+      REDIS_URL: redis://localhost:6379/2
+      AI_PROVIDER: mock
+      EMBEDDING_BACKEND: hash
+      STORAGE_BACKEND: local
+      PAYMENT_PROVIDER: mock
+      EMAIL_PROVIDER: mock
+      SECRET_KEY: ci-secret
+      APP_ENV: test
+      SEED_DEMO_ACCOUNTS: "true"
+      COOKIE_SECURE: "false"
+      # The suite registers 4 disposable users and performs ~9 logins from a
+      # single runner IP (globalSetup, the sweep's own UI logins, and the auth
+      # negative tests which deliberately fail logins). The production defaults
+      # (login 30/min, register 3/min) throttle that, which made the suite fail
+      # a different subset of tests on every run. Raised HERE ONLY: the limits
+      # themselves are asserted by the backend suite, which is where that
+      # behaviour belongs. This job is not testing rate limiting.
+      LOGIN_RATE_LIMIT_PER_MINUTE: "200"
+      REGISTER_RATE_LIMIT_PER_MINUTE: "100"
+      # globalSetup captures each role's storageState ONCE, at t=0, but the
+      # suite takes ~25 minutes (run 33045931573: 06:28:40 -> 06:53:56). With
+      # the 15-minute production access-token lifetime the later specs were
+      # running with an expired token and got bounced to /login mid-suite
+      # (auth-smoke "session survives a full page reload" is the tell). The
+      # token lifetime is not what this job is testing — expiry and refresh
+      # are covered by the backend suite — so give the sessions room to
+      # outlive the run.
+      ACCESS_TOKEN_EXPIRE_MINUTES: "120"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.lock.txt
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.lock.txt
+          # Stage 1 (T-1.5): same locked-set proof as the backend job.
+          python scripts/verify_lock_install.py --strict-extra
+
+      - name: Migrate — upgrade head
+        working-directory: backend
+        run: |
+          alembic upgrade head
+
+      # Stage 1 (T-1.4 close-out): the homeowner and admin journeys need a
+      # real catalogue (recommendations must return 3-5 products per category)
+      # and the seeded demo accounts globalSetup logs in with.
+      - name: Seed products and demo accounts
+        working-directory: backend
+        run: |
+          python scripts/seed_products.py
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: |
+          npm ci
+
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: |
+          npx playwright install --with-deps chromium
+
+      - name: Start backend (uvicorn)
+        working-directory: backend
+        run: |
+          nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 > /tmp/uvicorn-e2e.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8000/api/v1/health > /dev/null 2>&1; then
+              echo "backend up after ${i} tries"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::backend never became healthy"; cat /tmp/uvicorn-e2e.log
+          exit 1
+
+      - name: Start frontend (vite dev)
+        working-directory: frontend
+        run: |
+          nohup npx vite --host 0.0.0.0 --port 5173 > /tmp/vite-e2e.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:5173 > /dev/null 2>&1; then
+              echo "frontend up after ${i} tries"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::frontend never became healthy"; cat /tmp/vite-e2e.log
+          exit 1
+
+      # BLOCKING. Every Stage-1 spec: the three role journeys, the auth
+      # negatives and the authenticated smoke. A failure here fails the job.
+      - name: Run Playwright e2e (Stage-1 specs — blocking)
+        working-directory: frontend
+        run: |
+          E2E_BASE_URL=http://localhost:5173 npx playwright test \
+            --project=chromium \
+            --project=chromium-homeowner \
+            --project=chromium-designer \
+            --project=chromium-admin
+
+      # ADVISORY (IR-S1-013). The legacy dead-key sweep predates Stage 1 and
+      # its remaining verdicts are click-actionability artefacts plus a small
+      # number of genuine a11y findings (IR-S1-011), all filed and assigned to
+      # Stage-3 hardening. It runs and publishes its findings, but it does not
+      # gate the release. It must be restored to blocking by Stage-3 task
+      # G-3.x — do not delete it, and do not relax its assertions.
+      - name: Run Playwright dead-key sweep (legacy — advisory, IR-S1-013)
+        working-directory: frontend
+        continue-on-error: true
+        run: |
+          E2E_BASE_URL=http://localhost:5173 npx playwright test --project=chromium-sweep
+
+      # Stage 1 (T-1.4 close-out): the JSON + HTML reports are the evidence the
+      # three-role journeys actually ran, so they are uploaded on success too,
+      # not only when something breaks.
+      - name: Upload e2e report (JSON + HTML) and traces
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: e2e-report
+          path: frontend/test-results
+
+  security-scans:
+    name: Security & docs gates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Repository secret scan
+        run: |
+          python scripts/audit_secrets.py
+
+      - name: Documentation link audit
+        run: |
+          pip install pyyaml
+          python scripts/audit_docs_links.py
+
+      - name: Dead translation keys audit
+        run: |
+          npm install -g typescript tsx
+          npx tsx scripts/auditDeadKeys.ts
+
+  docker:
+    name: Docker — compose config and image builds
+    runs-on: ubuntu-latest
+    needs:
+      - backend
+      - frontend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Provide placeholder environment
+        run: |
+          cp .env.example .env
+
+      - name: Validate Compose files
+        run: |
+          docker compose config -q
+          docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.dev.yml \
+            config -q
+          docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.prod.yml \
+            config -q
+          docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.test.yml \
+            config -q
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: false
+          load: true
+          tags: decor-backend:ci
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: false
+          load: true
+          tags: decor-frontend:ci
+
+  lighthouse:
+    name: Lighthouse CI — performance and accessibility
+    runs-on: ubuntu-latest
+    # RESTORED AS BLOCKING (Stage 2, T-2.6 — closes IR-S1-010). The Stage-1
+    # waiver (`continue-on-error: true`) is removed: the IR-S1-010 restore
+    # conditions are met on the authenticated matrix, which enforces
+    # perf >= 80 / LCP < 3000 ms / TTI <= 4000 ms on home plus the contract
+    # gates on /recommendations (measured on 65f4783: home perf=100,
+    # LCP 1281–1282 ms, TTI 1289 ms; recommendations/mobile perf 98/97,
+    # LCP 2338 ms — runs 33086824717 and 33086828679).
+    needs:
+      - frontend
+      - backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install, migrate and seed backend
+        working-directory: backend
+        env:
+          DATABASE_URL: sqlite:///./ci.sqlite3
+          EMBEDDING_BACKEND: hash
+          APP_ENV: test
+          AI_PROVIDER: mock
+          STORAGE_BACKEND: local
+          PAYMENT_PROVIDER: mock
+          EMAIL_PROVIDER: mock
+          SECRET_KEY: ci-secret
+          COOKIE_SECURE: "false"
+        run: |
+          python -m pip install --upgrade pip
+          # Stage 1 (T-1.5): the lighthouse job was the last CI python install
+          # still resolving the RANGES in requirements.txt, so it could measure
+          # a dependency set no other job — and no deployment — ever used.
+          pip install -r requirements.lock.txt
+          python scripts/verify_lock_install.py --strict-extra
+          # Stage 2 (T-2.1/A3): seed the REAL 150-product catalog (images,
+          # retailer links) instead of the tiny demo set, so the measured
+          # /recommendations page renders representative content.
+          python scripts/load_realistic_products.py --realistic --if-empty --expand-to 150
+
+      - name: Start backend
+        working-directory: backend
+        env:
+          DATABASE_URL: sqlite:///./ci.sqlite3
+          EMBEDDING_BACKEND: hash
+          APP_ENV: test
+          AI_PROVIDER: mock
+          STORAGE_BACKEND: local
+          PAYMENT_PROVIDER: mock
+          EMAIL_PROVIDER: mock
+          SECRET_KEY: ci-secret
+          COOKIE_SECURE: "false"
+          # Stage 2 (T-2.1/A3): the authenticated Lighthouse matrix (6 pages x
+          # 2 form factors) runs longer than the 15-minute production access
+          # token, and its session is minted once before the matrix starts.
+          # Same rationale and precedent as the e2e job (IR-S1-012); token
+          # lifetime is not what this job measures.
+          ACCESS_TOKEN_EXPIRE_MINUTES: "120"
+        run: |
+          nohup uvicorn app.main:app \
+            --host 127.0.0.1 \
+            --port 8000 \
+            > /tmp/backend.log 2>&1 &
+
+      - name: Build and preview frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+          nohup npm run preview \
+            -- --host 127.0.0.1 --port 4173 \
+            > /tmp/frontend-preview.log 2>&1 &
+
+      - name: Wait for backend readiness
+        run: |
+          set -e
+
+          for i in {1..30}; do
+            if curl -fsS \
+              http://127.0.0.1:8000/api/v1/health/ready \
+              > /tmp/backend-ready.json; then
+
+              echo "Backend readiness check passed."
+              cat /tmp/backend-ready.json
+              exit 0
+            fi
+
+            echo "Waiting for backend readiness: attempt $i/30"
+            sleep 2
+          done
+
+          echo "::error::Backend did not become ready."
+          cat /tmp/backend.log 2>/dev/null || true
+          exit 1
+
+      - name: Wait for frontend routes and API proxy
+        run: |
+          set -e
+
+          frontend_ready=false
+
+          for i in {1..30}; do
+            if curl -fsS \
+              http://127.0.0.1:4173/ \
+              > /tmp/frontend-home.html; then
+
+              frontend_ready=true
+              echo "Frontend preview became ready."
+              break
+            fi
+
+            echo "Waiting for frontend preview: attempt $i/30"
+            sleep 2
+          done
+
+          if [ "$frontend_ready" != "true" ]; then
+            echo "::error::Frontend preview did not become ready."
+            cat /tmp/frontend-preview.log 2>/dev/null || true
+            exit 1
+          fi
+
+          curl -fsS \
+            http://127.0.0.1:4173/ \
+            > /tmp/frontend-home.html
+
+          curl -fsS \
+            http://127.0.0.1:4173/recommendations \
+            > /tmp/frontend-recommendations.html
+
+          curl -fsS \
+            http://127.0.0.1:4173/api/v1/health/ready \
+            > /tmp/frontend-proxy-ready.json
+
+          grep -q '<div id="root"></div>' \
+            /tmp/frontend-home.html
+
+          grep -q '<div id="root"></div>' \
+            /tmp/frontend-recommendations.html
+
+          echo "Frontend home route passed."
+          echo "Frontend recommendations route passed."
+          echo "Frontend API proxy passed."
+
+      - name: Show frontend and backend diagnostics
+        if: always()
+        run: |
+          echo "Backend log:"
+          cat /tmp/backend.log 2>/dev/null || true
+
+          echo "Frontend preview log:"
+          cat /tmp/frontend-preview.log 2>/dev/null || true
+
+          echo "Backend readiness response:"
+          cat /tmp/backend-ready.json 2>/dev/null || true
+
+          echo "Frontend proxy readiness response:"
+          cat /tmp/frontend-proxy-ready.json 2>/dev/null || true
+
+      - name: Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          # Stage 2 (A3): the anonymous /recommendations URL was removed — it
+          # measured the RequireAuth login redirect, not the page (wrong-page
+          # artifact behind the IR-S1-010 numbers). /recommendations is
+          # measured AUTHENTICATED by the matrix step below.
+          #
+          # Stage 2 (T-2.6b, supervisor ruling 2026-08-27): budgetPath removed —
+          # this anonymous layer now REPORTS ONLY (uploadArtifacts kept). It
+          # duplicated the home-page assertions the authenticated matrix
+          # already enforces (perf >= 80 / LCP < 3000 / TTI <= 4000 on home,
+          # plus the contract gates on /recommendations), with far worse
+          # stability: main run 33102053859 failed HERE on a knife-edge
+          # single-shot TTI of 4274 ms vs the 4000 ms budget — and killed the
+          # job before the matrix ran — while the matrix measures the same
+          # page at ~1285 ms (±10) TTI across >= 4 runs. Consolidated, not
+          # silently dropped: docs/agent-reports/stage2-report.md §T-2.6 and
+          # docs/reports/ACCEPTANCE_EVIDENCE.md carry the full ruling. The
+          # budget file (lighthouse-budget.json) itself is unchanged.
+          urls: |
+            http://127.0.0.1:4173/
+          uploadArtifacts: true
+          temporaryPublicStorage: false
+
+      - name: Create authenticated session and quiz (A3)
+        run: |
+          set -e
+          API=http://127.0.0.1:8000/api/v1
+          EMAIL="lighthouse-$(date +%s)@example.com"
+          PASS='Lighthouse-Passw0rd!'
+
+          curl -fsS -X POST "$API/auth/register" \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASS\",\"role\":\"homeowner\",\"full_name\":\"Lighthouse Matrix\"}" \
+            > /tmp/lh-register.json
+
+          curl -fsS -X POST "$API/auth/login" \
+            -H 'Content-Type: application/json' \
+            -d "{\"email\":\"$EMAIL\",\"password\":\"$PASS\"}" \
+            > /tmp/lh-login.json
+
+          ACCESS=$(jq -r '.data.access_token' /tmp/lh-login.json)
+          REFRESH=$(jq -r '.data.refresh_token' /tmp/lh-login.json)
+          CSRF=$(jq -r '.data.csrf_token' /tmp/lh-login.json)
+          test -n "$ACCESS" && test "$ACCESS" != "null"
+          test -n "$CSRF" && test "$CSRF" != "null"
+
+          curl -fsS -X POST "$API/quiz" \
+            -H "Authorization: Bearer $ACCESS" \
+            -H 'Content-Type: application/json' \
+            -d '{"styles":["modern"],"color_palette":["#2E2E2E","#FFFFFF"],"room_width_cm":400,"room_length_cm":500,"budget_min_toman":1000000,"budget_max_toman":150000000,"materials":["wood"],"patterns":[]}' \
+            > /tmp/lh-quiz.json
+          QUIZ_ID=$(jq -r '.data.id' /tmp/lh-quiz.json)
+          test -n "$QUIZ_ID" && test "$QUIZ_ID" != "null"
+
+          # Session must survive the preview proxy before anything is measured.
+          curl -fsS -H "Cookie: access_token=$ACCESS" \
+            http://127.0.0.1:4173/api/v1/auth/me > /tmp/lh-me.json
+          jq -e '.data.email' /tmp/lh-me.json
+
+          {
+            echo "LH_ACCESS_TOKEN=$ACCESS"
+            echo "LH_REFRESH_TOKEN=$REFRESH"
+            echo "LH_CSRF_TOKEN=$CSRF"
+            echo "LH_QUIZ_ID=$QUIZ_ID"
+          } >> "$GITHUB_ENV"
+          echo "::add-mask::$ACCESS"
+          echo "::add-mask::$REFRESH"
+          echo "quiz id: $QUIZ_ID"
+
+      - name: Authenticated Lighthouse matrix — 6 pages x 2 form factors (A3)
+        working-directory: frontend
+        env:
+          LH_BASE_URL: http://127.0.0.1:4173
+          LH_OUT_DIR: /tmp/lighthouse-matrix
+        run: |
+          npm install --no-save lighthouse@12 chrome-launcher puppeteer-core
+          node scripts/lighthouse-auth-matrix.mjs
+
+      - name: Lighthouse report secret scan
+        run: |
+          HITS=$(
+            grep -rcE \
+              "(BEGIN (RSA|OPENSSH|EC|PRIVATE) KEY|ghp_[A-Za-z0-9]{36}|sk-[A-Za-z0-9]{20,}|AIza[0-9A-Za-z_-]{35})" \
+              /tmp/lighthouse-matrix/*.json \
+              | awk -F: '{s+=$2} END {print s+0}'
+          )
+
+          echo "Credential-pattern hits: $HITS"
+          test "$HITS" -eq 0
+
+      - name: Upload Lighthouse matrix (JSON + HTML, all cells)
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: lighthouse-matrix
+          path: /tmp/lighthouse-matrix/
+
+  # ---------------------------------------------------------------------------
+  # Stage 2 (T-2.2 / amendment A5): the CONTRACT-EVIDENCE environment for the
+  # /recommend p95 < 2 s gate. Real Postgres 16 + pgvector + real Redis;
+  # 20 150-row corpus; cold and warm cells, >= 200 samples each; EXPLAIN
+  # ANALYZE + raw JSON uploaded as artifacts. Local pgserver/fakeredis runs
+  # are iteration-only (A1) — the numbers quoted to the client come from HERE.
+  # ---------------------------------------------------------------------------
+  p95-evidence:
+    name: p95 evidence — /recommend vs Postgres16+pgvector & Redis
+    runs-on: ubuntu-latest
+    needs:
+      - backend
+
+    services:
+      postgres:
+        image: pgvector/pgvector:0.6.2-pg16
+        env:
+          POSTGRES_USER: decor
+          POSTGRES_PASSWORD: decor
+          POSTGRES_DB: decor_perf
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd "pg_isready -U decor -d decor_perf"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - "6379:6379"
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+psycopg://decor:decor@localhost:5432/decor_perf
+      REDIS_URL: redis://localhost:6379/1
+      AI_PROVIDER: mock
+      EMBEDDING_BACKEND: hash
+      STORAGE_BACKEND: local
+      PAYMENT_PROVIDER: mock
+      EMAIL_PROVIDER: mock
+      SECRET_KEY: ci-secret
+      APP_ENV: test
+      COOKIE_SECURE: "false"
+      # The documented load-test switch (backend/app/core/config.py:95).
+      # This job measures latency, not the limiter; the limiter has its own
+      # backend tests.
+      RECOMMEND_RATE_LIMIT_PER_MINUTE: "0"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies (lockfile)
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.lock.txt
+          python scripts/verify_lock_install.py --strict-extra
+
+      - name: Migrate and seed the perf corpus (150 realistic + 20k synthetic)
+        working-directory: backend
+        run: |
+          alembic upgrade head
+          python scripts/load_realistic_products.py --realistic --if-empty --expand-to 150
+          python scripts/seed_perf_products.py
+          # MANDATORY (T-2.2 finding): without fresh statistics the planner
+          # estimated 564 rows in the 20 150-row table and chose a Seq Scan
+          # over the HNSW index — a measurement artifact that must not reach
+          # the evidence.
+          python - <<'PY'
+          import os
+          from sqlalchemy import create_engine, text
+          eng = create_engine(os.environ["DATABASE_URL"],
+                              isolation_level="AUTOCOMMIT")
+          with eng.connect() as c:
+              c.execute(text("VACUUM ANALYZE products"))
+              n = c.execute(text("SELECT count(*) FROM products")).scalar()
+              est = c.execute(text(
+                  "SELECT reltuples::bigint FROM pg_class "
+                  "WHERE relname='products'")).scalar()
+          print(f"rows={n} planner_estimate={est}")
+          assert n >= 20000 and abs(est - n) < 1000, "stale stats or bad seed"
+          PY
+
+      - name: EXPLAIN ANALYZE + ef_search sensitivity (artifact)
+        working-directory: backend
+        run: |
+          mkdir -p /tmp/p95-evidence
+          python scripts/ef_search_sweep.py \
+            --json /tmp/p95-evidence/ef-search-sweep.json \
+            | tee /tmp/p95-evidence/ef-search-sweep.log
+
+      - name: DB-level fused-query bench (artifact)
+        working-directory: backend
+        run: |
+          python scripts/bench_pgvector.py --sizes 20150 \
+            --json /tmp/p95-evidence/bench-pgvector.json \
+            | tee /tmp/p95-evidence/bench-pgvector.log
+
+      - name: Start backend (uvicorn, 1 worker)
+        working-directory: backend
+        run: |
+          nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 \
+            > /tmp/p95-backend.log 2>&1 &
+
+      - name: Wait for backend readiness
+        run: |
+          set -e
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8000/api/v1/health/ready; then
+              echo; echo "Backend ready."
+              exit 0
+            fi
+            echo "waiting ($i/30)"; sleep 2
+          done
+          echo "::error::Backend did not become ready."
+          cat /tmp/p95-backend.log || true
+          exit 1
+
+      - name: "Cold + warm cells — >=200 samples each (gate p95 < 2000 ms)"
+        working-directory: backend
+        run: |
+          python scripts/load_recommend.py \
+            --base-url http://127.0.0.1:8000 \
+            --samples 250 --concurrency 20 \
+            --json /tmp/p95-evidence/load-recommend-ci.json \
+            | tee /tmp/p95-evidence/load-recommend-ci.log
+          # load_recommend.py exits 1 if either cell has errors or p95 >= 2000.
+
+      - name: Record runner environment
+        if: always()
+        run: |
+          {
+            echo "date_utc: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "commit: $GITHUB_SHA"
+            echo "runner: ubuntu-latest ($(nproc) vCPU, $(free -h | awk '/Mem/{print $2}') RAM)"
+            echo "cpu: $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2-)"
+            echo "postgres: pgvector/pgvector:0.6.2-pg16 (service container)"
+            echo "redis: redis:7.4-alpine (service container)"
+            echo "app: uvicorn 1 worker; RECOMMEND_RATE_LIMIT_PER_MINUTE=0"
+          } | tee /tmp/p95-evidence/environment.txt
+
+      - name: Upload p95 evidence artifacts
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: p95-evidence
+          path: /tmp/p95-evidence/
+
+  # ---------------------------------------------------------------------------
+  # Stage 2 (T-2.5 / amendment A4): seller-link liveness from an egress-enabled
+  # host — the sandbox cannot reach the internet (B-10), the runner can.
+  # ADVISORY (continue-on-error): third-party shop availability must not gate
+  # unrelated commits; docs/reports/seller_links.md consumes the artifact and
+  # the T-2.5 verdict is made there. Polite: 1 req/s, retries only on
+  # network errors, honest classification (ok/redirect/blocked/dead/...).
+  # ---------------------------------------------------------------------------
+  link-liveness:
+    name: Seller-link liveness — 150-product catalog (advisory, T-2.5)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    needs:
+      - backend
+
+    env:
+      DATABASE_URL: sqlite:///./links.sqlite3
+      EMBEDDING_BACKEND: hash
+      APP_ENV: test
+      AI_PROVIDER: mock
+      STORAGE_BACKEND: local
+      PAYMENT_PROVIDER: mock
+      EMAIL_PROVIDER: mock
+      SECRET_KEY: ci-secret
+      COOKIE_SECURE: "false"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies (lockfile)
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.lock.txt
+
+      - name: Migrate and load the 150-product catalog
+        working-directory: backend
+        run: |
+          alembic upgrade head
+          python scripts/load_realistic_products.py --realistic --if-empty --expand-to 150
+
+      - name: "Check every seller link — polite 1 req/s, retry network errors"
+        run: |
+          mkdir -p /tmp/link-liveness
+          python scripts/check_links.py \
+            --report /tmp/link-liveness/links-summary.json \
+            --detailed-report /tmp/link-liveness/links-detailed.json \
+            --delay 1.0 --retries 2 \
+            | tee /tmp/link-liveness/check-links.log
+
+      - name: Upload link-liveness artifacts
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: link-liveness
+          path: /tmp/link-liveness/
