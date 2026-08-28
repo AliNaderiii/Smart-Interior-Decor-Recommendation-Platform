@@ -17,7 +17,7 @@
 در مرحله ۳ تحویل پروژه، یک ارزیابی امنیتی جامع و تهاجمی (Red-Team Penetration Testing) بر روی کلیه نقاط پایانی (Endpoints)، سیستم احراز هویت، اعطای دسترسی، جریان پرداخت، بارگذاری فایل‌ها، کنترل کوکی‌ها و هدرهای امنیتی، مکانیزم‌های انطباق با قوانین حفاظت از داده‌ها (GDPR Art. 15/17) و روال‌های بازیابی از بحران (DR) انجام گرفت.
 
 ### دستاوردهای کلیدی مرحله ۳:
-1. **انجام تست نفوذ کامل بر روی ۱۴ دسته حمله:** تمامی دسته‌های حمله اعم از دور زدن احراز هویت، جعل و دستکاری توکن JWT، چرخش و رقابت رفرش‌توکن، آسیب‌پذیری‌های ارجاع مستقیم شیء ناامن (IDOR)، جعل درخواست میان‌وب‌گاهی (CSRF)، تزریق اسکریپت (XSS)، بارگذاری فایل‌های مخرب، جعل درخواست سمت سرور (SSRF)، دور زدن محدودیت نرخ (Rate Limit) و نشت اطلاعات در خطای سیستم ارزیابی و لاگ‌های خام استخراج گردید.
+1. **انجام تست نفوذ جامع (۱۵ تست / ۱۶ دسته لاگ‌شده / ۹۴ رکورد JSONL):** ارزیابی تهاجمی بر روی تمامی دسته‌های حمله اعم از دور زدن احراز هویت، جعل و دستکاری توکن JWT، چرخش و رقابت رفرش‌توکن، آسیب‌پذیری‌های ارجاع مستقیم شیء ناامن (IDOR)، جعل درخواست میان‌وب‌گاهی (CSRF)، تزریق اسکریپت (XSS)، بارگذاری فایل‌های مخرب، جعل درخواست سمت سرور (SSRF)، دور زدن محدودیت نرخ (Rate Limit) و نشت اطلاعات در خطای سیستم انجام و لاگ‌های خام استخراج گردید.
 2. **کشف و رفع کلیه آسیب‌پذیری‌ها:**
    - **آسیب‌پذیری S3-F001 (شدت: بالا / High):** نقص کنترل دسترسی در انتساب کوییز به پروژه‌های سایر طراحان در `POST /api/v1/quiz` کشف و برطرف گردید.
    - **آسیب‌پذیری S3-F002 (شدت: متوسط / Medium):** عدم پاک‌سازی حافظه کش Redis کاربر پس از حذف کامل حساب (GDPR Art. 17) کشف و برطرف گردید.
@@ -116,13 +116,22 @@ The machine-verifiable pentest telemetry file `docs/agent-reports/stage3-evidenc
 - **Backend Pytest Suite:** **588 passed, 22 skipped, 0 failed** (includes 15 penetration test scenarios and 2 DR restore tests).
 - **Frontend Vitest Suite:** **65 passed, 0 failed** across 10 test files.
 - **Frontend Strict Build (`tsc -b && vite build`):** **0 errors / built in < 1s**.
-- **Playwright E2E & Dead-Key Sweep:**
-  - Push Run `33194531963` on HEAD `8e0b6a9ce163c3a3f79b2327e32b4944693eae0d`: **All 9/9 Jobs GREEN / SUCCESS** (including Step 13 Stage-1 specs and Step 14 blocking dead-key sweep).
-  - Push Run `33193682947` on HEAD `7c2b0bba3a8f19f4b8b5b563e64608470027c88d`: **All 9/9 Jobs GREEN / SUCCESS** (including Step 13 Stage-1 specs and Step 14 blocking dead-key sweep).
+- **Playwright E2E & Dead-Key Sweep (Verified Consecutive Green Runs):**
+  1. Push Run `33196063635` (HEAD `044f79035d1b4830a98cf5883932e8a8e625d140`): **All 9/9 Jobs GREEN / SUCCESS**
+  2. Push Run `33195327662` (HEAD `b79da0e81c157080d915ae04a6e7b9b9df4666bf`): **All 9/9 Jobs GREEN / SUCCESS**
+  3. PR Run `33195332708` (HEAD `b79da0e81c157080d915ae04a6e7b9b9df4666bf`): **All 9/9 Jobs GREEN / SUCCESS**
+  4. Push Run `33194531963` (HEAD `8e0b6a9ce163c3a3f79b2327e32b4944693eae0d`): **All 9/9 Jobs GREEN / SUCCESS**
+  5. Push Run `33193682947` (HEAD `7c2b0bba3a8f19f4b8b5b563e64608470027c88d`): **All 9/9 Jobs GREEN / SUCCESS**
 
 ### 6.1 Performance & CI Runner Diagnostic Analysis
-- **p95 Evidence Gate:** Cold and warm cells (>200 samples each) passed comfortably below the 2000 ms gate with 2 uvicorn workers and shared Redis caching.
-- **Lighthouse CI Telemetry:** Authenticated Lighthouse matrix (6 pages x 2 form factors) passing contract scores.
+- **p95 Evidence Gate (Verbatim Artifact Output):**
+  - Run `33196063635`: `cold p95=1705.7 warm p95=120.3, n=250/cell, conc=20, err=0, cold_pass=True` (Gate: `< 2000 ms` -> PASS).
+  - Run `33195327662`: `cold p95=1661.0 warm p95=150.2, n=250/cell, conc=20, err=0, cold_pass=True` (Gate: `< 2000 ms` -> PASS).
+  - Separate DB-level fused query benchmark (pgvector standalone bench): p95 ~= `16 ms`.
+- **Lighthouse CI Matrix (Verbatim Artifact Lines):**
+  - Evaluated across 6 pages x 2 form factors (`home`, `login`, `quiz`, `recommendations`, `moodboards`, `shopping-list`; categories: `Performance`, `Accessibility`, `Best Practices`):
+    - `home/mobile`: Performance = `99`, LCP = `2110 ms`
+    - `recommendations/mobile`: Performance = `98-99`, LCP = `2114 ms`
 - **Pipeline Pipefail & Concurrency Hardening (`ci/ci.stage3.yml`):**
   - Added `set -o pipefail` to all CI pipeline steps where test output or benchmarks are piped into `tee` (`lock-verification`, `dependency-audit`, `ef-search-sweep`, `bench-pgvector`, `load-recommend`, `check-links`).
   - Configured `uvicorn` in `p95-evidence` to run with 2 workers (`--workers 2`) on the 2-vCPU runner. Rationale: DB-level fused query is 15-21 ms, but a single worker causes artificial app-layer queueing at concurrency=20, whereas production runs multi-worker with warm-cell caching shared via Redis.
