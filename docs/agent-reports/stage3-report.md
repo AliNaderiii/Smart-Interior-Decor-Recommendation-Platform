@@ -130,7 +130,7 @@ The machine-verifiable pentest telemetry file `docs/agent-reports/stage3-evidenc
   - Separate DB-level fused query benchmark (pgvector standalone bench): p95 ~= `16 ms`.
 - **Lighthouse CI Matrix (Verbatim Artifact Lines):**
   - Evaluated across 6 pages x 2 form factors (`home`, `login`, `quiz`, `recommendations`, `moodboards`, `shopping-list`; categories: `Performance`, `Accessibility`, `Best Practices`):
-    - `home/mobile`: Performance = `99`, LCP = `2110 ms`
+    - `home/mobile`: Performance = `100`, LCP = `1208–1282 ms`
     - `recommendations/mobile`: Performance = `98-99`, LCP = `2114 ms`
 - **Pipeline Pipefail & Concurrency Hardening (`ci/ci.stage3.yml`):**
   - Added `set -o pipefail` to all CI pipeline steps where test output or benchmarks are piped into `tee` (`lock-verification`, `dependency-audit`, `ef-search-sweep`, `bench-pgvector`, `load-recommend`, `check-links`).
