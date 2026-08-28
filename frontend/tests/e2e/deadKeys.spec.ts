@@ -387,9 +387,15 @@ test.describe("dead keys — specific known suspects", () => {
 
     const firstBefore = await page.locator("tbody tr").first().innerText();
     const sortBtn = page.getByRole("button", { name: /price|قیمت|sort by price/i });
+    // First click sets asc; if default list was already min-price at index 0, second click sets desc (guarantees inversion)
     await sortBtn.click({ timeout: 15_000 });
     await page.waitForTimeout(300);
-    const firstAfter = await page.locator("tbody tr").first().innerText();
+    let firstAfter = await page.locator("tbody tr").first().innerText();
+    if (firstAfter === firstBefore) {
+      await sortBtn.click({ timeout: 15_000 });
+      await page.waitForTimeout(300);
+      firstAfter = await page.locator("tbody tr").first().innerText();
+    }
     expect(firstAfter).not.toBe(firstBefore);
   });
 
