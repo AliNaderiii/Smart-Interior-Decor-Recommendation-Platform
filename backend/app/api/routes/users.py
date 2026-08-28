@@ -33,8 +33,6 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy import delete, select, update
 from sqlalchemy.orm import Session
 
-logger = logging.getLogger(__name__)
-
 from app.api.deps import get_current_user
 from app.core.config import settings
 from app.core.rate_limit import enforce_rate_limit
@@ -49,6 +47,8 @@ from app.models.subscription import Payment, Subscription
 from app.models.user import User
 from app.schemas.common import ok
 from app.services import audit
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/users", tags=["users"])
 

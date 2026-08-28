@@ -13,25 +13,20 @@ import os
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any
 
 import jwt
 import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
 
-from app.core import brute_force
-from app.core.config import settings
-from app.core.cookies import ACCESS_COOKIE, CSRF_COOKIE, CSRF_HEADER, REFRESH_COOKIE
+from app.core.cookies import ACCESS_COOKIE, CSRF_COOKIE, CSRF_HEADER
 from app.core.redis_client import get_redis
 from app.core.security import create_token, hash_password
 from app.core.url_safety import UnsafeUrl, validate_public_url
-from app.main import app
 from app.models.moodboard import Moodboard
-from app.models.product import Product
 from app.models.project import Project, ShareLink
 from app.models.quiz import StyleQuiz
-from app.models.subscription import Payment, Subscription
+from app.models.subscription import Subscription
 from app.models.user import User
 
 logger = logging.getLogger("penetration_test")
@@ -95,7 +90,7 @@ def _create_user(db, email: str, role: str = "homeowner", active: bool = True) -
 # ============================================================================
 def test_attack_class_1_auth_and_brute_force(client: TestClient, db):
     email = f"e2e-victim-{uuid.uuid4().hex[:8]}@example.com"
-    user = _create_user(db, email, "homeowner")
+    _create_user(db, email, "homeowner")
 
     # Positive case: valid login succeeds
     resp = client.post("/api/v1/auth/login", json={"email": email, "password": "Pass1234!Secure"})
@@ -109,7 +104,7 @@ def test_attack_class_1_auth_and_brute_force(client: TestClient, db):
     for i in range(1, 5):
         r = client.post("/api/v1/auth/login", json={"email": email, "password": f"wrong_{i}"}, headers=headers)
         assert r.status_code == 401
-    
+
     # 5th failure triggers lockout
     lockout_resp = client.post(
         "/api/v1/auth/login", json={"email": email, "password": "wrong_5"}, headers=headers

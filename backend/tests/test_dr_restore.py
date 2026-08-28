@@ -9,16 +9,12 @@ import os
 import shutil
 import tempfile
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 
-import pytest
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
-from app.models.base import Base
 from app.models.product import Product
-from app.models.user import User
 
 
 def test_backup_retention_pruning():
