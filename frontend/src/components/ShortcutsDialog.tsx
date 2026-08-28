@@ -3,7 +3,8 @@
  *  A keyboard layer nobody can discover may as well not exist. Linear's answer
  *  is a single "?" that lists everything; this is that, lazy-loaded so it
  *  costs nothing until asked for. */
-import { useEffect } from "react";
+import { useRef } from "react";
+import { useDialog } from "@/hooks/useDialog";
 
 const GROUPS: { title: string; items: [string, string][] }[] = [
   {
@@ -35,16 +36,20 @@ const GROUPS: { title: string; items: [string, string][] }[] = [
 ];
 
 export default function ShortcutsDialog({ onClose }: { onClose: () => void }) {
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useDialog({
+    isOpen: true,
+    onClose,
+    containerRef,
+    restoreFocus: true,
+    trapFocus: true,
+    closeOnEscape: true,
+  });
 
   return (
     <div
+      ref={containerRef}
       className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4 backdrop-blur-sm"
       role="dialog"
       aria-modal="true"

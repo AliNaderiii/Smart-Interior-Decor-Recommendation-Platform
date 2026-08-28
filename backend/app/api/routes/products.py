@@ -59,6 +59,7 @@ def _reembed(product: Product) -> None:
 def list_products(
     category: str | None = None,
     is_verified: bool | None = None,
+    link_status: str | None = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -69,6 +70,14 @@ def list_products(
         stmt = stmt.where(Product.category == category)
     if is_verified is not None:
         stmt = stmt.where(Product.is_verified.is_(is_verified))
+    if link_status:
+        if link_status == "quarantined":
+            stmt = stmt.where(
+                (Product.link_status.in_(["dead", "unsafe", "blocked"]))
+                | (Product.seller_link_ok.is_(False))
+            )
+        else:
+            stmt = stmt.where(Product.link_status == link_status)
     total = db.scalar(select(func.count()).select_from(stmt.subquery()))
     rows = db.scalars(
         stmt.order_by(Product.created_at.desc())

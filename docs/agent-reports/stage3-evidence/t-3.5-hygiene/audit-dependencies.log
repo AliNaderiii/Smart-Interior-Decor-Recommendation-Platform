@@ -1,0 +1,10 @@
+Dependency audit — 2026-08-28
+  requirements: /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/requirements.lock.txt
+  allowlist:    /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/security/pip-audit-allowlist.yml
+
+Allowlist entries (valid, unexpired): 0
+
+$ /home/user/backend_env/bin/python -m pip_audit --requirement /home/user/Smart-Interior-Decor-Recommendation-Platform/backend/requirements.lock.txt --format json --progress-spinner off
+pip-audit findings: 0
+
+PASS: no unsuppressed vulnerabilities in the locked dependency set.

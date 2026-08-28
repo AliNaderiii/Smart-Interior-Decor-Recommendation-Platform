@@ -150,13 +150,17 @@ def check_url(url: str, timeout: float = 10.0) -> bool:
 def check_product_link(product_id: str) -> None:
     """Background task: validate a product's seller link and persist result."""
     from app.db.session import SessionLocal
+    from app.models.base import utcnow
     from app.models.product import Product
 
     db = SessionLocal()
     try:
         product = db.get(Product, product_id)
         if product and product.seller_link:
-            product.seller_link_ok = check_url(product.seller_link)
+            res = check_url_detailed(product.seller_link)
+            product.seller_link_ok = res.ok
+            product.link_status = res.classification
+            product.link_checked_at = utcnow()
             db.commit()
     finally:
         db.close()

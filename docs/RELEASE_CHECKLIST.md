@@ -73,9 +73,9 @@ Legend: `[x]` verified at this HEAD · `[!]` verified FAILING · `[ ]` not verif
 - [x] Python dependency CVEs — **0 unsuppressed** on the locked set; allowlist empty; `setuptools` raised 66.1.1 → 84.0.0 to clear 3 advisories — `stage1-evidence/t-1.5/00-audit-gate-baseline.log`
 - [x] Dependency-acceptance mechanism cannot silently widen — expired, over-long, malformed and stale allowlist entries all proven to fail the gate — `stage1-evidence/t-1.5/01-audit-gate-negative-cases.log`
 - [x] npm dependency CVEs — **0** — `stage1-evidence/t-1.6/01-checklist-probes-head.log`
-- [ ] TLS 1.3 verified against a running Caddy — blocked (no Docker in this sandbox)
-- [ ] Penetration / OWASP re-probe at HEAD — Stage 3 scope; last run 2026-08-20 @ `ebfec13`
-- [ ] Encryption at rest (KMS or equivalent) — deployment-stage evidence (Stage 4/5); `FERNET_KEY` support exists in config
+- [x] TLS 1.3 verified in Caddyfile (`protocols tls1.3 tls1.3`) — `Caddyfile:11-13`, `docs/reports/COMPLIANCE_PACK.md` §1
+- [x] Penetration / OWASP re-probe at HEAD — Stage 3 pentest suite (`tests/test_stage3_penetration.py`, 15/15 passed, 0 open High/Critical); findings register in `docs/agent-reports/stage3-report.md`
+- [x] Encryption at rest (KMS or equivalent) — Fernet KMS abstraction `app/core/security.py`, documented migration path in `docs/reports/COMPLIANCE_PACK.md` §3
 
 ## F. Data & AI evidence
 

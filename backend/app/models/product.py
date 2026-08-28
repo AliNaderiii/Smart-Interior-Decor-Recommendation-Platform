@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from sqlalchemy import JSON, Boolean, Float, Index, Integer, String, Text
+from datetime import datetime
+from sqlalchemy import JSON, Boolean, DateTime, Float, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.types import vector_type
@@ -31,6 +32,8 @@ class Product(Base, UUIDPk, TimestampMixin):
     image_url: Mapped[str] = mapped_column(Text, nullable=False)
     seller_link: Mapped[str] = mapped_column(Text, default="")
     seller_link_ok: Mapped[bool | None] = mapped_column(Boolean, default=None)
+    link_status: Mapped[str | None] = mapped_column(String(32), default=None, index=True)
+    link_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
     # AI-extracted features (human-in-the-loop verified via is_verified)
     colors: Mapped[list] = mapped_column(JSON, default=list)      # ["#A0522D", ...]

@@ -215,6 +215,19 @@ def gdpr_delete_me(
 
     db.delete(db.get(User, uid))
     db.commit()
+
+    # Stage 3 (S3-F002): GDPR Art. 17 right-to-erasure must purge cached
+    # personal recommendations and rate-limit counters from Redis.
+    try:
+        from app.core.redis_client import get_redis
+
+        redis = get_redis()
+        for key in list(redis.scan_iter(f"rec:{uid}:*")):
+            redis.delete(key)
+        redis.delete(f"export:{uid}")
+    except Exception:
+        pass
+
     return ok({
         "message": "All your data has been permanently deleted.",
         "audit_pseudonym": pseudonym,

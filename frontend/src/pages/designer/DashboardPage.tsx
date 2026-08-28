@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, get, post } from "@/lib/api";
@@ -8,6 +8,7 @@ import { EmptyState, ErrorState } from "@/components/states";
 import { useToast } from "@/components/Toast";
 import { useCommands } from "@/components/CommandPalette";
 import { STATUS_META, avatarFor, getStatus, type ProjectStatus } from "@/lib/projectStatus";
+import { useDialog } from "@/hooks/useDialog";
 
 type Filter = "all" | ProjectStatus;
 
@@ -43,6 +44,89 @@ function StatusPill({ status }: { status: ProjectStatus }) {
       <span className={`h-1.5 w-1.5 rounded-full ${meta.dot}`} aria-hidden="true" />
       {meta.label}
     </span>
+  );
+}
+
+function CreateProjectModal({
+  form,
+  setForm,
+  onClose,
+  onSubmit,
+  isPending,
+}: {
+  form: { name: string; client_name: string; client_email: string };
+  setForm: (f: { name: string; client_name: string; client_email: string }) => void;
+  onClose: () => void;
+  onSubmit: () => void;
+  isPending: boolean;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useDialog({
+    isOpen: true,
+    onClose,
+    containerRef,
+    restoreFocus: true,
+    trapFocus: true,
+    closeOnEscape: true,
+  });
+
+  return (
+    <div
+      ref={containerRef}
+      className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Create project"
+      onClick={onClose}
+    >
+      <Card className="w-full max-w-md p-6" onClick={(e) => e.stopPropagation()}>
+        <h2 className="text-lg font-semibold text-[var(--color-ink)]">New client project</h2>
+        <div className="mt-4 space-y-3">
+          <div>
+            <label htmlFor="p-name" className="mb-1 block text-sm font-medium text-[var(--color-ink)]">
+              Project name
+            </label>
+            <Input
+              id="p-name"
+              autoFocus
+              value={form.name}
+              placeholder="Villa Lavasan — living room"
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
+          </div>
+          <div>
+            <label htmlFor="p-client" className="mb-1 block text-sm font-medium text-[var(--color-ink)]">
+              Client name
+            </label>
+            <Input
+              id="p-client"
+              value={form.client_name}
+              onChange={(e) => setForm({ ...form, client_name: e.target.value })}
+            />
+          </div>
+          <div>
+            <label htmlFor="p-email" className="mb-1 block text-sm font-medium text-[var(--color-ink)]">
+              Client email (optional)
+            </label>
+            <Input
+              id="p-email"
+              type="email"
+              value={form.client_email}
+              onChange={(e) => setForm({ ...form, client_email: e.target.value })}
+            />
+          </div>
+        </div>
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button variant="accent" onClick={onSubmit} disabled={!form.name || isPending}>
+            {isPending ? "Creating…" : "Create"}
+          </Button>
+        </div>
+      </Card>
+    </div>
   );
 }
 
@@ -121,60 +205,13 @@ export default function DesignerDashboardPage() {
       </div>
 
       {open && (
-        <div
-          className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Create project"
-          onKeyDown={(e) => e.key === "Escape" && setOpen(false)}
-        >
-          <Card className="w-full max-w-md p-6">
-            <h2 className="text-lg font-semibold text-[var(--color-ink)]">New client project</h2>
-            <div className="mt-4 space-y-3">
-              <div>
-                <label htmlFor="p-name" className="mb-1 block text-sm font-medium text-[var(--color-ink)]">
-                  Project name
-                </label>
-                <Input
-                  id="p-name"
-                  autoFocus
-                  value={form.name}
-                  placeholder="Villa Lavasan — living room"
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                />
-              </div>
-              <div>
-                <label htmlFor="p-client" className="mb-1 block text-sm font-medium text-[var(--color-ink)]">
-                  Client name
-                </label>
-                <Input
-                  id="p-client"
-                  value={form.client_name}
-                  onChange={(e) => setForm({ ...form, client_name: e.target.value })}
-                />
-              </div>
-              <div>
-                <label htmlFor="p-email" className="mb-1 block text-sm font-medium text-[var(--color-ink)]">
-                  Client email (optional)
-                </label>
-                <Input
-                  id="p-email"
-                  type="email"
-                  value={form.client_email}
-                  onChange={(e) => setForm({ ...form, client_email: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="mt-5 flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-              <Button variant="accent" onClick={() => create.mutate()} disabled={!form.name || create.isPending}>
-                {create.isPending ? "Creating…" : "Create"}
-              </Button>
-            </div>
-          </Card>
-        </div>
+        <CreateProjectModal
+          form={form}
+          setForm={setForm}
+          onClose={() => setOpen(false)}
+          onSubmit={() => create.mutate()}
+          isPending={create.isPending}
+        />
       )}
 
       {/* Linear's filter row: counts inline, current filter has weight, no chrome. */}

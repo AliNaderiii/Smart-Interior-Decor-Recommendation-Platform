@@ -504,15 +504,10 @@ jobs:
             --project=chromium-designer \
             --project=chromium-admin
 
-      # ADVISORY (IR-S1-013). The legacy dead-key sweep predates Stage 1 and
-      # its remaining verdicts are click-actionability artefacts plus a small
-      # number of genuine a11y findings (IR-S1-011), all filed and assigned to
-      # Stage-3 hardening. It runs and publishes its findings, but it does not
-      # gate the release. It must be restored to blocking by Stage-3 task
-      # G-3.x — do not delete it, and do not relax its assertions.
-      - name: Run Playwright dead-key sweep (legacy — advisory, IR-S1-013)
+      # Stage 3 (IR-S1-013): restored to BLOCKING after click-actionability triage
+      # and global useDialog accessible modal adoption.
+      - name: Run Playwright dead-key sweep (blocking — IR-S1-013 restored)
         working-directory: frontend
-        continue-on-error: true
         run: |
           E2E_BASE_URL=http://localhost:5173 npx playwright test --project=chromium-sweep
 
