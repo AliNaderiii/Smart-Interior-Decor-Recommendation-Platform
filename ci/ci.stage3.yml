@@ -77,6 +77,7 @@ jobs:
       - name: Verify locked install (pip freeze diff)
         working-directory: backend
         run: |
+          set -o pipefail
           python scripts/verify_lock_install.py \
             --json-out lock-verification.json \
             --freeze-out pip-freeze.txt \
@@ -172,6 +173,7 @@ jobs:
       - name: Dependency audit (locked set + expiring allowlist)
         working-directory: backend
         run: |
+          set -o pipefail
           python scripts/audit_dependencies.py \
             --requirements requirements.lock.txt \
             --allowlist security/pip-audit-allowlist.yml \
@@ -971,6 +973,7 @@ jobs:
       - name: EXPLAIN ANALYZE + ef_search sensitivity (artifact)
         working-directory: backend
         run: |
+          set -o pipefail
           mkdir -p /tmp/p95-evidence
           python scripts/ef_search_sweep.py \
             --json /tmp/p95-evidence/ef-search-sweep.json \
@@ -979,14 +982,20 @@ jobs:
       - name: DB-level fused-query bench (artifact)
         working-directory: backend
         run: |
+          set -o pipefail
           python scripts/bench_pgvector.py --sizes 20150 \
             --json /tmp/p95-evidence/bench-pgvector.json \
             | tee /tmp/p95-evidence/bench-pgvector.log
 
-      - name: Start backend (uvicorn, 1 worker)
+      - name: Start backend (uvicorn, 2 workers)
         working-directory: backend
         run: |
+          # G2(b): Run uvicorn with 2 workers on 2 vCPU runner.
+          # Rationale: DB-level fused query is 15-21 ms, but 1 worker creates
+          # artificial app-layer queueing at concurrency=20. Production runs
+          # multi-worker; warm-cell caching is shared via Redis.
           nohup uvicorn app.main:app --host 127.0.0.1 --port 8000 \
+            --workers 2 \
             > /tmp/p95-backend.log 2>&1 &
 
       - name: Wait for backend readiness
@@ -1006,6 +1015,7 @@ jobs:
       - name: "Cold + warm cells — >=200 samples each (gate p95 < 2000 ms)"
         working-directory: backend
         run: |
+          set -o pipefail
           python scripts/load_recommend.py \
             --base-url http://127.0.0.1:8000 \
             --samples 250 --concurrency 20 \
@@ -1023,7 +1033,7 @@ jobs:
             echo "cpu: $(grep -m1 'model name' /proc/cpuinfo | cut -d: -f2-)"
             echo "postgres: pgvector/pgvector:0.6.2-pg16 (service container)"
             echo "redis: redis:7.4-alpine (service container)"
-            echo "app: uvicorn 1 worker; RECOMMEND_RATE_LIMIT_PER_MINUTE=0"
+            echo "app: uvicorn 2 workers; RECOMMEND_RATE_LIMIT_PER_MINUTE=0"
           } | tee /tmp/p95-evidence/environment.txt
 
       - name: Upload p95 evidence artifacts
@@ -1082,6 +1092,7 @@ jobs:
 
       - name: "Check every seller link — polite 1 req/s, retry network errors"
         run: |
+          set -o pipefail
           mkdir -p /tmp/link-liveness
           python scripts/check_links.py \
             --report /tmp/link-liveness/links-summary.json \
