@@ -478,19 +478,28 @@ export default function AdminProductsPage() {
                 <th className="px-4 py-3">AI features</th>
                 <th className="px-4 py-3">
                   <button
-                    onClick={() => setSortLowConfidence((v) => !v)}
+                    onClick={() => {
+                      setSortPrice(null);
+                      setSortLowConfidence((v) => !v);
+                    }}
                     className="uppercase tracking-wide hover:text-[var(--color-ink)]"
                     title="Sort lowest confidence first to prioritize review"
+                    aria-label="Sort by confidence"
+                    aria-sort={sortLowConfidence ? "ascending" : "none"}
                   >
                     Confidence {sortLowConfidence ? "↑" : "·"}
                   </button>
                 </th>
                 <th className="px-4 py-3">
                   <button
-                    onClick={() => setSortPrice((s) => (s === "asc" ? "desc" : s === "desc" ? null : "asc"))}
+                    onClick={() => {
+                      setSortLowConfidence(false);
+                      setSortPrice((s) => (s === "asc" ? "desc" : s === "desc" ? null : "asc"));
+                    }}
                     className="uppercase tracking-wide hover:text-[var(--color-ink)]"
                     title="Sort by price"
                     aria-label="Sort by price"
+                    aria-sort={sortPrice === "asc" ? "ascending" : sortPrice === "desc" ? "descending" : "none"}
                   >
                     Price {sortPrice === "asc" ? "↑" : sortPrice === "desc" ? "↓" : "·"}
                   </button>
