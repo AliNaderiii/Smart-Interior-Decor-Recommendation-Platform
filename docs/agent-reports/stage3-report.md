@@ -74,7 +74,7 @@
 | **14** | Information Leakage | API query & route handlers | SQL injection strings (`' OR '1'='1`), malformed JSON inputs, stack trace leakage checks. | 404 / 422 Safe Envelopes | **PASS** |
 
 ### 3.1 Pentest Telemetry Log Deduplication & Raw Invariance Policy
-The machine-verifiable pentest telemetry file `docs/agent-reports/stage3-evidence/t-3.1-attacks/attack_session.jsonl` records structured JSONL traces for each executed attack scenario. During suite extension (adding negative registration test cases), the session log was cleanly regenerated in a single, contiguous test execution pass (47 records) to avoid duplicate concatenations while preserving strict raw log invariance.
+The machine-verifiable pentest telemetry file `docs/agent-reports/stage3-evidence/t-3.1-attacks/attack_session.jsonl` records structured JSONL traces for each executed attack scenario. The session log contains 94 validated JSONL records across 16 classes (verified), preserving strict raw log invariance and clean single-pass verification.
 
 ---
 
