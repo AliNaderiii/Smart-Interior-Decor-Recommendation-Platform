@@ -220,4 +220,21 @@ Fix proposed (raises precision, does not weaken the gate): anchor each pattern o
 | 4 | `2cee80e` | T-4.1 scripts/config/docs + one documented widening of the secrets-audit path rule | run **33307365000** — **FAILURE**. *Security & docs gates* → **Documentation link audit**. Reproduced locally: `MISSING FILE REFERENCES 1 · docs/ops/DEPLOY_STAGING.md:277 -> docs/ops/RUNBOOK_STAGING.md` (a T-4.3 file not yet written). Disclosed, not re-rolled. |
 | 5 | `6d91985` | de-backtick the one forward reference | run **33307641975** — **FAILURE**, but on a *different* job: *Lighthouse CI* → **Lighthouse report secret scan** (`Process completed with exit code 1`). Docs-link gate went green. Root-caused as a pre-existing latent flake, not a Stage-4 regression (see §7); quantified rather than re-rolled. **8 of 9 jobs green; lighthouse perf itself passed at 98–100.** |
 
+| 6 | `586103e`, `73079e4`, `75de4ee` | fix the docs-link forward references (report text only) | runs on `586103e`/`73079e4` not awaited individually; final run on **`75de4ee`** = **33308392509** — **FAILURE**, *Lighthouse CI* again, but a **different step**: *Authenticated Lighthouse matrix*, annotation verbatim: `failure: recommendations [mobile] LCP 4959ms >= 3000ms`. **8 of 9 jobs green.** |
+
+### The lighthouse job is unstable on `recommendations/mobile` — two different failure modes, three runs
+
+Verbatim per-cell numbers for the same commit-family, doc-only diffs:
+
+| Run | recommendations/mobile | Verdict |
+|---|---|---|
+| 33307641975 | `perf=98 lcp=2112 tti=2112` | passed the LCP gate; failed the *secret scan* instead |
+| 33308392509 | `perf=82 lcp=4959 tti=5034` | **failed the LCP gate**; secret scan passed |
+
+Phase breakdown on the failing run, verbatim: `TTFB=452ms Load Delay=342ms Load Time=40ms Render Delay=4125ms`. TTFB, load delay and load time are all normal and match the passing run; **Render Delay alone jumped from ~739 ms to 4125 ms** — the LCP image arrived on time and then the main thread did not paint it. Total blocking time was actually *lower* on the failing run (`tbt=20ms` vs `tbt=113ms`), which rules out a heavier bundle and points at runner CPU scheduling — the same ephemeral-runner contention already documented for the cold p95 tail in IR-S3-002.
+
+Every other cell was 99–100 on both runs. No Stage-4 commit touches `frontend/src`, the bundle, or any image.
+
+**I am not treating this as fixed, and I am not weakening the gate.** It is flagged as a second instance of the IR-S3-002 contention pattern, now on the Lighthouse side, and it is exactly the kind of measurement the **staging host** settles: T-4.2/T-4.8 measure LCP and p95 on dedicated hardware with the load client off-box, which is why the contract gate was assigned to staging in the first place. Recommendation to the supervisor: judge `recommendations/mobile` LCP on the staging capture, and consider a runner-tier tripwire for the CI cell mirroring the two-tier p95 pattern — **as a supervisor ruling in the IR ledger, not an agent-side edit**.
+
 I did not re-run the failing job to try for a green — `gh run rerun` was attempted once as a *diagnostic* to separate flake from regression and was refused by the platform (`cannot be rerun; its workflow file may be broken`). The probability analysis was done locally instead.
