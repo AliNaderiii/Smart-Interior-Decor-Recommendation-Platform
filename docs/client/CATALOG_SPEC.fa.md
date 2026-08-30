@@ -38,6 +38,29 @@ _(افزودن اتاق خواب و آشپزخانه یک تصمیم باز اس
 
 **جنس (`material_tags`):** `wood` · `metal` · `fabric` · `leather` · `rattan`
 
+## تبدیل از JSON
+
+اگر کاتالوگ شما از قبل به صورت فایل JSON آماده است، لازم نیست آن را دستی در
+اکسل بازنویسی کنید:
+
+```
+python scripts/catalog_json_to_csv.py my-catalog.json my-catalog.csv
+python scripts/validate_catalog.py my-catalog.csv
+```
+
+قاعدهٔ تبدیل:
+
+| در JSON | در CSV |
+|---|---|
+| `"dimensions_cm": {"length":220,"width":95,"height":85}` | `220x95x85` |
+| `"color_palette": ["#CFCFD1","#2E2E2E"]` | `#CFCFD1,#2E2E2E` |
+| `"style_tags": ["modern","minimal"]` | `modern,minimal` |
+| `"material_tags": ["fabric","metal"]` | `fabric,metal` |
+| بقیهٔ فیلدها | بدون تغییر |
+| فیلدهای اضافی (مثل `dataset_notice`) | حذف می‌شوند |
+
+خروجی با کدگذاری UTF-8 و BOM ذخیره می‌شود تا اکسل متن فارسی را درست نشان دهد.
+
 ## نکته‌های مهم
 
 * **حداقل تعداد:** برای اینکه پیشنهادها معنادار باشند، دست‌کم **۵۰ محصول**

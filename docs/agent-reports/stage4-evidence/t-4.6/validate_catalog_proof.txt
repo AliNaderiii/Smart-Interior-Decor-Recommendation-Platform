@@ -75,3 +75,24 @@ EXIT=0
 /tmp/bad_enc.csv -> EXIT=1
 /tmp/blank.csv -> EXIT=0
 /tmp/definitely_missing.csv -> EXIT=1
+
+############ REPRODUCIBLE CROSS-CHECK (added 2026-08-30T13:54:35Z)
+$ python3 scripts/catalog_json_to_csv.py backend/seed_data/products_realistic_150.json /tmp/repro150.csv
+wrote 150 rows -> /tmp/repro150.csv
+now validate it:  python scripts/validate_catalog.py /tmp/repro150.csv
+$ python3 scripts/validate_catalog.py /tmp/repro150.csv
+بررسی فایل: /tmp/repro150.csv
+تعداد سطرهای بررسی‌شده: ۱۵۰
+------------------------------------------------------------
+
+[هشدار] ۱ مورد — اختیاری:
+
+  ! ۱۳۳ محصول تصویر تکراری دارند. تصویر اختصاصی برای هر محصول نتیجهٔ بهتری می‌دهد.
+------------------------------------------------------------
+نتیجه: فایل قابل قبول است. هشدارها اجباری نیستند.
+EXIT=0
+
+converter error paths:
+  /tmp/bad.json -> EXIT=1
+  /tmp/obj.json -> EXIT=1
+  /tmp/missing.json -> EXIT=1
