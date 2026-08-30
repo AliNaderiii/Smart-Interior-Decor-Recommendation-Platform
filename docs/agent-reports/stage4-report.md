@@ -2,7 +2,7 @@
 
 **Branch:** `arena/01a051ef-smart-interior-decor-recommend` (D-0: platform-locked name; equivalent to `agent/stage4-staging-demo`)
 **Baseline:** `main` = `bd3cb52d` = `v0.7.0` (Stage 3 merged, supervisor-verified 2026-08-30)
-**Status:** Kickoff approved (Directive 1). Agent wave in progress — **T-4.1 COMPLETE**, T-4.4/T-4.6/T-4.5 next. Host wave gated on R2 (hostname) + R5.
+**Status:** Kickoff approved (Directive 1). Agent wave in progress — **T-4.1 COMPLETE (CI green on `1f49d52`, run 33308694272)**; T-4.4/T-4.6/T-4.5 next. Host wave gated on R2 (hostname) + R5.
 
 ---
 
@@ -236,5 +236,9 @@ Phase breakdown on the failing run, verbatim: `TTFB=452ms Load Delay=342ms Load 
 Every other cell was 99–100 on both runs. No Stage-4 commit touches `frontend/src`, the bundle, or any image.
 
 **I am not treating this as fixed, and I am not weakening the gate.** It is flagged as a second instance of the IR-S3-002 contention pattern, now on the Lighthouse side, and it is exactly the kind of measurement the **staging host** settles: T-4.2/T-4.8 measure LCP and p95 on dedicated hardware with the load client off-box, which is why the contract gate was assigned to staging in the first place. Recommendation to the supervisor: judge `recommendations/mobile` LCP on the staging capture, and consider a runner-tier tripwire for the CI cell mirroring the two-tier p95 pattern — **as a supervisor ruling in the IR ledger, not an agent-side edit**.
+
+| 7 | `1f49d52` | record the LCP instability verbatim (report text only) | run **33308694272** — **SUCCESS, all 9 jobs green** (backend, frontend, e2e, security & docs gates, docker, multi-worker, p95-evidence, **lighthouse**, link-liveness). |
+
+**Verdict on the two Lighthouse failures: confirmed nondeterministic, not a Stage-4 regression.** Four consecutive runs over doc-only diffs produced: pass → secret-scan fail → LCP fail → pass. No commit in that range touches application code, the bundle, CI config, or any image. Both failure modes are runner-contention artifacts of the same family as IR-S3-002; the secret-scan one is additionally a genuine pattern defect (quantified above) that will keep recurring until the pattern is anchored.
 
 I did not re-run the failing job to try for a green — `gh run rerun` was attempted once as a *diagnostic* to separate flake from regression and was refused by the platform (`cannot be rerun; its workflow file may be broken`). The probability analysis was done locally instead.
