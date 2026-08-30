@@ -1629,7 +1629,7 @@ random-base64url false-positive rate: 288/200000 = 0.14400% per 700 chars
 
 **(a) APPLIED in-repo (no paste needed)** — `frontend/scripts/lighthouse-auth-matrix.mjs` now redacts the session tokens before writing each report. The real problem it solves is that CI was publishing working session JWTs in a 90-day downloadable artifact; removing the flake's main entropy source is the secondary benefit. Performance numbers are untouched (only credential values are masked). Proven by `docs/agent-reports/stage4-evidence/n4/redaction_test.mjs`, verbatim output in `redaction_test_output.txt`, including `sk- pattern matched BEFORE redaction` / `sk- pattern clean AFTER redaction` and `perf number preserved`.
 
-**(b) STAGED for the single paste sitting** (`ci/ci.stage4.yml`, Directive 3 N4b/N6):
+**(b) IMPLEMENTED — CI half** (see the status block at the end of this entry):
 
 1. Anchor each secret-scan alternative on a non-token boundary so base64url interiors cannot match, while every real key still does. Detection strength goes **up**, not down.
 2. Tier the Lighthouse matrix, per the two-tier IR-S3-002 precedent:
@@ -1688,3 +1688,51 @@ relaxed.
 No gate threshold, scan pattern or acceptance criterion changes in this entry.
 It exists so the topology deviation is on the record before the first
 activation, per the no-silent-deviation rule.
+
+
+### Status update — CI half IMPLEMENTED (Stage 4 fix loop)
+
+**Supervisor ruling, 2026-08-30.** The retiering below is a **supervisor-ruled
+change of the place a measurement is enforced, logged in this ledger. It is not
+gate weakening**, and it was not applied unilaterally.
+
+**Where it landed.** Investigation during the fix loop found the thresholds are
+**not** in `ci/ci.stage4.yml` at all — that workflow only invokes
+`node scripts/lighthouse-auth-matrix.mjs`, and its `budgetPath` was already
+removed under the T-2.6b ruling. The gates live in
+`frontend/scripts/lighthouse-auth-matrix.mjs`. The supervisor was consulted
+before any edit and approved implementing there; **no workflow file was
+touched** and `ci/ci.stage4.yml` remains byte-identical to the active CI
+workflow (md5 `4ff82072e0da8d3aa6167d5e26b83705`).
+
+**What changed, exactly.**
+
+| Cell | Before | After |
+|---|---|---|
+| `recommendations/mobile` LCP | 3000 ms, blocking | **8000 ms catastrophic tripwire**, blocking; the 3000 ms value is emitted as a `::notice::` every run |
+| `recommendations/desktop` LCP | 3000 ms, blocking | **unchanged, still 3000 ms blocking** |
+| `home/*` perf, LCP, TTI | 80 / 3000 / 4000 | **unchanged** |
+| All `perf` gates everywhere | 80 | **unchanged** |
+| Fake-coverage guard (A3) | blocking | **unchanged** |
+
+The override is per-form-factor (`lcpMsByFormFactor: { mobile: 8000 }`), so the
+retiering is exactly as narrow as the measured instability. Desktop has never
+exceeded ~360 ms and keeps the strict gate.
+
+**Contract verdict.** Unchanged and NOT deleted: `recommendations/mobile` must
+still meet LCP < 3000 ms, and that verdict is now taken from the **staging
+capture** (G-4.x / T-4.8) on the deployed demo, on hardware that is not a
+shared CI runner. This is the two-tier IR-S3-002 precedent applied to one cell.
+
+**Verification.** Gate logic replayed against real observed measurements, 9/9
+correct: the `c1b15de` failure (`recommendations/mobile` LCP 4984 ms) now
+passes **with an `ABOVE 3000ms` notice**; a healthy 2112 ms run passes and
+still reports its value; 8200 ms fails the tripwire; `recommendations/desktop`
+at 3100 ms still fails; `home/mobile` at 3200 ms still fails; a perf drop to 70
+still fails. `node --check` and ESLint clean. The N4a token redaction is
+untouched.
+
+**Restore condition (unchanged).** If a future runner tier removes the CPU
+contention, this cell returns to the strict 3000 ms CI gate. Evidence that the
+instability is environmental, not a regression: RenderDelay moved 739 ms ->
+4125 ms while TBT *fell* 113 ms -> 20 ms across doc-only runs.

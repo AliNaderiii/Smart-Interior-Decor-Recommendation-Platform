@@ -58,6 +58,15 @@ function emitError(msg) {
   progress(`ERROR ${flat}`);
   return flat;
 }
+function emitNotice(msg) {
+  // Notice-level: visible in the run summary and the annotations API, but it
+  // never fails the job. Used for the IR-S4-001 retiered cell, so the strict
+  // contract number stays observable in CI without gating on it.
+  const flat = String(msg).replace(/\s*\n\s*/g, ' | ').slice(0, 2000);
+  console.log(`::notice title=lighthouse-matrix::${flat}`);
+  progress(`NOTICE ${flat}`);
+  return flat;
+}
 progress(`boot node=${process.version} base=${BASE} quiz=${QUIZ_ID ? 'set' : 'MISSING'}`);
 
 const COOKIES = [
@@ -71,8 +80,17 @@ const PAGES = [
     gates: { perf: 80, lcpMs: 3000, ttiMs: 4000 } },
   { slug: 'login', url: '/login', auth: false, gates: null },
   { slug: 'quiz', url: '/quiz', auth: true, gates: null },
+  // IR-S4-001 (supervisor-ruled retiering, Stage 4). recommendations/mobile is
+  // the one cell whose LCP is unstable on a shared CI runner: doc-only runs
+  // flipped 2112ms -> 4959ms with RenderDelay 739 -> 4125ms while TBT FELL
+  // (113 -> 20ms), i.e. runner CPU contention, not a page regression. The
+  // strict 3000ms CONTRACT verdict is not deleted — it moves to the staging
+  // capture (G-4.x / T-4.8) on the deployed demo. In CI this cell keeps a
+  // CATASTROPHIC tripwire only. Desktop is unaffected (it has never exceeded
+  // ~360ms) and keeps the strict gate, so the retiering is as narrow as the
+  // measured instability.
   { slug: 'recommendations', url: `/recommendations?quiz=${QUIZ_ID}`, auth: true,
-    gates: { perf: 80, lcpMs: 3000 } },
+    gates: { perf: 80, lcpMs: 3000, lcpMsByFormFactor: { mobile: 8000 } } },
   { slug: 'moodboards', url: '/moodboards', auth: true, gates: null },
   { slug: 'shopping-list', url: '/shopping-list', auth: true, gates: null },
 ];
@@ -300,8 +318,16 @@ function redactSecrets(text) {
         if (row.perf < p.gates.perf) {
           failures.push(emitError(`${p.slug} [${ff}] perf ${row.perf} < ${p.gates.perf}`));
         }
-        if (p.gates.lcpMs && row.lcpMs >= p.gates.lcpMs) {
-          failures.push(emitError(`${p.slug} [${ff}] LCP ${row.lcpMs}ms >= ${p.gates.lcpMs}ms`));
+        // Per-form-factor LCP override (IR-S4-001). Only the cell listed in
+        // lcpMsByFormFactor is retiered; every other cell keeps p.gates.lcpMs.
+        const lcpLimit = p.gates.lcpMsByFormFactor?.[ff] ?? p.gates.lcpMs;
+        if (lcpLimit && row.lcpMs >= lcpLimit) {
+          failures.push(emitError(`${p.slug} [${ff}] LCP ${row.lcpMs}ms >= ${lcpLimit}ms`));
+        } else if (lcpLimit && lcpLimit !== p.gates.lcpMs) {
+          // The strict threshold still governs the CONTRACT; it is verified on
+          // staging, not here. Emit the value so the trend stays visible.
+          const verdict = row.lcpMs >= p.gates.lcpMs ? 'ABOVE' : 'within';
+          emitNotice(`${p.slug} [${ff}] LCP ${row.lcpMs}ms — ${verdict} the ${p.gates.lcpMs}ms contract threshold (CI tripwire ${lcpLimit}ms; contract verdict is captured on staging per IR-S4-001)`);
         }
         if (p.gates.ttiMs && row.ttiMs > p.gates.ttiMs) {
           failures.push(emitError(`${p.slug} [${ff}] TTI ${row.ttiMs}ms > ${p.gates.ttiMs}ms`));
