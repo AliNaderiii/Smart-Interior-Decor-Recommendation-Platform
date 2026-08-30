@@ -25,7 +25,9 @@
 #
 # SECRETS: HF_TOKEN (write-scoped PAT) and HF_USERNAME come from repository
 # secrets. HF_TOKEN is never echoed, never passed on a command line, and is
-# additionally registered with ::add-mask::. The GITHUB_TOKEN is read-only.
+# additionally registered with ::add-mask::. HF_USERNAME is NOT masked: it is
+# public (it is in the Space URL), and masking it makes Actions silently drop
+# every step output built from it. The GITHUB_TOKEN is read-only.
 # =============================================================================
 name: Stage 4 — Deploy demo Space
 
@@ -109,10 +111,15 @@ jobs:
           HF_USERNAME="$(printf '%s' "${HF_USERNAME_RAW}" | tr -d '[:space:]')"
           HF_TOKEN="$(printf '%s' "${HF_TOKEN_RAW}" | tr -d '[:space:]')"
 
-          # Re-mask the trimmed token: the runner masks the raw secret, but the
+          # Re-mask the trimmed TOKEN: the runner masks the raw secret, but the
           # trimmed value is a different string and would NOT be masked.
           echo "::add-mask::${HF_TOKEN}"
-          echo "::add-mask::${HF_USERNAME}"
+          # The USERNAME is deliberately NOT masked. Deploy #2 (run 33317879016)
+          # failed because it was: Actions refuses to set any step output whose
+          # value contains a masked string ("Skip output 'space_url' since it may
+          # contain secret"), so space_id/space_url silently became empty and the
+          # Space-creation step got an empty repo_id. The username is not a
+          # secret in any case — it is the public demo URL the client visits.
 
           if [ -z "${HF_USERNAME}" ] || [ -z "${HF_TOKEN}" ]; then
             echo "::error::A required secret is only whitespace. Re-save it per docs/ops/HF_SPACE_SETUP.fa.md"
@@ -145,7 +152,8 @@ jobs:
           set -euo pipefail
           # HF_USERNAME comes from GITHUB_ENV, already trimmed and validated by
           # the guard step above, so these values cannot contain a newline.
-          echo "::add-mask::${HF_USERNAME}"
+          # Not masked — see the guard step: masking it makes Actions drop these
+          # very outputs.
           echo "space_id=${HF_USERNAME}/${SPACE_NAME}" >> "$GITHUB_OUTPUT"
           echo "space_url=https://${HF_USERNAME}-${SPACE_NAME}.hf.space" >> "$GITHUB_OUTPUT"
 
@@ -418,7 +426,8 @@ jobs:
             echo "::warning::HF_USERNAME is not set — skipping the uptime probe"
             exit 0
           fi
-          echo "::add-mask::${HF_USERNAME}"
+          # Not masked: it is the public demo URL, and masking it would hide the
+          # probe target from the very log meant to diagnose an outage.
           URL="https://${HF_USERNAME}-${SPACE_NAME}.hf.space"
 
           stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
