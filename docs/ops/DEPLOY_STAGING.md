@@ -274,8 +274,8 @@ exercised by CI. If a migration is the problem, restore from a backup instead:
 ./scripts/restore_db.sh backups/<file>.dump
 ```
 
-Full procedure, including the scratch-database drill: `docs/ops/RUNBOOK_STAGING.md`
-and `docs/DISASTER_RECOVERY.md`.
+Full procedure, including the scratch-database drill: `docs/DISASTER_RECOVERY.md`
+and the staging operations runbook delivered by T-4.3 (docs/ops/RUNBOOK_STAGING.md).
 
 ---
 
