@@ -2,7 +2,7 @@
 
 **Branch:** `arena/01a051ef-smart-interior-decor-recommend` (D-0: platform-locked name; equivalent to `agent/stage4-staging-demo`)
 **Baseline:** `main` = `bd3cb52d` = `v0.7.0` (Stage 3 merged, supervisor-verified 2026-08-30)
-**Status:** **KICKOFF POSTED — AWAITING SUPERVISOR APPROVAL** (Directive 0 §1c gate; no further work started)
+**Status:** Kickoff approved (Directive 1). Agent wave in progress — **T-4.1 COMPLETE**, T-4.4/T-4.6/T-4.5 next. Host wave gated on R2 (hostname) + R5.
 
 ---
 
@@ -155,3 +155,69 @@ Pending approval, **no** agent-side task has been started.
 | 3 | `4th commit` (link-audit fix) | de-backtick planned-artifact paths in the report only; no gate weakened, no audit config touched | run **33303746290** — **SUCCESS**, all 9 jobs green (backend, frontend, e2e, security & docs gates, docker, multi-worker, p95-evidence, lighthouse, link-liveness). |
 
 Local reproduction after fix, verbatim: `[BROKEN LINKS] 0` / `[MISSING FILE REFERENCES] 0` / `RESULT: PASS`.
+
+
+---
+
+## §7 T-4.1 — Deployment automation · **COMPLETE**
+
+**Owner:** SA-2 · **Commit:** `2cee80e` (+ `6d91985` docs-link fix)
+**DoD:** deploy script + runbook merged, `.env.staging.example` complete, shellcheck clean, idempotency provable. All met except the 3-run idempotency *execution*, which is host-side (T-4.2) — the mechanism that proves it is built and self-verified here.
+
+### Delivered
+
+| Artifact | Purpose |
+|---|---|
+| `scripts/host_prep.sh` | idempotent Ubuntu 24.04 prep: docker+compose, UFW 22/80/443 only, non-root `deploy` user, unattended-upgrades, 2 GB swap, SSH hardening, 10 MB×5 container log rotation; `--check` reporting mode |
+| `scripts/deploy_staging.sh` | 11-step one-command deploy; `--dry-run`, `--no-pull`; appends an end-state fingerprint per run |
+| `scripts/smoke_staging.sh` | public-origin HTTP capture suite — the evidence the honesty protocol requires |
+| `scripts/render_caddyfile.sh` | derives `Caddyfile.staging`, self-verifying that the header block is byte-identical |
+| `scripts/assert_staging_env.py` | deploy-time gate: the production fail-safes that still apply to a public host |
+| `scripts/prove_demo_refusal.sh` | re-proves invariant §2.3 on the staging host, every deploy |
+| `docker-compose.staging.yml` | staging overlay: pinned production-shaped settings, media volume, brand build-args, retention job |
+| `.env.staging.example` | redacted template; every real value marked `[FILL]` and generated on the host |
+| `docs/ops/DEPLOY_STAGING.md` | full runbook + Persian quick section (§9) |
+
+### Decisions recorded
+
+**D-4.1 — staging runs `APP_ENV=development`, and no gate was weakened.**
+`Settings.validate_runtime()` refuses `APP_ENV=production` when `AI_PROVIDER=mock` or `STORAGE_BACKEND=local` — exactly the profile ruling R3 mandates. Rather than relax that check for a "staging" env (forbidden by §2.8), the overlay pins every production-shaped setting explicitly, `assert_staging_env.py` re-asserts the production checks that matter on a public host and fails the deploy otherwise, and the invariant that actually matters — demo accounts impossible under production — is re-proven on every deploy by step 9. Stage 5 swaps in `docker-compose.prod.yml` and every fail-safe applies unchanged.
+
+**D-4.2 — one additional tracked env template.**
+`scripts/audit_secrets.py` forbade every tracked `.env.*` except `.env.example`. It now allows exactly one more explicit filename, `.env.staging.example`. This is a path-shape exception only: full content scanning still applies to it (a real credential pasted in still fails CI), and `.env.staging` / `.env.production` remain forbidden — verified by negative control.
+
+### Self-verification (verbatim: `stage4-evidence/t-4.1/`)
+
+| Check | Result |
+|---|---|
+| shellcheck, 5 scripts, default severity | `exit=0`, no output — `shellcheck.txt` |
+| env gate rejects the unfilled template | `RESULT: FAIL — 4 problem(s)`, exit 1 |
+| env gate accepts a filled file | `RESULT: PASS — 2 documented waiver(s)`, exit 0 |
+| env gate catches a host/origin mismatch | 2 FAILs on `FRONTEND_ORIGIN host` + `PAYMENT_CALLBACK_URL` |
+| Caddy render diff | exactly 3 lines (`email`, `:443 {`, `tls internal {`); CSP byte-identical |
+| render refuses bad input | exit 2 on missing host and on a URL-shaped host |
+| `audit_secrets.py` | `RESULT: PASS`, forbidden-path negative control still fails on `.env.staging` |
+| `audit_docs_links.py` | `RESULT: PASS` |
+
+Two real defects were found by this self-verification and fixed before push: the env parser read `KEY=   # comment` as the comment text (an unfilled template would have sailed through a length check), and the deploy script's own `STAGING_HOST` extraction did not strip inline comments (it derived `staging.smartdecor.test#[FILL]`). The shell now calls the same Python parser, so the two can never disagree.
+
+### Open CI defect found — needs a supervisor ruling
+
+`Lighthouse report secret scan` failed on runs `33307365000` and `33307641975`, both on **doc-only diffs**, and has never failed in the previous 25 runs. Root cause: the step's `sk-[A-Za-z0-9]{20,}` alternative matches random **base64url**, and the matrix embeds real session JWTs in every report. Measured false-positive rate: **288/200000 = 0.144% per 700 random base64url chars**, ~1.7% per 12 embeddings and ~25% per 200. Lighthouse itself passed on that run (perf 98–100, all 12 cells within contract).
+
+Fix proposed (raises precision, does not weaken the gate): anchor each pattern on a non-token boundary, and redact the session tokens before the reports are written. The first half needs the CI paste. Full write-up + reproduction script: `docs/agent-reports/stage4-evidence/ci/lighthouse-secret-scan-falsepositive.md`. **Awaiting a ruling before spending the 1-paste budget.**
+
+### Host actions this unlocks (blocked on R2 hostname + R5 green-light)
+
+`host_prep.sh` → clone → fill `.env` → `deploy_staging.sh` ×3 → relay: 3 deploy logs, `fingerprint.log`, `curl -i` health, `openssl s_client -tls1_3`, header dump, `smoke_staging.sh` output.
+
+---
+
+## §8 I1 honesty log — continued
+
+| # | Commit | Intent (pre-push) | Verdict (post-push, verbatim) |
+|---|---|---|---|
+| 4 | `2cee80e` | T-4.1 scripts/config/docs + one documented widening of the secrets-audit path rule | run **33307365000** — **FAILURE**. *Security & docs gates* → **Documentation link audit**. Reproduced locally: `MISSING FILE REFERENCES 1 · docs/ops/DEPLOY_STAGING.md:277 -> docs/ops/RUNBOOK_STAGING.md` (a T-4.3 file not yet written). Disclosed, not re-rolled. |
+| 5 | `6d91985` | de-backtick the one forward reference | run **33307641975** — **FAILURE**, but on a *different* job: *Lighthouse CI* → **Lighthouse report secret scan** (`Process completed with exit code 1`). Docs-link gate went green. Root-caused as a pre-existing latent flake, not a Stage-4 regression (see §7); quantified rather than re-rolled. **8 of 9 jobs green; lighthouse perf itself passed at 98–100.** |
+
+I did not re-run the failing job to try for a green — `gh run rerun` was attempted once as a *diagnostic* to separate flake from regression and was refused by the platform (`cannot be rerun; its workflow file may be broken`). The probability analysis was done locally instead.

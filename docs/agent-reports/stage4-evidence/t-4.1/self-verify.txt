@@ -1,0 +1,97 @@
+=== A. env gate rejects the UNFILLED template (negative control) ===
+$ python3 scripts/assert_staging_env.py .env.staging.example --host staging.example.com
+
+Staging environment gate — .env.staging.example (host=staging.example.com)
+--------------------------------------------------------------
+  FAIL  SECRET_KEY: must be >=32 chars and not the documented default (openssl rand -hex 32)
+  FAIL  FERNET_KEY: empty — a random key per process makes at-rest ciphertext unrecoverable across restarts (python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+  PASS  FRONTEND_ORIGIN: https://staging.example.com
+  PASS  FRONTEND_ORIGIN host: https://staging.example.com matches https://staging.example.com
+  PASS  COOKIE_SECURE: true
+  PASS  REDIS_URL: redis://redis:6379/0
+  FAIL  POSTGRES_PASSWORD: must be >=16 chars and not a well-known default (openssl rand -base64 24)
+  PASS  PAYMENT_CALLBACK_URL: https://staging.example.com/payment/callback
+  PASS  template placeholders: none left
+  PASS  APP_ENV: development (D-4.1: mock AI + local storage are refused under production by design; the compose overlay pins the production-shaped settings explicitly)
+  PASS  SEED_DEMO_ACCOUNTS: true (staging demo logins, client decision C-7)
+  FAIL  DEMO_ACCOUNT_PASSWORD: set a randomized password (>=12 chars) — the documented dev defaults must never guard a public host (openssl rand -base64 18)
+  WAIVED AI_PROVIDER: mock — supervisor ruling R3 (no key on a public demo box). Stage 5 must set gemini/openai.
+  WAIVED STORAGE_BACKEND: local — supervisor ruling R3 (local media volume). Stage 5 must set s3 + S3_*.
+--------------------------------------------------------------
+RESULT: FAIL — 4 problem(s):
+  - SECRET_KEY: must be >=32 chars and not the documented default (openssl rand -hex 32)
+  - FERNET_KEY: empty — a random key per process makes at-rest ciphertext unrecoverable across restarts (python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+  - POSTGRES_PASSWORD: must be >=16 chars and not a well-known default (openssl rand -base64 24)
+  - DEMO_ACCOUNT_PASSWORD: set a randomized password (>=12 chars) — the documented dev defaults must never guard a public host (openssl rand -base64 18)
+exit=1 (expected 1)
+
+=== B. env gate accepts a properly filled file ===
+$ python3 scripts/assert_staging_env.py <filled> --host staging.smartdecor.test
+
+Staging environment gate — /tmp/env.good (host=staging.smartdecor.test)
+--------------------------------------------------------------
+  PASS  SECRET_KEY: 64 chars, non-default
+  PASS  FERNET_KEY: valid urlsafe-base64 32-byte key
+  PASS  FRONTEND_ORIGIN: https://staging.smartdecor.test
+  PASS  FRONTEND_ORIGIN host: https://staging.smartdecor.test matches https://staging.smartdecor.test
+  PASS  COOKIE_SECURE: true
+  PASS  REDIS_URL: redis://redis:6379/0
+  PASS  POSTGRES_PASSWORD: 30 chars, non-default
+  PASS  PAYMENT_CALLBACK_URL: https://staging.smartdecor.test/payment/callback
+  PASS  template placeholders: none left
+  PASS  APP_ENV: development (D-4.1: mock AI + local storage are refused under production by design; the compose overlay pins the production-shaped settings explicitly)
+  PASS  SEED_DEMO_ACCOUNTS: true (staging demo logins, client decision C-7)
+  PASS  DEMO_ACCOUNT_PASSWORD: 22 chars (randomized, delivered out-of-band)
+  WAIVED AI_PROVIDER: mock — supervisor ruling R3 (no key on a public demo box). Stage 5 must set gemini/openai.
+  WAIVED STORAGE_BACKEND: local — supervisor ruling R3 (local media volume). Stage 5 must set s3 + S3_*.
+--------------------------------------------------------------
+RESULT: PASS — 2 documented waiver(s)
+exit=0 (expected 0)
+
+=== C. env gate catches a host/origin mismatch ===
+  FAIL  FRONTEND_ORIGIN host: https://staging.smartdecor.test does not match the deploy host https://wrong.example.com — CORS will reject the SPA
+  FAIL  PAYMENT_CALLBACK_URL: https://staging.smartdecor.test/payment/callback — must point at https://wrong.example.com/... or the gateway cannot return the user
+RESULT: FAIL — 2 problem(s):
+
+=== D. Caddyfile render: header block byte-identical ===
+$ STAGING_HOST=staging.example.com ./scripts/render_caddyfile.sh /tmp/Caddyfile.staging
+rendered /tmp/Caddyfile.staging for host=staging.example.com (acme email=admin@example.com)
+header block verified identical to Caddyfile (CSP single source of truth intact)
+$ diff <(grep Content-Security-Policy Caddyfile) <(grep Content-Security-Policy /tmp/Caddyfile.staging)
+(no diff — CSP identical)
+$ diff Caddyfile /tmp/Caddyfile.staging   # only the 3 intended lines
+6c6
+< 	email admin@smartdecor.local
+---
+> 	email admin@example.com
+9,10c9,10
+< :443 {
+< 	tls internal {
+---
+> staging.example.com {
+> 	tls {
+
+=== E. render refuses bad input ===
+FATAL: STAGING_HOST is not set (e.g. STAGING_HOST=staging.example.com)
+  (no STAGING_HOST) exit=2
+FATAL: 'https://bad.com/x' is not a plain hostname (no scheme, port, or path)
+  (URL not hostname) exit=2
+
+=== F. deploy dry-run plan ===
+
+==> [0] Preflight
+    WARN missing (dry run, ignored): docker docker-compose-plugin
+    OK   .env permissions 600
+    OK   staging host: staging.smartdecor.test
+
+==> [-] DRY RUN — planned actions
+    1  python3 scripts/assert_staging_env.py .env --host staging.smartdecor.test
+    2  git pull --ff-only 
+    3  STAGING_HOST=staging.smartdecor.test ./scripts/render_caddyfile.sh Caddyfile.staging
+    4  docker compose -f docker-compose.yml -f docker-compose.staging.yml build
+    5  docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d
+    6  docker compose -f docker-compose.yml -f docker-compose.staging.yml exec -T backend alembic current
+    7  docker compose -f docker-compose.yml -f docker-compose.staging.yml exec -T backend python scripts/load_realistic_products.py --realistic --expand-to 150 --if-empty
+    8  curl https://staging.smartdecor.test/api/v1/health/ready
+    9  ./scripts/prove_demo_refusal.sh
+   10  ./scripts/smoke_staging.sh https://staging.smartdecor.test
