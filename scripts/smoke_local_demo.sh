@@ -99,8 +99,9 @@ done
 # Each account is attempted exactly ONCE: logging in twice per account would
 # double-count the result and needlessly exercise the rate limiter.
 JAR=""
+ADMIN_JAR=""
 login_one() {
-  local email="$1" pw="$2" jar code
+  local email="$1" pw="$2" jar code role_is_admin="${3:-}"
   jar=$(mktemp)
   code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 25 \
     -c "$jar" -H 'Content-Type: application/json' \
@@ -108,6 +109,14 @@ login_one() {
     "${BASE}/api/v1/auth/login")
   if [ "$code" = "200" ] && grep -q 'access_token' "$jar"; then
     pass "login ${email} -> 200 with session cookie"
+    # Keep the admin jar separately: GET /api/v1/products is admin-only
+    # (require_admin in backend/app/api/deps.py), so the first-login jar -
+    # the homeowner - correctly gets 403 there. Run #4 caught exactly that.
+    if [ -n "$role_is_admin" ] && [ -z "$ADMIN_JAR" ]; then
+      ADMIN_JAR="$jar"
+      if [ -z "$JAR" ]; then JAR="$jar"; fi
+      return 0
+    fi
     if [ -z "$JAR" ]; then JAR="$jar"; else rm -f "$jar"; fi
     return 0
   fi
@@ -118,19 +127,19 @@ login_one() {
 
 login_one "demo@smartdecor.dev"     "Demo1234!"  || true
 login_one "designer@smartdecor.dev" "Design123!" || true
-login_one "admin@smartdecor.dev"    "Admin123!"  || true
+login_one "admin@smartdecor.dev"    "Admin123!"  admin || true
 
 # ---- 5. catalog --------------------------------------------------------------
-if [ -n "${JAR}" ] && [ -f "${JAR}" ]; then
-  body=$(curl -sS --max-time 25 -b "${JAR}" "${BASE}/api/v1/products?limit=5" 2>/dev/null)
+if [ -n "${ADMIN_JAR}" ] && [ -f "${ADMIN_JAR}" ]; then
+  body=$(curl -sS --max-time 25 -b "${ADMIN_JAR}" "${BASE}/api/v1/products?limit=5" 2>/dev/null)
   if printf '%s' "$body" | grep -q '"id"'; then
-    pass "authenticated /api/v1/products returns a non-empty catalog"
+    pass "admin /api/v1/products returns a non-empty catalog"
   else
-    fail "authenticated /api/v1/products empty: ${body:0:200}"
+    fail "admin /api/v1/products empty: ${body:0:200}"
   fi
   rm -f "${JAR}"
 else
-  fail "no authenticated session — catalog check skipped"
+  fail "no admin session — catalog check skipped"
 fi
 
 # ---- 6. security headers from the container's nginx --------------------------

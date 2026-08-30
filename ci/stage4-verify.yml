@@ -276,7 +276,15 @@ jobs:
       - name: Start and await the container
         run: |
           set -uo pipefail
-          docker run -d --name demo -p "127.0.0.1:${DEMO_PORT}:${DEMO_PORT}" "${IMAGE_TAG}"
+          # RECOMMEND_RATE_LIMIT_PER_MINUTE=0 is the documented load-test
+          # switch (config.py:95, and the harness docstring names it as a
+          # precondition). The image ships the protective default of 20, which
+          # 200 samples per cell would trip immediately; overriding it HERE
+          # keeps the rate limiter fully active in demo-verify and in the real
+          # demo image. This measures the /recommend path, not the limiter.
+          docker run -d --name demo -p "127.0.0.1:${DEMO_PORT}:${DEMO_PORT}" \
+            -e RECOMMEND_RATE_LIMIT_PER_MINUTE=0 \
+            "${IMAGE_TAG}"
           deadline=$(( $(date +%s) + 600 ))
           while [ "$(date +%s)" -lt "$deadline" ]; do
             code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \

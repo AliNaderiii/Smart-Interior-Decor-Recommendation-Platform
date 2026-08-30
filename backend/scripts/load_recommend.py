@@ -121,16 +121,18 @@ async def main() -> int:
         if r.status_code not in (200, 201):
             print(f"register failed: {r.status_code} {r.text[:300]}", file=sys.stderr)
             # Annotations are the only channel back to the sandbox.
-            print(f"::error title=register-failed::"
-                  f"HTTP {r.status_code} {r.text[:400]}".replace("\n", " "))
+            _m = f"HTTP {r.status_code} {r.text[:400]}".replace("\n", " ")
+            print(f"::error title=register-failed::{_m}", flush=True)
+            print(f"[register-failed] {_m}", file=sys.stderr, flush=True)
             return 2
         r = await client.post("/api/v1/auth/login",
                               json={"email": email, "password": password})
         if r.status_code != 200:
             print(f"login failed: {r.status_code} {r.text[:300]}", file=sys.stderr)
             # Annotations are the only channel back to the sandbox.
-            print(f"::error title=login-failed::"
-                  f"HTTP {r.status_code} {r.text[:400]}".replace("\n", " "))
+            _m = f"HTTP {r.status_code} {r.text[:400]}".replace("\n", " ")
+            print(f"::error title=login-failed::{_m}", flush=True)
+            print(f"[login-failed] {_m}", file=sys.stderr, flush=True)
             return 2
         # Envelope: {"success": true, "data": {..., "access_token": ...}}
         token = r.json()["data"]["access_token"]
@@ -194,4 +196,18 @@ async def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(asyncio.run(main()))
+    # Run #4 lesson: this script exited 2 with no annotation at all, which
+    # means it died before reaching the instrumented register/login checks.
+    # Step logs are unreadable from the agent sandbox, so an uninstrumented
+    # exit is undiagnosable. Nothing may fail silently from here on.
+    try:
+        _rc = asyncio.run(main())
+    except BaseException as exc:  # noqa: BLE001 - deliberate: report, then re-raise
+        import traceback
+        _tb = traceback.format_exc().replace("\n", " ")[-700:]
+        print(f"::error title=load-harness-crashed::"
+              f"{type(exc).__name__}: {exc} | {_tb}")
+        raise
+    if _rc != 0:
+        print(f"::error title=load-harness-exit::exit code {_rc}")
+    raise SystemExit(_rc)
