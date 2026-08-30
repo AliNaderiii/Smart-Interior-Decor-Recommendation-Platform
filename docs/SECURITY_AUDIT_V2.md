@@ -384,3 +384,30 @@ and the CI workflow includes dependency/security scans. See
 `docs/agent-reports/infra-report.md` for current command evidence and the
 explicit distinction between local sandbox results, blocked Docker checks, and
 blocked real GitHub Actions activation.
+
+## Stage 3 Penetration Testing & Compliance Hardening Addendum — 2026-08-28
+
+A comprehensive red-team offensive penetration test was conducted across all
+platform endpoints by SA-2 covering 14 attack classes (auth brute-force, JWT
+tampering, refresh rotation races, IDOR, share token security, RBAC, payment
+tampering, file uploads, SSRF, XSS, CSRF, rate-limiting, and error leakage).
+
+Key findings remediated in this stage:
+* **S3-F001 (High — Broken Object-Level Authorization on `POST /quiz`):**
+  A user could associate a quiz with any foreign designer's `project_id`.
+  Fixed by enforcing designer project ownership verification at creation.
+* **S3-F002 (Medium — Incomplete GDPR Art. 17 Cache Erasure):**
+  User hard deletion left active recommendation cache keys `rec:{user_id}:*`
+  in Redis. Fixed by adding explicit cache key invalidation on deletion.
+* **Transfer Register Delivered:**
+  - **IR-S1-011:** Shared accessible `useDialog` modal primitive implemented
+    and adopted across all modals in the application.
+  - **IR-S1-013:** Dead-key sweep actionability stabilized and restored to
+    BLOCKING in CI workflow.
+  - **IR-S2-001:** Seller link quarantine admin surface delivered with link
+    status filtering and visual quarantine badges; 8 dead/unresolvable dataset
+    URLs replaced; Persian operator guide published.
+
+All findings remediated and verified: **0 Open High/Critical findings.**
+Full evidence recorded in `docs/agent-reports/stage3-report.md` and
+`docs/reports/COMPLIANCE_PACK.md`.

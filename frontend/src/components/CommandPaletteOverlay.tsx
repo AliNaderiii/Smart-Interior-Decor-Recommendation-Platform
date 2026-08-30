@@ -6,10 +6,12 @@
  * button). Keeping them out of the entry chunk is what lets the app stay under
  * the <120 KB initial-JS budget.
  */
+import { useRef } from "react";
 import { Command } from "cmdk";
 import { AnimatePresence, motion } from "framer-motion";
 import { spring } from "@/lib/motion";
 import type { CommandItem } from "@/components/CommandPalette";
+import { useDialog } from "@/hooks/useDialog";
 
 export default function CommandPaletteOverlay({
   groups,
@@ -18,9 +20,24 @@ export default function CommandPaletteOverlay({
   groups: { group: string; items: CommandItem[] }[];
   onClose: () => void;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useDialog({
+    isOpen: true,
+    onClose,
+    containerRef,
+    restoreFocus: true,
+    trapFocus: true,
+    closeOnEscape: true,
+  });
+
   return (
     <AnimatePresence>
       <motion.div
+        ref={containerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Command palette"
         className="fixed inset-0 z-[200] flex items-start justify-center bg-black/25 p-4 pt-[12vh] backdrop-blur-sm"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -36,7 +53,7 @@ export default function CommandPaletteOverlay({
           className="w-full max-w-lg overflow-hidden rounded-2xl bg-[var(--color-surface)] shadow-[var(--shadow-float)]"
           onClick={(e) => e.stopPropagation()}
         >
-          <Command label="Command palette" loop onKeyDown={(e) => e.key === "Escape" && onClose()}>
+          <Command label="Command palette" loop>
             <div className="flex items-center gap-3 border-b border-[var(--color-line)] px-4">
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="shrink-0 text-[var(--color-faint)]">
                 <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />

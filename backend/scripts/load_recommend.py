@@ -105,6 +105,10 @@ async def main() -> int:
     ap.add_argument("--base-url", default="http://127.0.0.1:8000")
     ap.add_argument("--samples", type=int, default=200)
     ap.add_argument("--concurrency", type=int, default=20)
+    ap.add_argument("--gate-cold-ms", type=float, default=2000.0,
+                    help="Cold cell p95 threshold in milliseconds (default: 2000)")
+    ap.add_argument("--gate-warm-ms", type=float, default=2000.0,
+                    help="Warm cell p95 threshold in milliseconds (default: 2000)")
     ap.add_argument("--json", dest="json_out")
     args = ap.parse_args()
 
@@ -140,6 +144,8 @@ async def main() -> int:
 
     sha = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True,
                          text=True).stdout.strip()
+    cold_pass = cold.get("p95_ms", 1e9) < args.gate_cold_ms and not cold["errors"]
+    warm_pass = warm.get("p95_ms", 1e9) < args.gate_warm_ms and not warm["errors"]
     result = {
         "generated_utc": datetime.now(timezone.utc).isoformat(),
         "commit": sha,
@@ -153,9 +159,12 @@ async def main() -> int:
         },
         "cold": cold,
         "warm": warm,
-        "gate": {"p95_lt_ms": 2000,
-                 "cold_pass": cold.get("p95_ms", 1e9) < 2000 and not cold["errors"],
-                 "warm_pass": warm.get("p95_ms", 1e9) < 2000 and not warm["errors"]},
+        "gate": {
+            "gate_cold_ms": args.gate_cold_ms,
+            "gate_warm_ms": args.gate_warm_ms,
+            "cold_pass": cold_pass,
+            "warm_pass": warm_pass,
+        },
     }
     print(json.dumps(result, indent=2))
     if args.json_out:
@@ -170,11 +179,11 @@ async def main() -> int:
         f"p99={cold.get('p99_ms')} err={cold['errors']} | "
         f"warm p50={warm.get('p50_ms')} p95={warm.get('p95_ms')} "
         f"p99={warm.get('p99_ms')} err={warm['errors']} | "
-        f"gate<2000ms cold_pass={result['gate']['cold_pass']} "
-        f"warm_pass={result['gate']['warm_pass']}"
+        f"gate_cold<{args.gate_cold_ms:.0f}ms cold_pass={cold_pass} "
+        f"gate_warm<{args.gate_warm_ms:.0f}ms warm_pass={warm_pass}"
     )
     print(f"::notice title=p95-cells::{compact}")
-    ok = result["gate"]["cold_pass"] and result["gate"]["warm_pass"]
+    ok = cold_pass and warm_pass
     return 0 if ok else 1
 
 

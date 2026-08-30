@@ -22,6 +22,38 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-08-28 (Stage 3: Security Penetration Testing & Compliance Hardening)
+
+Tagged on the merge commit of the Stage-3 PR (#17); see
+`docs/agent-reports/stage3-report.md` for executive summary and full technical register.
+
+### Added
+
+- **Automated Security Penetration Test Suite** (`backend/tests/test_stage3_penetration.py`):
+  15 test scenarios spanning 14 attack classes (auth brute force & lockout, JWT signature tampering & algorithm confusion, refresh token replay & rotation races, cross-tenant IDOR on moodboards and projects, share-token entropy and PII leakage, RBAC elevation & admin self-demotion, payment verification replay attacks, malicious file upload filtering, SSRF IP-blocklist validation, stored XSS sanitization, CSRF double-submit token enforcement, rate limiting, and information leakage prevention).
+- **Compliance Pack & PII Data Map** (`docs/reports/COMPLIANCE_PACK.md`):
+  Comprehensive regulatory and security compliance pack covering GDPR Art. 15 (Right of Access / JSON export) and Art. 17 (Right to Erasure / hard deletion), comprehensive PII data map across all DB entities and caches, TLS 1.3 / HSTS / cookie security posture, no-card-data attestation, and client decisions register (C-01 to C-03).
+- **Disaster Recovery & Backup Automation** (`scripts/backup_db.sh`, `scripts/restore_db.sh`, `docs/DR_DRILL.md`, `backend/tests/test_dr_restore.py`):
+  Standardized PostgreSQL schema + data dump and restore tooling with automated snapshot verification tests.
+- **Accessible Modal Primitive `useDialog`** (`frontend/src/hooks/useDialog.ts`):
+  Implements document-level `Escape` key handling, keyboard focus trapping (`Tab` / `Shift+Tab`), focus restoration on unmount, and body scroll lock (resolves IR-S1-011).
+- **Seller-Link Quarantine Admin Workflow** (`frontend/src/pages/admin/ProductsPage.tsx`, `docs/OPERATOR_SELLER_LINKS.fa.md`):
+  Database persistence for `link_status` and `link_checked_at` (Alembic migration `0004_product_link_status.py`), API status filter, UI quarantine badges (`🔴 قرنطینه`, `⚠️ ریدایرکت`, `✓ سالم`), and a Persian operator replacement guide (resolves IR-S2-001).
+
+### Changed
+
+- **Dead-Key Sweep CI Gate** (`ci/ci.stage3.yml`):
+  Removed `continue-on-error: true` from the `chromium-sweep` Playwright job, restoring it to a **BLOCKING** check in CI (resolves IR-S1-013).
+- Replaced 8 dead/NXDOMAIN URLs in `datasets/products_realistic.json` with live Digikala seller links.
+- Migrated all modal surfaces (`DashboardPage.tsx`, `ShortcutsDialog.tsx`, `PresentMode.tsx`, `ProductsPage.tsx`, `CommandPaletteOverlay.tsx`) to `useDialog`.
+
+### Fixed
+
+- **S3-F001 (High · IDOR in `POST /api/v1/quiz`):** `create_quiz` now verifies that the authenticated designer owns the referenced `project_id`, returning HTTP 404 on ownership mismatch.
+- **S3-F002 (Medium · GDPR Art. 17 Redis Invalidation):** `DELETE /api/v1/users/me` now flushes user recommendation and export cache keys (`rec:{uid}:*`, `export:{uid}`) from Redis upon account erasure.
+
+---
+
 ### Fixed
 
 - **Quota guard reported success for rows it never inserted (production

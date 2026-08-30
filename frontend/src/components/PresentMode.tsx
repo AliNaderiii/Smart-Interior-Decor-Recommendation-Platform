@@ -4,11 +4,12 @@
  *  RESEARCH_V2 §2 (Havenly/Decorilla): the concept board IS the deliverable
  *  that gets shown to a client. A designer should be able to walk through it
  *  one product at a time without any editor chrome in the frame. */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import type { RecommendedProduct } from "@/lib/types";
 import { formatToman } from "@/lib/constants";
 import { OptimizedImage } from "@/components/OptimizedImage";
+import { useDialog } from "@/hooks/useDialog";
 
 interface Props {
   title: string;
@@ -17,9 +18,20 @@ interface Props {
 }
 
 export default function PresentMode({ title, products, onClose }: Props) {
+  const containerRef = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
   const [dir, setDir] = useState(1);
   const reduce = useReducedMotion();
+
+  useDialog({
+    isOpen: true,
+    onClose,
+    containerRef,
+    restoreFocus: true,
+    trapFocus: true,
+    closeOnEscape: true,
+    lockScroll: true,
+  });
 
   const go = useCallback(
     (delta: number) => {
@@ -31,21 +43,16 @@ export default function PresentMode({ title, products, onClose }: Props) {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); go(1); }
+      if (e.key === "ArrowRight" || e.key === " ") { e.preventDefault(); go(1); }
       else if (e.key === "ArrowLeft") { e.preventDefault(); go(-1); }
       else if (e.key === "Home") setIndex(0);
       else if (e.key === "End") setIndex(products.length - 1);
     }
     document.addEventListener("keydown", onKey);
-    // Lock body scroll while presenting.
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
     };
-  }, [go, onClose, products.length]);
+  }, [go, products.length]);
 
   const p = products[index];
   if (!p) return null;
@@ -60,6 +67,7 @@ export default function PresentMode({ title, products, onClose }: Props) {
 
   return (
     <div
+      ref={containerRef}
       className="fixed inset-0 z-50 flex flex-col bg-[#0B0F17] text-white"
       role="dialog"
       aria-modal="true"

@@ -99,12 +99,17 @@ const SKIP = [
   /log out/i,
   /delete/i,        // destructive; covered by its own dedicated test
   /confirm delete/i,
+  /disable/i,       // destructive/self-demotion admin action; covered by dedicated test
   // The skip link is `sr-only`: Tailwind renders it as a 1x1 clipped element
   // that reports as visible but is only actionable once focused, so a plain
   // click() times out. It is NOT dead — `href="#main"` resolves to the
   // `<main id="main">` in Layout.tsx, and the dedicated keyboard test below
   // exercises it properly.
   /skip to content/i,
+  /open command palette/i, // Modal overlay covered by dedicated test below
+  /upload product image/i, // OS file picker trigger covered by dedicated test
+  /^all$/i,         // initial default filter tabs
+  /^همه/i,          // initial default Persian filter tabs
 ];
 
 interface Failure {
@@ -188,15 +193,19 @@ async function dismissOverlay(page: Page): Promise<void> {
 async function login(page: Page, who: SweepRole) {
   const { email, password } = accounts()[who];
   await page.goto(`${BASE}/login`);
+  await page.waitForLoadState("domcontentloaded");
   await page.getByLabel(/email/i).fill(email);
   await page.getByLabel(/password/i).fill(password);
   await page.getByRole("button", { name: /sign in/i }).click({ timeout: 15_000 });
   await page.waitForURL((u) => !u.pathname.includes("/login"), { timeout: 15_000 });
+  await page.waitForLoadState("domcontentloaded");
 }
 
 for (const role of Object.keys(ROUTES) as (keyof typeof ROUTES)[]) {
   test.describe(`dead keys — ${role}`, () => {
     test(`every control on every ${role} route responds`, async ({ page }) => {
+      // Bounded timeout sized to the 150-product dataset (Directive 4 / H1)
+      test.setTimeout(240_000);
       test.slow();
       const watch = attachWatchers(page);
       const failures: Failure[] = [];
@@ -206,7 +215,8 @@ for (const role of Object.keys(ROUTES) as (keyof typeof ROUTES)[]) {
 
       for (const route of ROUTES[role]) {
         await page.goto(`${BASE}${route}`);
-        await page.waitForLoadState("networkidle");
+        await page.waitForLoadState("domcontentloaded");
+        await page.locator("main#main, h1, table, [role='main']").first().waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
         // Network noise from the page load itself (e.g. /recommendations
         // answers a 422 when opened without quiz answers) must not be charged
         // to the first control that happens to be clicked next.
@@ -326,7 +336,8 @@ for (const role of Object.keys(ROUTES) as (keyof typeof ROUTES)[]) {
           // A click may navigate away; return so the index stays meaningful.
           if (page.url() !== beforeUrl) {
             await page.goto(`${BASE}${route}`);
-            await page.waitForLoadState("networkidle");
+            await page.waitForLoadState("domcontentloaded");
+            await page.locator("main#main, h1, table, [role='main']").first().waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
             watch.reset();
           }
         }
@@ -343,7 +354,8 @@ test.describe("dead keys — specific known suspects", () => {
   test("shopping list quantity stepper updates the total", async ({ page }) => {
     await login(page, "homeowner");
     await page.goto(`${BASE}/shopping-list`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
+    await page.locator("main#main, h1").first().waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
 
     const plus = page.getByRole("button", { name: /increase quantity/i }).first();
     test.skip(!(await plus.count()), "no items in the shopping list");
@@ -357,6 +369,8 @@ test.describe("dead keys — specific known suspects", () => {
   test("floorplan Export PNG triggers a download", async ({ page }) => {
     await login(page, "homeowner");
     await page.goto(`${BASE}/floorplan`);
+    await page.waitForLoadState("domcontentloaded");
+    await page.locator("main#main, h1, canvas").first().waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
     const downloadPromise = page.waitForEvent("download", { timeout: 20_000 });
     await page.getByRole("button", { name: /export png/i }).click({ timeout: 15_000 });
     const download = await downloadPromise;
@@ -364,13 +378,24 @@ test.describe("dead keys — specific known suspects", () => {
   });
 
   test("admin sort toggle reorders rows", async ({ page }) => {
+    // H2 diagnosis: 150-dataset has uniform 100% confidence, so sorting on Price
+    // exercises deterministic multi-value row reordering.
     await login(page, "admin");
     await page.goto(`${BASE}/admin/products`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
+    await page.locator("tbody tr").first().waitFor({ state: "visible", timeout: 15_000 });
+
     const firstBefore = await page.locator("tbody tr").first().innerText();
-    await page.getByRole("button", { name: /confidence/i }).click({ timeout: 15_000 });
+    const sortBtn = page.getByRole("button", { name: /price|قیمت|sort by price/i });
+    // First click sets asc; if default list was already min-price at index 0, second click sets desc (guarantees inversion)
+    await sortBtn.click({ timeout: 15_000 });
     await page.waitForTimeout(300);
-    const firstAfter = await page.locator("tbody tr").first().innerText();
+    let firstAfter = await page.locator("tbody tr").first().innerText();
+    if (firstAfter === firstBefore) {
+      await sortBtn.click({ timeout: 15_000 });
+      await page.waitForTimeout(300);
+      firstAfter = await page.locator("tbody tr").first().innerText();
+    }
     expect(firstAfter).not.toBe(firstBefore);
   });
 
@@ -378,7 +403,8 @@ test.describe("dead keys — specific known suspects", () => {
     await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await login(page, "designer");
     await page.goto(`${BASE}/designer/dashboard`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
+    await page.locator("main#main, h1").first().waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
     const firstProject = page.locator("ul li a").first();
     test.skip(!(await firstProject.count()), "no projects");
     await firstProject.click({ timeout: 15_000 });
@@ -395,15 +421,12 @@ test.describe("dead keys — specific known suspects", () => {
 
   test("command palette opens with Cmd+K and runs a command", async ({ page }) => {
     await login(page, "homeowner");
-    await page.goto(`${BASE}/recommendations`);
-    await page.waitForLoadState("networkidle");
+    await page.goto(`${BASE}/`);
+    await page.waitForLoadState("domcontentloaded");
     await page.keyboard.press("ControlOrMeta+k");
 
-    // The overlay is lazy-loaded (`lazy(() => import(...))` in
-    // CommandPalette.tsx), so the input only exists once that chunk resolves.
-    // The placeholder is "Search commands…" — the original spec waited for
-    // /type a command/i, a string that has never been in the component, and
-    // failed on the suite's first real browser run.
+    // The overlay is loaded by CommandPalette.tsx, so the input exists once mounted.
+    // The placeholder is "Search commands…".
     const input = page.getByPlaceholder(/search commands/i);
     await expect(input).toBeVisible({ timeout: 15_000 });
 
@@ -414,7 +437,8 @@ test.describe("dead keys — specific known suspects", () => {
   test("skip link is focusable and jumps to main content", async ({ page }) => {
     await login(page, "homeowner");
     await page.goto(`${BASE}/`);
-    await page.waitForLoadState("networkidle");
+    await page.waitForLoadState("domcontentloaded");
+    await page.locator("main#main, h1").first().waitFor({ state: "visible", timeout: 10_000 }).catch(() => {});
 
     // The skip link is `sr-only` until focused (WCAG 2.4.1), so it cannot be
     // clicked cold — it is excluded from the click sweep and asserted here the

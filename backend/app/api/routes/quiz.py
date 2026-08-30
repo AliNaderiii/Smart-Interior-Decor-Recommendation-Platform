@@ -10,6 +10,7 @@ from app.api.deps import get_current_user
 from app.core.datasets import recommendation_limit
 from app.core.rate_limit import enforce_rate_limit
 from app.db.session import get_db
+from app.models.project import Project
 from app.models.quiz import StyleQuiz
 from app.models.user import User
 from app.schemas.common import ok
@@ -50,6 +51,10 @@ def _quiz_dict(q: StyleQuiz) -> dict:
 
 @router.post("/quiz", status_code=status.HTTP_201_CREATED)
 def create_quiz(body: QuizIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if body.project_id:
+        project = db.get(Project, body.project_id)
+        if project is None or project.designer_id != user.id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found")
     quiz = StyleQuiz(
         user_id=user.id,
         project_id=body.project_id,

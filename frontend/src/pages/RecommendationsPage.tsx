@@ -34,8 +34,10 @@ function useRecommendations(quizId: string | null) {
           /* fall back to the canonical request below */
         }
       }
-      const url = quizId ? `/recommend?quiz_id=${quizId}` : "/recommend";
-      return post<RecommendResult>(url);
+      if (!quizId) {
+        return { categories: {}, cached: false, is_pro: false };
+      }
+      return post<RecommendResult>(`/recommend?quiz_id=${quizId}`);
     },
     staleTime: 5 * 60 * 1000,
   });

@@ -49,7 +49,13 @@ async function createProjectViaUi(page: Page, name: string) {
   await expect(dialog).toBeVisible();
   await dialog.getByLabel(/project name/i).fill(name);
   await dialog.getByLabel(/^client name$/i).fill("E2E Client");
+  const postPromise = page.waitForResponse(
+    (r) => r.url().includes("/api/v1/projects") && r.request().method() === "POST",
+    { timeout: 20_000 },
+  );
   await dialog.getByRole("button", { name: /^create$/i }).click({ timeout: 15_000 });
+  const postResponse = await postPromise;
+  return postResponse;
 }
 
 /** Delete every project this run created, straight through the API using the
@@ -106,12 +112,15 @@ test.describe.serial("designer journey", () => {
 
     for (let i = 1; i <= FREE_PLAN_QUOTA; i++) {
       const name = `E2E Project ${RUN}-${i}`;
-      await createProjectViaUi(page, name);
+      const res = await createProjectViaUi(page, name);
+      expect(res.status(), `Project ${i} should return 201`).toBe(201);
       // Success closes the modal and the new row appears in the list.
       await expect(page.getByRole("dialog", { name: /create project/i })).toHaveCount(0, {
         timeout: 20_000,
       });
-      await expect(page.getByText(name, { exact: true })).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByRole("link", { name: new RegExp(name) })).toBeVisible({
+        timeout: 20_000,
+      });
     }
 
     // Multiple project management: both rows coexist and are navigable links.
@@ -128,16 +137,7 @@ test.describe.serial("designer journey", () => {
       timeout: 30_000,
     });
 
-    // Watch the wire so the test proves the backend really refused, not just
-    // that some toast happened to appear.
-    const quotaResponse = page.waitForResponse(
-      (r) => r.url().includes("/api/v1/projects") && r.request().method() === "POST",
-      { timeout: 30_000 },
-    );
-
-    await createProjectViaUi(page, `E2E Project ${RUN}-over-quota`);
-
-    const response = await quotaResponse;
+    const response = await createProjectViaUi(page, `E2E Project ${RUN}-over-quota`);
     expect(response.status(), "3rd project should be refused with 402").toBe(402);
     const body = (await response.json()) as { success: boolean; error: string };
     expect(body.success).toBe(false);

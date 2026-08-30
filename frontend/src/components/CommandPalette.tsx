@@ -14,12 +14,11 @@
  *    moves, per WAI-ARIA — screen readers announce the active option without
  *    focus thrash. `cmdk` implements this correctly.
  */
-import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useThemeStore } from "@/stores/themeStore";
-
-const PaletteOverlay = lazy(() => import("@/components/CommandPaletteOverlay"));
-const ShortcutsDialog = lazy(() => import("@/components/ShortcutsDialog"));
+import PaletteOverlay from "@/components/CommandPaletteOverlay";
+import ShortcutsDialog from "@/components/ShortcutsDialog";
 
 export interface CommandItem {
   id: string;
@@ -127,12 +126,8 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   return (
     <PaletteContext.Provider value={api}>
       {children}
-      {/* cmdk + the overlay chrome are ~28 KB gzip and are only needed once
-          the user actually opens the palette, so they load on demand. Mounted
-          only while open, which also means the dialog cannot trap focus or
-          intercept keys when it is closed. */}
-      <Suspense fallback={null}>{open && <PaletteOverlay groups={groups} onClose={() => setOpen(false)} />}</Suspense>
-      <Suspense fallback={null}>{help && <ShortcutsDialog onClose={() => setHelp(false)} />}</Suspense>
+      {open && <PaletteOverlay groups={groups} onClose={() => setOpen(false)} />}
+      {help && <ShortcutsDialog onClose={() => setHelp(false)} />}
     </PaletteContext.Provider>
   );
 }

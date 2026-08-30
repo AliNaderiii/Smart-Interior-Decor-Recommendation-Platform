@@ -20,6 +20,7 @@ Stage 03 hardening (probe `X-01`, `X-02`, `V-01`, `V-03`):
 from __future__ import annotations
 
 import json
+from datetime import datetime
 from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -142,6 +143,7 @@ class ProductUpdate(BaseModel):
     height_cm: int | None = Field(default=None, ge=0, le=100_000)
     description: SafeText(max_length=2000) | None = None
     is_verified: bool | None = None
+    link_status: str | None = None
 
     _styles_from_taxonomy = field_validator("styles")(validate_styles)
     _category_allowed = field_validator("category")(validate_category)
@@ -168,6 +170,8 @@ class ProductOut(BaseModel):
     image_url: str
     seller_link: str
     seller_link_ok: bool | None
+    link_status: str | None = None
+    link_checked_at: datetime | None = None
     colors: list
     styles: list
     materials: list

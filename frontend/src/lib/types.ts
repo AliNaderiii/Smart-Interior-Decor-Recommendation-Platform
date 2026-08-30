@@ -46,6 +46,8 @@ export interface RecommendedProduct {
   image_url: string;
   seller_link: string;
   seller_link_ok: boolean | null;
+  link_status?: "ok" | "redirect" | "dead" | "unsafe" | "blocked" | string | null;
+  link_checked_at?: string | null;
   colors: string[];
   styles: string[];
   materials: string[];
