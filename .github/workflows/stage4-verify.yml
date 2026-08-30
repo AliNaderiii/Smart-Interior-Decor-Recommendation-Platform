@@ -153,7 +153,8 @@ jobs:
             # agent. Re-emit the decisive lines as ::error:: annotations, which
             # the check-runs API does return.
             docker logs demo 2>&1 \
-              | grep -aE "FATAL|Error|error|Traceback|die|refus|denied|Permission|No such|not found|could not|failed" \
+              | grep -av "PASS" \
+              | grep -aE "FATAL|FAIL|Error|error|Traceback|refus|denied|Permission|No such|not found|could not|failed" \
               | tail -25 \
               | while IFS= read -r line; do
                   echo "::error::boot: ${line}"
@@ -275,7 +276,15 @@ jobs:
       - name: Start and await the container
         run: |
           set -uo pipefail
-          docker run -d --name demo -p "127.0.0.1:${DEMO_PORT}:${DEMO_PORT}" "${IMAGE_TAG}"
+          # RECOMMEND_RATE_LIMIT_PER_MINUTE=0 is the documented load-test
+          # switch (config.py:95, and the harness docstring names it as a
+          # precondition). The image ships the protective default of 20, which
+          # 200 samples per cell would trip immediately; overriding it HERE
+          # keeps the rate limiter fully active in demo-verify and in the real
+          # demo image. This measures the /recommend path, not the limiter.
+          docker run -d --name demo -p "127.0.0.1:${DEMO_PORT}:${DEMO_PORT}" \
+            -e RECOMMEND_RATE_LIMIT_PER_MINUTE=0 \
+            "${IMAGE_TAG}"
           deadline=$(( $(date +%s) + 600 ))
           while [ "$(date +%s)" -lt "$deadline" ]; do
             code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
@@ -286,7 +295,8 @@ jobs:
           done
           docker logs demo 2>&1 | tail -100
           docker logs demo 2>&1 \
-            | grep -aE "FATAL|Error|error|Traceback|refus|denied|Permission|No such|not found|could not|failed" \
+            | grep -av "PASS" \
+            | grep -aE "FATAL|FAIL|Error|error|Traceback|refus|denied|Permission|No such|not found|could not|failed" \
             | tail -20 \
             | while IFS= read -r line; do echo "::error::boot: ${line}"; done
           echo "::error::container never became healthy"
@@ -302,9 +312,28 @@ jobs:
 
       - name: Load test — defaults
         run: |
+          set -uo pipefail
+          # Capture in the SHELL, not in Python. Runs #5 and #6 proved that a
+          # ::error:: emitted from inside the harness can fail to reach the
+          # check-run, while the smoke script's shell-emitted annotation always
+          # arrived. Annotations are the only channel the agent can read (step
+          # logs and artifacts are not downloadable), so the last lines of the
+          # harness are re-emitted here, from bash, where it is known to work.
+          set +e
           python backend/scripts/load_recommend.py \
             --base-url "http://127.0.0.1:${DEMO_PORT}" \
-            --json /tmp/g4x-defaults.json
+            --json /tmp/g4x-defaults.json 2>&1 | tee /tmp/g4x-defaults.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            grep -aviE "^::(error|notice|warning)" /tmp/g4x-defaults.log \
+              | tail -12 \
+              | while IFS= read -r line; do
+                  [ -n "$line" ] && echo "::error title=g4x-defaults::${line}"
+                done
+            echo "::error title=g4x-defaults::harness exit ${rc}"
+            exit "$rc"
+          fi
 
       - name: Load test — 250 samples at concurrency 20
         run: |
