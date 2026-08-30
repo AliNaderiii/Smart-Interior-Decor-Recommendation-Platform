@@ -1,0 +1,405 @@
+# =============================================================================
+# STAGED WORKFLOW — deploy the public demo to a free Hugging Face Space
+# =============================================================================
+# Stage 4, Wave 2. This file is STAGED, not active: the repository token cannot
+# push `.github/workflows/*` (D-0 / IR-S1-009), so it is committed here and a
+# human pastes it to `.github/workflows/stage4-deploy.yml` in the single
+# approved paste sitting, together with `ci/ci.stage4.yml`.
+#
+# TRIGGERS — and why each one is shaped this way:
+#
+#   push (path-scoped)
+#       `workflow_dispatch` ALONE cannot fire before merge: GitHub only offers
+#       the Run-workflow button for workflows present on the DEFAULT branch. To
+#       make first activation testable on the stage branch, the push trigger is
+#       scoped to the paths that actually change the Space contents. First push
+#       after the paste IS the acceptance test.
+#
+#   schedule (*/30) — the uptime ping (Directive 3, N6)
+#       NOTE: GitHub runs scheduled workflows ONLY from the default branch, so
+#       this becomes active after merge, not on the stage branch. Until then,
+#       run the `ping` job manually via workflow_dispatch. The ping also serves
+#       a second purpose: it keeps the Space from sleeping (deviation D-4b).
+#
+#   workflow_dispatch — manual redeploy / manual ping, with a mode input.
+#
+# SECRETS: HF_TOKEN (write-scoped PAT) and HF_USERNAME come from repository
+# secrets. HF_TOKEN is never echoed, never passed on a command line, and is
+# additionally registered with ::add-mask::. The GITHUB_TOKEN is read-only.
+# =============================================================================
+name: Stage 4 — Deploy demo Space
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "deploy/hf-space/**"
+      - "backend/**"
+      - "frontend/**"
+      - "datasets/**"
+      - "ci/stage4-deploy.yml"
+  schedule:
+    # Uptime ping every 30 minutes. Default-branch only (see the note above).
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "deploy = rebuild and push the Space; ping = probe only"
+        type: choice
+        options: [deploy, ping]
+        default: deploy
+
+# Read-only: this workflow never writes to the repository.
+permissions:
+  contents: read
+
+concurrency:
+  group: hf-space-deploy
+  cancel-in-progress: false
+
+env:
+  SPACE_NAME: smart-decor-demo
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # DEPLOY — assemble the Space context and push it. The Space builds the
+  # Dockerfile itself; we do not build the image in CI (the free Space builder
+  # does that), so this job is fast and only fails on genuine packaging errors.
+  # ---------------------------------------------------------------------------
+  deploy:
+    if: github.event_name != 'schedule' && inputs.mode != 'ping'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    outputs:
+      space_url: ${{ steps.target.outputs.space_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Guard — required secrets are present
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME: ${{ secrets.HF_USERNAME }}
+        run: |
+          set -euo pipefail
+          missing=""
+          [ -n "${HF_TOKEN:-}" ]    || missing="${missing} HF_TOKEN"
+          [ -n "${HF_USERNAME:-}" ] || missing="${missing} HF_USERNAME"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secret(s):${missing}"
+            echo "Add them under Settings -> Secrets and variables -> Actions."
+            echo "Step-by-step guide: docs/ops/HF_SPACE_SETUP.fa.md"
+            exit 1
+          fi
+          echo "Required secrets are present."
+
+      - name: Resolve target
+        id: target
+        env:
+          HF_USERNAME: ${{ secrets.HF_USERNAME }}
+        run: |
+          set -euo pipefail
+          # The username is not secret, but keep it out of the logs anyway so a
+          # screenshot of a failed run does not leak the account name.
+          echo "::add-mask::${HF_USERNAME}"
+          echo "space_id=${HF_USERNAME}/${SPACE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "space_url=https://${HF_USERNAME}-${SPACE_NAME}.hf.space" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.14"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build the SPA (fail fast before touching the Space)
+        working-directory: frontend
+        env:
+          VITE_BRAND_NAME: Smart Decor
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+          test -f dist/index.html
+          echo "SPA build OK ($(du -sh dist | cut -f1))"
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install huggingface_hub
+        run: |
+          # `cryptography` is needed for the generated demo FERNET_KEY below.
+          pip install --quiet "huggingface_hub>=0.25,<1.0" "cryptography>=42"
+
+      - name: Assemble the Space context
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/space && mkdir -p /tmp/space
+
+          # The Space builds this Dockerfile with the context root = the Space
+          # repo, so the paths inside it must resolve there. We ship the same
+          # tree layout the Dockerfile expects.
+          cp deploy/hf-space/Dockerfile        /tmp/space/Dockerfile
+          cp deploy/hf-space/README.md         /tmp/space/README.md
+          cp deploy/hf-space/supervisord.conf  /tmp/space/
+          cp deploy/hf-space/nginx.conf        /tmp/space/
+          cp deploy/hf-space/entrypoint.sh     /tmp/space/
+          cp deploy/hf-space/demo_env.py       /tmp/space/
+          mkdir -p /tmp/space/deploy/hf-space
+          cp deploy/hf-space/supervisord.conf deploy/hf-space/nginx.conf \
+             deploy/hf-space/entrypoint.sh deploy/hf-space/demo_env.py \
+             /tmp/space/deploy/hf-space/
+
+          # Application sources.
+          mkdir -p /tmp/space/backend /tmp/space/frontend
+          rsync -a --delete \
+            --exclude '__pycache__' --exclude '*.pyc' --exclude '.pytest_cache' \
+            --exclude '.venv' --exclude 'tests' --exclude 'htmlcov' \
+            backend/ /tmp/space/backend/
+          rsync -a --delete \
+            --exclude 'node_modules' --exclude 'e2e' --exclude 'coverage' \
+            frontend/ /tmp/space/frontend/
+          cp -r datasets /tmp/space/datasets
+
+          # Nothing resembling a credential may be uploaded.
+          if find /tmp/space -name '.env' -o -name '.env.*' \
+               ! -name '.env.example' ! -name '.env.staging.example' | grep -q .; then
+            echo "::error::an .env file reached the Space context — refusing to upload"
+            exit 1
+          fi
+
+          echo "Space context assembled:"
+          du -sh /tmp/space
+          find /tmp/space -maxdepth 1 -printf '  %f\n' | sort
+
+      - name: Create the Space if it does not exist
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          SPACE_ID: ${{ steps.target.outputs.space_id }}
+        run: |
+          python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+          from huggingface_hub.utils import RepositoryNotFoundError
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          space_id = os.environ["SPACE_ID"]
+          try:
+              api.repo_info(repo_id=space_id, repo_type="space")
+              print("Space already exists — will update it.")
+          except RepositoryNotFoundError:
+              api.create_repo(
+                  repo_id=space_id,
+                  repo_type="space",
+                  space_sdk="docker",
+                  private=False,
+                  exist_ok=True,
+              )
+              print("Space created.")
+          PY
+
+      - name: Set Space secrets (generated demo values only)
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          SPACE_ID: ${{ steps.target.outputs.space_id }}
+        run: |
+          python - <<'PY'
+          import os, secrets
+          from huggingface_hub import HfApi
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          space_id = os.environ["SPACE_ID"]
+
+          # Generated per deploy. NO real credential is involved anywhere: the
+          # demo runs mock AI, mock email and Zarinpal sandbox by design.
+          api.add_space_secret(
+              repo_id=space_id, key="SECRET_KEY", value=secrets.token_hex(32),
+              description="Demo JWT signing key, regenerated on every deploy",
+          )
+          from cryptography.fernet import Fernet
+
+          api.add_space_secret(
+              repo_id=space_id, key="FERNET_KEY",
+              value=Fernet.generate_key().decode(),
+              description="Demo at-rest key, regenerated on every deploy",
+          )
+          # Non-secret but environment-shaped settings.
+          for key, value in [
+              ("APP_ENV", "development"),
+              ("API_DOCS_MODE", "disabled"),   # D-4.1 condition, binding
+              ("SEED_DEMO_ACCOUNTS", "true"),
+              ("AI_PROVIDER", "mock"),
+              ("PAYMENT_PROVIDER", "zarinpal_sandbox"),
+              ("EMAIL_PROVIDER", "mock"),
+          ]:
+              api.add_space_variable(repo_id=space_id, key=key, value=value)
+          print("Space secrets and variables set (values not logged).")
+          PY
+
+      - name: Upload the Space context
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          SPACE_ID: ${{ steps.target.outputs.space_id }}
+        run: |
+          python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          api.upload_folder(
+              repo_id=os.environ["SPACE_ID"],
+              repo_type="space",
+              folder_path="/tmp/space",
+              commit_message=f"Deploy {os.environ.get('GITHUB_SHA', 'local')[:7]}",
+              delete_patterns="*",     # mirror exactly; no stale files survive
+          )
+          print("Upload complete — the Space will now build.")
+          PY
+
+      - name: Wait for the Space build
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          SPACE_ID: ${{ steps.target.outputs.space_id }}
+        run: |
+          python - <<'PY'
+          import os, sys, time
+          from huggingface_hub import HfApi
+
+          api = HfApi(token=os.environ["HF_TOKEN"])
+          space_id = os.environ["SPACE_ID"]
+          deadline = time.time() + 30 * 60
+          last = None
+          while time.time() < deadline:
+              runtime = api.get_space_runtime(repo_id=space_id)
+              stage = runtime.stage
+              if stage != last:
+                  print(f"  stage: {stage}")
+                  last = stage
+              if stage == "RUNNING":
+                  print("Space is RUNNING.")
+                  sys.exit(0)
+              if stage in {"BUILD_ERROR", "RUNTIME_ERROR", "CONFIG_ERROR"}:
+                  print(f"::error::Space entered {stage}")
+                  print("Open the Space -> Logs tab for the build output.")
+                  sys.exit(1)
+              time.sleep(15)
+          print("::error::Space did not reach RUNNING within 30 minutes")
+          sys.exit(1)
+          PY
+
+      - name: Probe the public URL until two consecutive 200s
+        env:
+          SPACE_URL: ${{ steps.target.outputs.space_url }}
+        run: |
+          set -uo pipefail
+          # Same wake rule as G-4.x (T-4.8): a single 200 can come from the
+          # platform's holding page or a warming worker. Two IN A ROW means the
+          # app is genuinely serving.
+          streak=0
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 \
+              "${SPACE_URL}/api/v1/health/ready" || echo 000)
+            if [ "$code" = "200" ]; then
+              streak=$((streak + 1))
+              echo "  attempt ${i}: 200 (streak ${streak})"
+              [ "$streak" -ge 2 ] && break
+            else
+              [ "$streak" -gt 0 ] && echo "  attempt ${i}: ${code} (streak reset)"
+              streak=0
+            fi
+            sleep 10
+          done
+          if [ "$streak" -lt 2 ]; then
+            echo "::error::no two consecutive 200s from ${SPACE_URL}"
+            exit 1
+          fi
+          echo "Public URL is serving."
+          curl -sSi --max-time 20 "${SPACE_URL}/api/v1/health/ready" | head -20
+
+      - name: Verify the docs are closed (D-4.1 condition)
+        env:
+          SPACE_URL: ${{ steps.target.outputs.space_url }}
+        run: |
+          set -uo pipefail
+          # BINDING: the public demo must not expose the interactive API map.
+          # Enforced in the app (API_DOCS_MODE=disabled), at the nginx edge and
+          # verified here against the LIVE url.
+          fail=0
+          for path in /docs /redoc /openapi.json; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 \
+              "${SPACE_URL}${path}" || echo 000)
+            if [ "$code" = "200" ]; then
+              echo "::error::${path} is PUBLIC on the demo (HTTP 200)"
+              fail=1
+            else
+              echo "  ${path} -> ${code} (closed)"
+            fi
+          done
+          exit $fail
+
+      - name: Summary
+        if: always()
+        env:
+          SPACE_URL: ${{ steps.target.outputs.space_url }}
+        run: |
+          {
+            echo "### Demo Space deploy"
+            echo ""
+            echo "- URL: ${SPACE_URL}"
+            echo "- Commit: \`${GITHUB_SHA:0:7}\`"
+            echo "- Demo accounts: demo@ / designer@ / admin@smartdecor.dev"
+            echo "- Data is ephemeral and re-seeded on every restart (D-4a)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # PING — uptime probe + keep-awake. Runs on the schedule (default branch only)
+  # and on a manual `ping` dispatch. Deliberately does NOT fail the workflow on
+  # a single bad probe: a sleeping Space is expected behaviour (D-4b), and a red
+  # X every 30 minutes would train everyone to ignore this workflow. It records
+  # the result as an artifact and warns instead.
+  # ---------------------------------------------------------------------------
+  ping:
+    if: github.event_name == 'schedule' || inputs.mode == 'ping'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Probe the Space
+        env:
+          HF_USERNAME: ${{ secrets.HF_USERNAME }}
+        run: |
+          set -uo pipefail
+          if [ -z "${HF_USERNAME:-}" ]; then
+            echo "::warning::HF_USERNAME is not set — skipping the uptime probe"
+            exit 0
+          fi
+          echo "::add-mask::${HF_USERNAME}"
+          URL="https://${HF_USERNAME}-${SPACE_NAME}.hf.space"
+
+          stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          start=$(date +%s%3N)
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 90 \
+            "${URL}/api/v1/health/ready" || echo 000)
+          end=$(date +%s%3N)
+          ms=$((end - start))
+
+          mkdir -p uptime
+          echo "${stamp} http=${code} ms=${ms}" | tee -a uptime/uptime.log
+
+          if [ "$code" = "200" ]; then
+            echo "Space is awake (${ms} ms)."
+          else
+            # A cold Space returns non-200 while it wakes; that is D-4b, not an
+            # outage. Warn, do not fail.
+            echo "::warning::probe returned ${code} after ${ms} ms — the Space may be waking (D-4b)"
+          fi
+
+      - name: Upload the uptime log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uptime-${{ github.run_id }}
+          path: uptime/
+          retention-days: 30

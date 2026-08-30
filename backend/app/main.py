@@ -119,9 +119,14 @@ app = FastAPI(
     lifespan=lifespan,
     # Stage 03: interactive docs are useful in development and are an attack
     # surface map in production.
-    docs_url=None if settings.is_production else "/docs",
-    redoc_url=None if settings.is_production else "/redoc",
-    openapi_url=None if settings.is_production else "/openapi.json",
+    # Stage 04 Wave 2 (D-4.1 condition): the public demo container runs
+    # APP_ENV=development deliberately, so "not production" is NOT a safe test
+    # for a public host. settings.api_docs_enabled is the single explicit
+    # switch (API_DOCS_MODE=disabled in the demo profile); production remains
+    # an unconditional lock inside that property.
+    docs_url="/docs" if settings.api_docs_enabled else None,
+    redoc_url="/redoc" if settings.api_docs_enabled else None,
+    openapi_url="/openapi.json" if settings.api_docs_enabled else None,
 )
 
 # Order matters: middleware added last runs first on the response path, so
