@@ -252,7 +252,7 @@ Before committing, confirm the copy is byte-identical:
 
 ```bash
 md5sum ci/stage4-verify.yml .github/workflows/stage4-verify.yml
-# both must print: c63abebd07004964d1fee57ef222c4cf
+# both must print: 85f64168dcbe3523928cc854db20ff01
 ```
 
 **What happens next.** That commit adds the workflow at its active path, which
@@ -264,3 +264,36 @@ time the image has ever been built or booted anywhere. The two likeliest breaks
 are the PGDG apt line resolving `postgresql-16-pgvector`, and `initdb` running
 as UID 1000. Both are recoverable and neither can affect anything outside the
 runner. The agent owns that fix loop.
+
+---
+
+## 8. Re-pasting a fix after a failed verification run
+
+The repo token cannot write `.github/workflows/*`, so every fix to the
+verification workflow lands in the mirror `ci/stage4-verify.yml` only, and you
+copy it across. This is the loop, repeated once per fix:
+
+```bash
+git pull origin arena/01a051ef-smart-interior-decor-recommend
+
+cp ci/stage4-verify.yml .github/workflows/stage4-verify.yml
+
+md5sum ci/stage4-verify.yml .github/workflows/stage4-verify.yml
+# both must print the same hash; for the run-#1 fix: 85f64168dcbe3523928cc854db20ff01
+
+git add .github/workflows/stage4-verify.yml
+git commit -m "Stage 4 - paste verification fix"
+git push origin arena/01a051ef-smart-interior-decor-recommend
+```
+
+Pushing the active path fires a new verification run automatically.
+
+### Why the workflow now shouts its errors
+
+Raw step logs and job artifacts cannot be downloaded through the API from the
+agent's sandbox — GitHub's blob storage closes the connection. Only *check-run
+annotations* come back. So the container boot failure path re-emits the
+decisive log lines as `::error::` annotations. Those lines are duplicated: they
+appear both in the normal step log (for you, in the browser) and as
+annotations (for the agent). That redundancy is deliberate — it is the only
+channel through which a boot failure can be diagnosed remotely.

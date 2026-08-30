@@ -493,3 +493,54 @@ No image has ever been built. `demo-verify`'s first run is the acceptance test
 for the PGDG apt line and `initdb`-as-UID-1000 — my two predicted failures —
 and it also produces the first **measured** image size to replace the ~500 MB
 estimate in `deploy/hf-space/README-dev.md`.
+
+## 15. Verification run #1 — the red, and the fix
+
+Run [`33330969648`](https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/actions/runs/33330969648)
+on `f4cc711`. **All three jobs failed.** As stated before the paste, this run
+was the acceptance test for code that had never executed.
+
+| Job | Failed step | Class |
+|---|---|---|
+| `demo-verify` | Wait for the container to become healthy | container boots, then exits |
+| `g4x-contract` | Start and await the container | same, downstream |
+| `dr-drill` | Back up | DSN incompatibility |
+
+### What did NOT fail
+
+The predicted breaks did not happen. **Build the demo image → success**, in
+both jobs: the PGDG `postgresql-16-pgvector` apt line resolves and `initdb`
+running as UID 1000 is fine. "Free disk space", "Set up Buildx" and "Report the
+MEASURED image size" all passed, so runner disk headroom and job timeouts —
+the supervisor's watch items — were not the constraint either.
+
+### `dr-drill` — diagnosed and fixed
+
+`scripts/backup_db.sh` and `scripts/restore_db.sh` prefer `DATABASE_URL` and
+pass it verbatim to `pg_dump`/`pg_restore`. The job-level value is a SQLAlchemy
+DSN, `postgresql+psycopg://…`, which libpq cannot parse. Fixed by blanking
+`DATABASE_URL` on those two steps only, so the scripts take their
+`PGHOST`/`PGUSER`/`PGDATABASE` path. The job-level variable is unchanged
+because alembic needs the `+psycopg` dialect. **The scripts are untouched** —
+the fixture was restructured, not the tool.
+
+### `demo-verify` — one real bug fixed, root cause still unknown
+
+A latent defect of mine: the catalog check ran `psql -U postgres -d smartdecor`,
+but the entrypoint creates role and database `decor`. That step was *skipped*
+in run #1, so it would have failed the job on the next attempt. Now
+`-U decor -d decor`.
+
+The boot failure itself is **not yet diagnosed**. Annotations report only "the
+container exited during boot" — the actual reason lives in the step log and the
+uploaded diagnostics, and **neither is reachable from the agent sandbox**:
+`gh run download` and raw log endpoints both fail against GitHub's blob storage
+(`EOF`). Check-run annotations are the only channel that returns content.
+
+So the fix for this class is **instrumentation, not a repair**: on failure both
+jobs now re-emit the matching boot-log lines, the container exit code and the
+log tail as `::error::` annotations. No gate is weakened and no threshold moves;
+the failure path only becomes legible. Run #2 is expected to fail again — but
+it will say *why*.
+
+**Iteration 1 of 5** for this defect class.
