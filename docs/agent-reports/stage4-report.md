@@ -196,7 +196,7 @@ Local reproduction after fix, verbatim: `[BROKEN LINKS] 0` / `[MISSING FILE REFE
 | env gate catches a host/origin mismatch | 2 FAILs on `FRONTEND_ORIGIN host` + `PAYMENT_CALLBACK_URL` |
 | Caddy render diff | exactly 3 lines (`email`, `:443 {`, `tls internal {`); CSP byte-identical |
 | render refuses bad input | exit 2 on missing host and on a URL-shaped host |
-| `audit_secrets.py` | `RESULT: PASS`, forbidden-path negative control still fails on `.env.staging` |
+| `audit_secrets.py` | `RESULT: PASS`, forbidden-path negative control still fails on an ignored runtime env file 
 | `audit_docs_links.py` | `RESULT: PASS` |
 
 Two real defects were found by this self-verification and fixed before push: the env parser read `KEY=   # comment` as the comment text (an unfilled template would have sailed through a length check), and the deploy script's own `STAGING_HOST` extraction did not strip inline comments (it derived `staging.smartdecor.test#[FILL]`). The shell now calls the same Python parser, so the two can never disagree.
