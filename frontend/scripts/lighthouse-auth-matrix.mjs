@@ -215,6 +215,49 @@ async function main() {
     diagNotes.push(`bootup6: ${bootup.join(' | ') || 'n/a'} ;; breakdown: ${breakdown.join(' ') || 'n/a'} ;; tbt=${Math.round(lhr.audits['total-blocking-time']?.numericValue ?? -1)}ms`);
   };
 
+/**
+ * Strip the live session credentials out of a Lighthouse report before it is
+ * written to disk (Stage 4, N4a).
+ *
+ * WHY: this script seeds REAL cookies over CDP, so every report embeds the
+ * access/refresh/CSRF JWTs — in request headers, the cookie jar and the
+ * network records — and the reports are uploaded as a CI artifact that stays
+ * downloadable for 90 days. Publishing working session tokens for a public
+ * repository's CI run is the actual problem; the `Lighthouse report secret
+ * scan` step firing on them is only the symptom.
+ *
+ * A secondary benefit: that scan greps for `sk-[A-Za-z0-9]{20,}`, which
+ * matches random base64url by chance (measured 0.144% per 700 token chars, so
+ * ~25% over 200 embeddings). Removing the tokens removes the main source of
+ * high-entropy base64url from the reports, and with it the flake.
+ *
+ * The performance numbers are untouched — only credential VALUES are masked,
+ * so every audit, timing and score in the report is byte-for-byte unchanged.
+ */
+const SESSION_SECRETS = [
+  process.env.LH_ACCESS_TOKEN,
+  process.env.LH_REFRESH_TOKEN,
+  process.env.LH_CSRF_TOKEN,
+].filter((v) => typeof v === 'string' && v.length >= 8);
+
+function redactSecrets(text) {
+  if (typeof text !== 'string' || SESSION_SECRETS.length === 0) return text;
+  let out = text;
+  for (const secret of SESSION_SECRETS) {
+    // Split/join rather than RegExp: a JWT contains '-' and '_' but also '.',
+    // and building a regex from an untrusted-length token risks catastrophic
+    // backtracking. Plain substring replacement is exact and linear.
+    out = out.split(secret).join('[REDACTED-SESSION-TOKEN]');
+    // JSON-escaped copies (the JSON report escapes '/' in some fields) and
+    // URL-encoded copies (query strings, Set-Cookie echoes).
+    const jsonEscaped = JSON.stringify(secret).slice(1, -1);
+    if (jsonEscaped !== secret) out = out.split(jsonEscaped).join('[REDACTED-SESSION-TOKEN]');
+    const urlEncoded = encodeURIComponent(secret);
+    if (urlEncoded !== secret) out = out.split(urlEncoded).join('[REDACTED-SESSION-TOKEN]');
+  }
+  return out;
+}
+
   for (const p of PAGES) {
     for (const ff of ['mobile', 'desktop']) {
       const url = BASE + p.url;
@@ -230,8 +273,8 @@ async function main() {
       const finalUrl = lhr.finalDisplayedUrl || lhr.finalUrl || '';
 
       const base = path.join(OUT, `${p.slug}.${ff}`);
-      fs.writeFileSync(`${base}.report.json`, result.report[0]);
-      fs.writeFileSync(`${base}.report.html`, result.report[1]);
+      fs.writeFileSync(`${base}.report.json`, redactSecrets(result.report[0]));
+      fs.writeFileSync(`${base}.report.html`, redactSecrets(result.report[1]));
 
       const row = {
         page: p.slug, formFactor: ff, requestedUrl: url, finalUrl,
