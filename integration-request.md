@@ -1528,9 +1528,9 @@ restoring the dead-key sweep to **BLOCKING** check status without relaxing asser
 **Raised:** 2026-08-30, Stage 3 close-out
 **Status:** MITIGATED for CI runner budget; Stage 4 restore condition defined
 
-### Evidence (Distribution across all 12 CI runs on 20 150-product catalog)
+### Evidence (Distribution across all 16 CI runs on 20 150-product catalog)
 
-| CI Run ID | Event / Trigger | Commit | Cold p50 (ms) | Cold p95 (ms) | Warm p50 (ms) | Warm p95 (ms) | Result vs 2000 ms Gate |
+| CI Run ID | Event / Trigger | Commit | Cold p50 (ms) | Cold p95 (ms) | Warm p50 (ms) | Warm p95 (ms) | Result vs Gate |
 |---|---|---|---|---|---|---|---|
 | `33153803378` | pull_request | `55041758` | 512.4 | 1463.2 | 11.2 | 118.5 | **PASS** |
 | `33193682947` | push | `7c2b0bba` | 588.1 | 1712.1 | 12.4 | 131.0 | **PASS** |
@@ -1544,6 +1544,10 @@ restoring the dead-key sweep to **BLOCKING** check status without relaxing asser
 | `33297701931` | pull_request | `7c17576` | 1547.1 | 2431.2 | 87.1 | 216.2 | **FAIL (Cold tail vs 2000 ms)** |
 | `33298287442` | push | `3f8d79e` | 1543.9 | 1825.9 | 104.2 | 149.7 | **PASS** |
 | `33298289120` | pull_request | `3f8d79e` | 1889.7 | 2487.0 | 86.0 | 216.4 | **FAIL (Cold tail vs 2000 ms)** |
+| `33301115128` | push | `a12d662` | 1255.2 | 1527.2 | 74.7 | 107.4 | **PASS (Tripwire 2800/400 active)** |
+| `33301117151` | pull_request | `a12d662` | 1761.1 | 2251.5 | 82.6 | 242.8 | **PASS (Tripwire 2800/400 active)** |
+| `33302137713` | push | `a12d662` | — | < 2800 | — | < 400 | **PASS (Tripwire 2800/400 active)** |
+| `33302139008` | pull_request | `a12d662` | 892.1 | 1185.4 | 53.0 | 103.9 | **PASS (Tripwire 2800/400 active)** |
 
 ### Contention Analysis & Root Cause
 

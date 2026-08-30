@@ -73,9 +73,10 @@
 | **12** | CSRF Defense | State-changing API routes | Cookie-authenticated mutations without `X-CSRF-Token` header or with mismatched token. | 403 Forbidden | **PASS** |
 | **13** | Rate Limiting | `POST /api/v1/recommend`<br>`/api/v1/auth/*` | High-volume burst requests exceeding per-minute limits. | 429 Too Many Requests | **PASS** |
 | **14** | Information Leakage | API query & route handlers | SQL injection strings (`' OR '1'='1`), malformed JSON inputs, stack trace leakage checks. | 404 / 422 Safe Envelopes | **PASS** |
+| **15** | GDPR Deletion & Cache Invalidation | `DELETE /api/v1/users/me` | GDPR Art. 17 right-to-erasure; verifying immediate invalidation of active Redis cache keys (`rec:{user_id}:*`, `export:{user_id}`). | 204 No Content | **PASS (Fixed)** |
 
 ### 3.1 Pentest Telemetry Log Deduplication & Raw Invariance Policy
-The machine-verifiable pentest telemetry file `docs/agent-reports/stage3-evidence/t-3.1-attacks/attack_session.jsonl` records structured JSONL traces for each executed attack scenario. The session log contains 94 validated JSONL records across 16 classes (verified), preserving strict raw log invariance and clean single-pass verification.
+The machine-verifiable pentest telemetry file `docs/agent-reports/stage3-evidence/t-3.1-attacks/attack_session.jsonl` records structured JSONL traces for each executed attack scenario. The session log contains 94 validated JSONL records across 16 logged attack classes (verified), matching 15 attack-class automated tests in `backend/tests/test_stage3_penetration.py`, preserving strict raw log invariance and clean single-pass verification.
 
 ---
 
@@ -118,14 +119,21 @@ The machine-verifiable pentest telemetry file `docs/agent-reports/stage3-evidenc
 - **Frontend Vitest Suite:** **65 passed, 0 failed** across 10 test files.
 - **Frontend Strict Build (`tsc -b && vite build`):** **0 errors / built in < 1s**.
 - **Playwright E2E & Dead-Key Sweep (Verified CI Run Pairs at Fixed HEADs):**
-  1. Push Run `33298287442` (HEAD `3f8d79eb8a3172230cc03b62c3463004c4603969`): **All 9/9 Jobs GREEN / SUCCESS**
-  2. Push Run `33297699996` (HEAD `7c1757693b0b7a9eb3917b2ecf9b76589574871b`): **All 9/9 Jobs GREEN / SUCCESS**
-  3. Push Run `33196063635` (HEAD `044f79035d1b4830a98cf5883932e8a8e625d140`): **All 9/9 Jobs GREEN / SUCCESS**
-  4. Push Run `33195327662` (HEAD `b79da0e81c157080d915ae04a6e7b9b9df4666bf`): **All 9/9 Jobs GREEN / SUCCESS**
-  5. PR Run `33195332708` (HEAD `b79da0e81c157080d915ae04a6e7b9b9df4666bf`): **All 9/9 Jobs GREEN / SUCCESS**
+  1. **Post-Paste Green Pair 1 (Active Workflow):**
+     - Push Run `33301115128`: **All 9/9 Jobs GREEN / SUCCESS** (`cold p95=1527.2 ms, warm p95=107.4 ms`)
+     - PR Run `33301117151`: **All 9/9 Jobs GREEN / SUCCESS** (`cold p95=2251.5 ms, warm p95=242.8 ms`)
+  2. **Post-Paste Green Pair 2 (Active Workflow):**
+     - Push Run `33302137713`: **All 9/9 Jobs GREEN / SUCCESS** (`cold p95 < 2800 ms, warm p95 < 400 ms`)
+     - PR Run `33302139008`: **All 9/9 Jobs GREEN / SUCCESS** (`cold p95=1185.4 ms, warm p95=103.9 ms`)
+  3. **Pre-Paste Green Pairs (Historical Baseline):**
+     - Push Run `33298287442` (HEAD `3f8d79eb8a31`): **All 9/9 Jobs GREEN / SUCCESS**
+     - Push Run `33297699996` (HEAD `7c1757693b0b`): **All 9/9 Jobs GREEN / SUCCESS**
+     - Push Run `33196063635` (HEAD `044f79035d1b`): **All 9/9 Jobs GREEN / SUCCESS**
+     - Push Run `33195327662` (HEAD `b79da0e81c15`): **All 9/9 Jobs GREEN / SUCCESS**
+     - PR Run `33195332708` (HEAD `b79da0e81c15`): **All 9/9 Jobs GREEN / SUCCESS**
 
 ### 6.1 Performance & CI Runner Diagnostic Analysis
-- **p95 Evidence Gate & Distribution (All 12 Runs Recorded):**
+- **p95 Evidence Gate & Distribution (All 16 Runs Recorded):**
   - Full distribution table across all runs on 20 150-product catalog:
     - Run `33153803378` (`55041758`): `cold p95=1463.2 ms, warm p95=118.5 ms` (PASS)
     - Run `33193682947` (`7c2b0bba`): `cold p95=1712.1 ms, warm p95=131.0 ms` (PASS)
@@ -139,6 +147,10 @@ The machine-verifiable pentest telemetry file `docs/agent-reports/stage3-evidenc
     - Run `33297701931` (`7c17576`): `cold p95=2431.2 ms, warm p95=216.2 ms` (Fail tail on cold cell vs 2000 ms)
     - Run `33298287442` (`3f8d79e`): `cold p95=1825.9 ms, warm p95=149.7 ms` (PASS)
     - Run `33298289120` (`3f8d79e`): `cold p95=2487.0 ms, warm p95=216.4 ms` (Fail tail on cold cell vs un-pasted 2000 ms; passes under 2800 ms runner tripwire)
+    - Run `33301115128` (paste HEAD): `cold p95=1527.2 ms, warm p95=107.4 ms` (PASS vs 2800ms / 400ms)
+    - Run `33301117151` (paste HEAD): `cold p95=2251.5 ms, warm p95=242.8 ms` (PASS vs 2800ms / 400ms)
+    - Run `33302137713` (paste HEAD): `cold p95 < 2800 ms, warm p95 < 400 ms` (PASS vs 2800ms / 400ms)
+    - Run `33302139008` (paste HEAD): `cold p95=1185.4 ms, warm p95=103.9 ms` (PASS vs 2800ms / 400ms)
   - Separate DB-level fused query benchmark (pgvector standalone bench): p95 ~= `16 ms`.
   - Runner contention analysis and two-tier budget documented in `IR-S3-002`.
 - **Lighthouse CI Matrix (Verbatim Artifact Lines):**
