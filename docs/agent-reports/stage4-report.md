@@ -544,3 +544,56 @@ the failure path only becomes legible. Run #2 is expected to fail again — but
 it will say *why*.
 
 **Iteration 1 of 5** for this defect class.
+
+## 16. Runs #2–#5 — the container is proven
+
+Five verification runs, each failing further along than the last. Nothing was
+guessed: every fix followed a named cause.
+
+| Run | Commit | Result |
+|---|---|---|
+| [#2](https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/actions/runs/33332217908) | `cbd6bff` | dr-drill **GREEN**; containers fail at the config gate |
+| [#3](https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/actions/runs/33332542166) | `e61e62c` | container **boots**; fails at smoke / load |
+| [#4](https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/actions/runs/33332769581) | `5ee260a` | smoke names its cause: 403 on an admin route |
+| [#5](https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/actions/runs/33333143587) | `67a35ce` | **demo-verify GREEN**, dr-drill GREEN, g4x red |
+
+### What is now proven on a real runner
+
+`demo-verify` passed **every** step in run #5: the image builds, the container
+boots, it becomes healthy, the D-4.4 production-refusal invariant runs at boot,
+the catalog seeds **150 products and 3 demo users**, the origin smoke test
+passes, and — the binding D-4.1 condition — **`/docs`, `/redoc`,
+`/openapi.json` and `/metrics` are confirmed 404 through the container's
+nginx**. `dr-drill` has been green three runs running: backup, simulated data
+loss, restore, verify, with the ≥150-product canary intact. **T-4.7 is proven.**
+
+### The defects, and why none was a gate weakening
+
+1. **`SECRET_KEY` absent (runs #1–#2).** `demo_env.py` requires a non-default
+   key ≥32 chars; nothing supplied one once D-4.5 retired the deploy workflow
+   that was meant to inject it. The entrypoint now mints one at boot. A gap
+   opened by the re-scope, not a flaw in the gate.
+2. **DR drill DSN (run #1).** `pg_dump` cannot parse the SQLAlchemy
+   `postgresql+psycopg://` DSN. Blanked for those two steps only; the scripts
+   were not touched.
+3. **Smoke queried an admin-only route as a homeowner (runs #3–#4).** `GET
+   /api/v1/products` is `require_admin`; the 403 was the authorization gate
+   working. The test now uses the admin jar. The alternative — relaxing the
+   check — would have taught a test to accept a security failure.
+4. **G-4.x vs. the rate limiter (run #5, open).** `/register` allows 3/min per
+   IP and CI shares one egress IP. The harness now falls back to the seeded
+   demo account, and `RECOMMEND_RATE_LIMIT_PER_MINUTE=0` — the documented
+   load-test switch — is set via `docker run -e` on the g4x container **only**,
+   so the image and `demo-verify` keep the live limiter.
+
+### A note on diagnosis
+
+Step logs and job artifacts are not retrievable from the sandbox, and
+annotations are capped and can be dropped. Run #5 exited 2 with its detail
+annotation missing. Failure reporting therefore now uses three channels —
+annotation, stderr, and `GITHUB_STEP_SUMMARY`. Instrumentation was committed
+*as its own step* before each fix, which is why runs #3–#5 each produced a
+specific cause instead of a guess.
+
+**G-4.x has not yet produced a p95 number, so IR-S3-002 remains open and no
+latency figure may be quoted.**
