@@ -120,11 +120,17 @@ async def main() -> int:
             "full_name": "Load Test"})
         if r.status_code not in (200, 201):
             print(f"register failed: {r.status_code} {r.text[:300]}", file=sys.stderr)
+            # Annotations are the only channel back to the sandbox.
+            print(f"::error title=register-failed::"
+                  f"HTTP {r.status_code} {r.text[:400]}".replace("\n", " "))
             return 2
         r = await client.post("/api/v1/auth/login",
                               json={"email": email, "password": password})
         if r.status_code != 200:
             print(f"login failed: {r.status_code} {r.text[:300]}", file=sys.stderr)
+            # Annotations are the only channel back to the sandbox.
+            print(f"::error title=login-failed::"
+                  f"HTTP {r.status_code} {r.text[:400]}".replace("\n", " "))
             return 2
         # Envelope: {"success": true, "data": {..., "access_token": ...}}
         token = r.json()["data"]["access_token"]

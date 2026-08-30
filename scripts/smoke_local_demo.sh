@@ -34,7 +34,15 @@ BASE="${BASE%/}"
 PASS=0
 FAIL=0
 pass() { PASS=$((PASS + 1)); printf '  PASS  %s\n' "$*"; }
-fail() { FAIL=$((FAIL + 1)); printf '  FAIL  %s\n' "$*"; }
+fail() {
+  FAIL=$((FAIL + 1))
+  printf '  FAIL  %s\n' "$*"
+  # Under GitHub Actions also emit an annotation: raw step logs are not
+  # retrievable from the agent sandbox, so stdout alone makes a smoke failure
+  # undiagnosable remotely. Harmless when run locally.
+  [ -n "${GITHUB_ACTIONS:-}" ] && printf '::error title=smoke::%s\n' "$*"
+  return 0
+}
 note() { printf '  NOTE  %s\n' "$*"; }
 
 echo "=== demo container smoke test ==="
