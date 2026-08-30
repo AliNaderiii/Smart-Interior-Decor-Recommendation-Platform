@@ -143,3 +143,15 @@ Relay back: `deploy-run{1,2,3}.log`, `docker compose ps`, `curl -i https://stagi
 3. Green-light before **any** real-host step (Directive 0 §5).
 
 Pending approval, **no** agent-side task has been started.
+
+---
+
+## §6 I1 honesty log — pushes this session
+
+| # | Commit | Intent (pre-push) | Verdict (post-push, verbatim) |
+|---|---|---|---|
+| 1 | `22d227d` | commit `ci/ci.stage4.yml` byte-identical baseline, nothing else | run **33303430399** — superseded by push #2 before conclusion |
+| 2 | `25a76bf` | kickoff report only, no code | run **33303484765** — **FAILURE**. Job *Security & docs gates*, step **Documentation link audit**. Reproduced locally: `[MISSING FILE REFERENCES] 13 … RESULT: FAIL` — the audit resolves backticked paths in the new report to files Stage 4 has not created yet. Disclosed, not re-rolled. |
+| 3 | `4th commit` (link-audit fix) | de-backtick planned-artifact paths in the report only; no gate weakened, no audit config touched | run **33303746290** — **SUCCESS**, all 9 jobs green (backend, frontend, e2e, security & docs gates, docker, multi-worker, p95-evidence, lighthouse, link-liveness). |
+
+Local reproduction after fix, verbatim: `[BROKEN LINKS] 0` / `[MISSING FILE REFERENCES] 0` / `RESULT: PASS`.
