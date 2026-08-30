@@ -153,7 +153,8 @@ jobs:
             # agent. Re-emit the decisive lines as ::error:: annotations, which
             # the check-runs API does return.
             docker logs demo 2>&1 \
-              | grep -aE "FATAL|Error|error|Traceback|die|refus|denied|Permission|No such|not found|could not|failed" \
+              | grep -av "PASS" \
+              | grep -aE "FATAL|FAIL|Error|error|Traceback|refus|denied|Permission|No such|not found|could not|failed" \
               | tail -25 \
               | while IFS= read -r line; do
                   echo "::error::boot: ${line}"
@@ -286,7 +287,8 @@ jobs:
           done
           docker logs demo 2>&1 | tail -100
           docker logs demo 2>&1 \
-            | grep -aE "FATAL|Error|error|Traceback|refus|denied|Permission|No such|not found|could not|failed" \
+            | grep -av "PASS" \
+            | grep -aE "FATAL|FAIL|Error|error|Traceback|refus|denied|Permission|No such|not found|could not|failed" \
             | tail -20 \
             | while IFS= read -r line; do echo "::error::boot: ${line}"; done
           echo "::error::container never became healthy"

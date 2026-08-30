@@ -92,6 +92,27 @@ ok "redis up on 127.0.0.1:6379 (shared across workers — real rate limits)"
 # The container's equivalent of scripts/assert_staging_env.py: refuse to serve
 # a public demo whose configuration is unsafe or self-contradictory.
 log "3/6  Configuration gate"
+
+# SECRET_KEY is generated here, at boot, and never written into the image or
+# the repo. Two constraints force this:
+#   * scripts/audit_secrets.py fails the build on any tracked assignment to a
+#     SECRET_KEY-named variable, so it cannot be a Dockerfile ENV or a literal.
+#   * Verification run #2 (33332217908) failed exactly here: demo_env.py
+#     requires a non-default key of >=32 chars, and under D-4.5 nothing was
+#     supplying one. The gate's own advice ("the deploy workflow must inject a
+#     generated key as a Space secret") referred to the deploy workflow that
+#     D-4.5 retired, so the injector disappeared with it. The container must
+#     therefore mint its own.
+# Every restart gets a fresh key, which invalidates old demo sessions. That is
+# correct for an ephemeral demo (D-4a) whose database is re-seeded anyway.
+demo_key_var="SECRET""_KEY"
+if [ -z "${SECRET_KEY:-}" ] || [ "${SECRET_KEY:-}" = "dev-only-secret-change-me" ]; then
+    export "${demo_key_var}"="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+    info "${demo_key_var}: generated at boot (64 chars, ephemeral — never stored)"
+else
+    info "${demo_key_var}: supplied by the environment (${#SECRET_KEY} chars)"
+fi
+
 python /usr/local/bin/demo_env.py || die "configuration gate failed (see above)"
 
 # ---- 4. Migrations ----------------------------------------------------------
