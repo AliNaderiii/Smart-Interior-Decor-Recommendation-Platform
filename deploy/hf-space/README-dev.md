@@ -252,7 +252,7 @@ Before committing, confirm the copy is byte-identical:
 
 ```bash
 md5sum ci/stage4-verify.yml .github/workflows/stage4-verify.yml
-# both must print: 26a52a5ce2017306645d1f08902e3c21
+# both must print: c63abebd07004964d1fee57ef222c4cf
 ```
 
 **What happens next.** That commit adds the workflow at its active path, which

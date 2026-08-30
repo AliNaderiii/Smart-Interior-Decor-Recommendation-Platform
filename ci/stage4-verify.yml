@@ -338,20 +338,25 @@ jobs:
       postgres:
         image: pgvector/pgvector:pg16
         env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
+          # decor:decor — the throwaway credential this repo already uses for
+          # ephemeral CI databases (see .github/workflows/ci.yml). Using the
+          # same pair keeps scripts/audit_secrets.py's existing allowlist
+          # honest: the FIXTURE is aligned to the gate, the gate is NOT taught
+          # a new exception.
+          POSTGRES_USER: decor
+          POSTGRES_PASSWORD: decor
           POSTGRES_DB: smartdecor
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U postgres"
+          --health-cmd "pg_isready -U decor"
           --health-interval 10s --health-timeout 5s --health-retries 10
     env:
       PGHOST: 127.0.0.1
       PGPORT: "5432"
-      PGUSER: postgres
-      PGPASSWORD: postgres
+      PGUSER: decor
+      PGPASSWORD: decor
       PGDATABASE: smartdecor
-      DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/smartdecor
+      DATABASE_URL: postgresql+psycopg://decor:decor@127.0.0.1:5432/smartdecor
     steps:
       - name: Checkout
         uses: actions/checkout@v4
