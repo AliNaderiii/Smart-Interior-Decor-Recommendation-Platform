@@ -117,15 +117,15 @@ The machine-verifiable pentest telemetry file `docs/agent-reports/stage3-evidenc
 - **Backend Pytest Suite:** **588 passed, 22 skipped, 0 failed** (includes 15 penetration test scenarios and 2 DR restore tests).
 - **Frontend Vitest Suite:** **65 passed, 0 failed** across 10 test files.
 - **Frontend Strict Build (`tsc -b && vite build`):** **0 errors / built in < 1s**.
-- **Playwright E2E & Dead-Key Sweep (Verified Consecutive Green Runs):**
-  1. Push Run `33196063635` (HEAD `044f79035d1b4830a98cf5883932e8a8e625d140`): **All 9/9 Jobs GREEN / SUCCESS**
-  2. Push Run `33195327662` (HEAD `b79da0e81c157080d915ae04a6e7b9b9df4666bf`): **All 9/9 Jobs GREEN / SUCCESS**
-  3. PR Run `33195332708` (HEAD `b79da0e81c157080d915ae04a6e7b9b9df4666bf`): **All 9/9 Jobs GREEN / SUCCESS**
-  4. Push Run `33194531963` (HEAD `8e0b6a9ce163c3a3f79b2327e32b4944693eae0d`): **All 9/9 Jobs GREEN / SUCCESS**
-  5. Push Run `33193682947` (HEAD `7c2b0bba3a8f19f4b8b5b563e64608470027c88d`): **All 9/9 Jobs GREEN / SUCCESS**
+- **Playwright E2E & Dead-Key Sweep (Verified CI Run Pairs at Fixed HEADs):**
+  1. Push Run `33298287442` (HEAD `3f8d79eb8a3172230cc03b62c3463004c4603969`): **All 9/9 Jobs GREEN / SUCCESS**
+  2. Push Run `33297699996` (HEAD `7c1757693b0b7a9eb3917b2ecf9b76589574871b`): **All 9/9 Jobs GREEN / SUCCESS**
+  3. Push Run `33196063635` (HEAD `044f79035d1b4830a98cf5883932e8a8e625d140`): **All 9/9 Jobs GREEN / SUCCESS**
+  4. Push Run `33195327662` (HEAD `b79da0e81c157080d915ae04a6e7b9b9df4666bf`): **All 9/9 Jobs GREEN / SUCCESS**
+  5. PR Run `33195332708` (HEAD `b79da0e81c157080d915ae04a6e7b9b9df4666bf`): **All 9/9 Jobs GREEN / SUCCESS**
 
 ### 6.1 Performance & CI Runner Diagnostic Analysis
-- **p95 Evidence Gate & Distribution (All 10 Runs Recorded):**
+- **p95 Evidence Gate & Distribution (All 12 Runs Recorded):**
   - Full distribution table across all runs on 20 150-product catalog:
     - Run `33153803378` (`55041758`): `cold p95=1463.2 ms, warm p95=118.5 ms` (PASS)
     - Run `33193682947` (`7c2b0bba`): `cold p95=1712.1 ms, warm p95=131.0 ms` (PASS)
@@ -137,6 +137,8 @@ The machine-verifiable pentest telemetry file `docs/agent-reports/stage3-evidenc
     - Run `33199895231` (`bb7dc5b7`): `cold p95=2302.5 ms, warm p95=148.8 ms` (Fail tail on cold cell vs 2000 ms)
     - Run `33297699996` (`7c17576`): `cold p95=1630.6 ms, warm p95=117.4 ms` (PASS)
     - Run `33297701931` (`7c17576`): `cold p95=2431.2 ms, warm p95=216.2 ms` (Fail tail on cold cell vs 2000 ms)
+    - Run `33298287442` (`3f8d79e`): `cold p95=1825.9 ms, warm p95=149.7 ms` (PASS)
+    - Run `33298289120` (`3f8d79e`): `cold p95=2487.0 ms, warm p95=216.4 ms` (Fail tail on cold cell vs un-pasted 2000 ms; passes under 2800 ms runner tripwire)
   - Separate DB-level fused query benchmark (pgvector standalone bench): p95 ~= `16 ms`.
   - Runner contention analysis and two-tier budget documented in `IR-S3-002`.
 - **Lighthouse CI Matrix (Verbatim Artifact Lines):**
