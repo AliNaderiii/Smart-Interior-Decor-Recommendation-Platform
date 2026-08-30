@@ -184,7 +184,7 @@ Local reproduction after fix, verbatim: `[BROKEN LINKS] 0` / `[MISSING FILE REFE
 `Settings.validate_runtime()` refuses `APP_ENV=production` when `AI_PROVIDER=mock` or `STORAGE_BACKEND=local` — exactly the profile ruling R3 mandates. Rather than relax that check for a "staging" env (forbidden by §2.8), the overlay pins every production-shaped setting explicitly, `assert_staging_env.py` re-asserts the production checks that matter on a public host and fails the deploy otherwise, and the invariant that actually matters — demo accounts impossible under production — is re-proven on every deploy by step 9. Stage 5 swaps in `docker-compose.prod.yml` and every fail-safe applies unchanged.
 
 **D-4.2 — one additional tracked env template.**
-`scripts/audit_secrets.py` forbade every tracked `.env.*` except `.env.example`. It now allows exactly one more explicit filename, `.env.staging.example`. This is a path-shape exception only: full content scanning still applies to it (a real credential pasted in still fails CI), and `.env.staging` / `.env.production` remain forbidden — verified by negative control.
+`scripts/audit_secrets.py` forbade every tracked `.env.*` except `.env.example`. It now allows exactly one more explicit filename, `.env.staging.example`. This is a path-shape exception only: full content scanning still applies to it (a real credential pasted in still fails CI), and the ignored runtime files (.env.staging, .env.production) remain forbidden — verified by negative control.
 
 ### Self-verification (verbatim: `stage4-evidence/t-4.1/`)
 
