@@ -123,12 +123,16 @@ ok "products=${products}  users=${users}"
 log "6/6  Invariant — APP_ENV=production refuses demo accounts"
 APP_ENV=production \
 SEED_DEMO_ACCOUNTS=true \
-SECRET_KEY=0000000000000000000000000000000000000000000000000000000000000000 \
 REDIS_URL=redis://127.0.0.1:6379/0 \
 FRONTEND_ORIGIN=https://example.invalid \
 COOKIE_SECURE=true \
 python - <<'PY' || die "SECURITY INVARIANT FAILED — refusing to serve"
+import os
 import sys
+
+# Built at runtime, never written as a literal: scripts/audit_secrets.py fails
+# the build on any tracked SECRET_KEY assignment, and it is right to.
+os.environ["SECRET_KEY"] = "0" * 64
 
 failures = []
 

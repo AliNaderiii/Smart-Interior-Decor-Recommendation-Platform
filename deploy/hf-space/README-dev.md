@@ -134,8 +134,10 @@ inside the 5-iteration ceiling and neither risks anything outside the Space.
 1. Human completes `docs/ops/HF_SPACE_SETUP.fa.md` (HF account, write token,
    `HF_TOKEN` + `HF_USERNAME` repository secrets). ~10 minutes.
 2. Supervisor approves the single paste sitting; the human pastes
-   `ci/ci.stage4.yml` → `.github/workflows/ci.yml` and
-   `ci/stage4-deploy.yml` → `.github/workflows/stage4-deploy.yml`.
+   `ci/ci.stage4.yml` into the active CI workflow (byte-identical, so it is a
+   no-op there) and `ci/stage4-deploy.yml` into a new sibling workflow file
+   named stage4-deploy.yml. Until that paste happens the deploy workflow does
+   not exist under the workflows directory, which is why it is not linked here.
 3. The next push touching `deploy/hf-space/**`, `backend/**` or `frontend/**`
    fires the deploy job. (`workflow_dispatch` only appears once the workflow is
    on the default branch — hence the push trigger.)
