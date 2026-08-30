@@ -1574,3 +1574,314 @@ In Stage 4 (Production Deployment & Multi-tier Architecture), where PostgreSQL, 
 2. Restore the strict single-threshold `--gate-cold-ms 2000 --gate-warm-ms 2000` or lower in the staging perf verification harness.
 
 
+---
+
+## IR-S4-001 · CI Lighthouse job is nondeterministic on `recommendations/mobile`; secret-scan pattern matches base64url
+
+**Owner:** Stage 4 (raised) → supervisor ruling required for the CI half
+**Raised:** 2026-08-30, Stage 4 / T-4.1 close-out
+**Blocker ID:** none — measurement-environment artifact plus a pattern defect; no application regression
+**Status:** ROOT-CAUSED. Fix (a) applied in-repo; fix (b) staged for the single CI paste sitting (Directive 3, N4/N6)
+
+### Evidence — four consecutive runs, doc-only diffs
+
+No commit in this range touches `frontend/src`, the bundle, any image, CI config, or application code. Every diff is Markdown in `docs/agent-reports/`.
+
+| # | Run | Commit | Diff | `recommendations/mobile` | Job verdict |
+|---|---|---|---|---|---|
+| 1 | `33307641975` | `6d91985` | 1 line of Markdown | `perf=98 lcp=2112 tti=2112` | **FAIL** — *Lighthouse report secret scan* (`Process completed with exit code 1`) |
+| 2 | `33308392509` | `75de4ee` | 1 line of Markdown | `perf=82 lcp=4959 tti=5034` | **FAIL** — *Authenticated Lighthouse matrix*: `failure: recommendations [mobile] LCP 4959ms >= 3000ms` |
+| 3 | `33308694272` | `1f49d52` | report text only | (within gate) | **SUCCESS**, all 9 jobs |
+| 4 | `33307365000` | `2cee80e` | T-4.1 scripts | — | FAIL on the docs-link gate (unrelated, since fixed) |
+
+Pass → fail → fail → pass over documentation edits.
+
+### Defect A — the LCP tail is runner contention, not a page regression
+
+Phase breakdown, verbatim from the run-2 annotation:
+
+```
+node=<img alt="مبل چستر عسلی 2 نفره - چرم کلاسیک مدل آرتا" ... loading="eager" fetchpriority="high" decoding="sync" ...
+phases: TTFB=452ms Load Delay=342ms Load Time=40ms Render Delay=4125ms
+```
+
+versus run 1 (same page, passing): `TTFB=453ms Load Delay=856ms Load Time=65ms Render Delay=739ms`.
+
+TTFB is identical (452 vs 453 ms). Load Delay and Load Time are *lower* on the failing run. **Render Delay alone moved 739 → 4125 ms.** Total blocking time also *fell* (`tbt=20ms` on the failing run vs `tbt=113ms` on the passing one), which excludes a heavier bundle or more main-thread work as the cause: the LCP image arrived on time and the main thread simply did not paint it. That is CPU scheduling on a shared 2-vCPU ephemeral runner — the same mechanism already documented for the cold p95 tail in **IR-S3-002**.
+
+All 11 other cells scored 99–100 on both runs.
+
+### Defect B — `sk-[A-Za-z0-9]{20,}` matches random base64url
+
+The matrix seeds real session cookies over CDP, so each report embeds the access/refresh/CSRF JWTs many times over 12 cells. A JWT is base64url (`A-Za-z0-9-_`), so the OpenAI-key alternative matches by chance.
+
+Measured (200 000 trials; reproduction: `docs/agent-reports/stage4-evidence/ci/falsepositive_probability.py`):
+
+```
+random-base64url false-positive rate: 288/200000 = 0.14400% per 700 chars
+  probability over   12 embeddings in a run: 1.71%
+  probability over   60 embeddings in a run: 8.28%
+  probability over  200 embeddings in a run: 25.04%
+  probability over 1000 embeddings in a run: 76.33%
+```
+
+### Fixes
+
+**(a) APPLIED in-repo (no paste needed)** — `frontend/scripts/lighthouse-auth-matrix.mjs` now redacts the session tokens before writing each report. The real problem it solves is that CI was publishing working session JWTs in a 90-day downloadable artifact; removing the flake's main entropy source is the secondary benefit. Performance numbers are untouched (only credential values are masked). Proven by `docs/agent-reports/stage4-evidence/n4/redaction_test.mjs`, verbatim output in `redaction_test_output.txt`, including `sk- pattern matched BEFORE redaction` / `sk- pattern clean AFTER redaction` and `perf number preserved`.
+
+**(b) IMPLEMENTED — CI half** (see the status block at the end of this entry):
+
+1. Anchor each secret-scan alternative on a non-token boundary so base64url interiors cannot match, while every real key still does. Detection strength goes **up**, not down.
+2. Tier the Lighthouse matrix, per the two-tier IR-S3-002 precedent:
+   * **stable contract gates unchanged and blocking** — all desktop cells and `home/mobile` keep perf ≥ 80 / LCP < 3000 / TTI ≤ 4000;
+   * `recommendations/mobile` keeps a **catastrophic tripwire only in CI (LCP < 8000 ms)**, with its **CONTRACT verdict moved to the staging capture in T-4.9**.
+
+### Restore condition
+
+When `recommendations/mobile` is measured on the deployed demo (T-4.9) rather than a shared CI runner, its contract verdict is recorded there. If a future runner tier removes the contention, the CI cell returns to the strict 3000 ms gate. **No gate is weakened by this entry** — the strict threshold still governs the contract; only the *place it is measured* changes for the one unstable cell.
+
+---
+
+## IR-S4-002 — Deviations D-4.2 / D-4.3 / D-4.4 · demo-container topology
+
+**Raised by:** agent, Stage 4 Wave 2
+**Status:** logged for supervisor ruling — **no gate semantics changed**
+**Affects:** the public demo target only; production topology is untouched.
+
+### D-4.2 — one additional tracked env template
+
+`.env.staging.example` is tracked alongside `.env.example`. It is redacted:
+placeholders only, no live values, and `audit_secrets.py` passes over it with
+zero findings. Rationale: the staging profile differs from both dev and prod in
+ways a reader cannot infer (public origin, cookie flags, sandbox payment
+sandbox, demo-account switch), and the alternative — documenting them in prose —
+is exactly how drift starts. Accepted risk: one more file to keep in sync;
+mitigated because `assert_staging_env.py` reads the same key list.
+
+### D-4.3 — the demo runs as a single container
+
+A Hugging Face Space runs exactly one container, so PostgreSQL, Redis, uvicorn
+and nginx share an image under supervisord. This is a **delivery constraint of
+the free tier, not an architecture decision**: `docker-compose.prod.yml` keeps
+the five-service topology and remains the Stage-5 target. The N3 asset-reuse map
+is honoured — `deploy_staging.sh` steps 1/5/6/7/9 are refolded into
+`entrypoint.sh`, `smoke_staging.sh` runs unchanged against the Space URL, and
+`host_prep.sh` / `render_caddyfile.sh` stay committed and parked.
+
+Consequences already recorded: **D-4a** the demo database is ephemeral; **D-4c**
+no origin-TLS evidence is obtainable because the HF edge terminates TLS, so the
+Stage-3 TLS item stays BLOCKED; **D-4d** the Space is shared CPU, so G-4.x does
+not deliver the separated hardware IR-S3-002 asked for — the number will be
+recorded with its tier stated.
+
+### D-4.4 — the production demo-refusal invariant runs on every boot
+
+Public demo accounts are only defensible if production genuinely cannot create
+them. Rather than trusting a CI-time proof, `entrypoint.sh` re-runs all three
+proofs (`validate_runtime()` refusal, `demo_seeding_allowed() -> False`,
+`DemoSeedRefused` on the CLI opt-in) at container startup and **refuses to
+serve** if any fails. This strengthens the existing guarantee; nothing is
+relaxed.
+
+### What is not being asked for
+
+No gate threshold, scan pattern or acceptance criterion changes in this entry.
+It exists so the topology deviation is on the record before the first
+activation, per the no-silent-deviation rule.
+
+
+### Status update — CI half IMPLEMENTED (Stage 4 fix loop)
+
+**Supervisor ruling, 2026-08-30.** The retiering below is a **supervisor-ruled
+change of the place a measurement is enforced, logged in this ledger. It is not
+gate weakening**, and it was not applied unilaterally.
+
+**Where it landed.** Investigation during the fix loop found the thresholds are
+**not** in `ci/ci.stage4.yml` at all — that workflow only invokes
+`node scripts/lighthouse-auth-matrix.mjs`, and its `budgetPath` was already
+removed under the T-2.6b ruling. The gates live in
+`frontend/scripts/lighthouse-auth-matrix.mjs`. The supervisor was consulted
+before any edit and approved implementing there; **no workflow file was
+touched** and `ci/ci.stage4.yml` remains byte-identical to the active CI
+workflow (md5 `4ff82072e0da8d3aa6167d5e26b83705`).
+
+**What changed, exactly.**
+
+| Cell | Before | After |
+|---|---|---|
+| `recommendations/mobile` LCP | 3000 ms, blocking | **8000 ms catastrophic tripwire**, blocking; the 3000 ms value is emitted as a `::notice::` every run |
+| `recommendations/desktop` LCP | 3000 ms, blocking | **unchanged, still 3000 ms blocking** |
+| `home/*` perf, LCP, TTI | 80 / 3000 / 4000 | **unchanged** |
+| All `perf` gates everywhere | 80 | **unchanged** |
+| Fake-coverage guard (A3) | blocking | **unchanged** |
+
+The override is per-form-factor (`lcpMsByFormFactor: { mobile: 8000 }`), so the
+retiering is exactly as narrow as the measured instability. Desktop has never
+exceeded ~360 ms and keeps the strict gate.
+
+**Contract verdict.** Unchanged and NOT deleted: `recommendations/mobile` must
+still meet LCP < 3000 ms, and that verdict is now taken from the **staging
+capture** (G-4.x / T-4.8) on the deployed demo, on hardware that is not a
+shared CI runner. This is the two-tier IR-S3-002 precedent applied to one cell.
+
+**Verification.** Gate logic replayed against real observed measurements, 9/9
+correct: the `c1b15de` failure (`recommendations/mobile` LCP 4984 ms) now
+passes **with an `ABOVE 3000ms` notice**; a healthy 2112 ms run passes and
+still reports its value; 8200 ms fails the tripwire; `recommendations/desktop`
+at 3100 ms still fails; `home/mobile` at 3200 ms still fails; a perf drop to 70
+still fails. `node --check` and ESLint clean. The N4a token redaction is
+untouched.
+
+**Restore condition (unchanged).** If a future runner tier removes the CPU
+contention, this cell returns to the strict 3000 ms CI gate. Evidence that the
+instability is environmental, not a regression: RenderDelay moved 739 ms ->
+4125 ms while TBT *fell* 113 ms -> 20 ms across doc-only runs.
+
+
+---
+
+## IR-S4-003 — BLOCKER: Docker Spaces now require a paid plan (HTTP 402)
+
+**Raised by:** agent, Stage 4 deploy fix loop, 2026-08-30
+**Status:** **BLOCKED — needs a human + supervisor decision.** No agent-side fix
+exists that respects Directive 3.
+**Blocks:** T-4.2 (live staging), T-4.8 (G-4.x staging p95, and therefore the
+closure of IR-S3-002), T-4.9 (QA against the public URL).
+
+### Evidence
+
+Deploy #7, run `33319446945`, step `Create the Space`, check-run annotation
+verbatim:
+
+```
+Could not create the Space — HfHubHTTPError (HTTP 402): 402 Client Error:
+Payment Required for url: https://huggingface.co/api/repos/create
+```
+
+Every earlier step passed: guard, trim, `Assert the target actually resolved`,
+SPA build, context assembly. The plumbing is correct; the account is not
+entitled.
+
+### Cause
+
+Hugging Face policy, quoted from the official Spaces Overview docs
+(read 2026-08-30):
+
+> Static Spaces are free for everyone. Gradio and Docker Spaces run on compute
+> and require a paid plan to create: PRO for personal accounts, Team or
+> Enterprise for organizations.
+
+Our demo must be a **Docker** Space — it runs PostgreSQL + pgvector, Redis,
+uvicorn and nginx in one container. Docker Spaces require **PRO (~$9/month)**.
+
+This invalidates the free-tier assumption behind the Directive 3 pivot (N1).
+When that pivot was chosen, a free Docker Space was believed available; it is
+not. **The plan was wrong, not the implementation.**
+
+### Not a token problem
+
+402 is billing, not authorization. A write-scoped token receives the same 402.
+`huggingface_hub` even ships a fix titled *"Do not fail on create space if
+exists_ok=True and 402 Payment required error"*, confirming this is the
+expected response for non-paid accounts.
+
+### Options (agent recommendation, decision NOT taken)
+
+| # | Option | Cost | Consequence |
+|---|---|---|---|
+| 1 | Another free host accepting a Docker container | 0 | Workflow logic ports with modest changes; needs verification that a genuinely free long-running-container tier exists |
+| 2 | HF PRO | ~$9/mo | **Reverses Directive 3**; fastest path, everything else is ready |
+| 3 | No public URL in Stage 4 | 0 | Demo via `run_local_demo.ps1` + recorded walkthrough; public URL deferred to Stage 5 |
+
+I recommend the human first confirm whether **option 1** has a real candidate,
+because Directive 3 has been binding all stage; **option 3** is the honest
+fallback that keeps the client meeting intact with zero spend, since the local
+launcher already exists and is frozen pending its Windows run.
+
+### What this does not change
+
+The deploy workflow stays committed and unmodified — it is correct, and it
+fails with an accurate message. The demo container remains **unbuilt and
+unverified**; apt/pgvector and initdb-as-UID-1000 are still untested and must
+not be reported otherwise. All Stage 4 work independent of the hosting target
+(docs-off switch, catalog validator, onboarding pack, IR-S4-001 CI retiering)
+is complete and green.
+
+### Live confirmation of IR-S4-001 (recorded here per supervisor request)
+
+The retiering proved itself the same day it landed. On commit `221c1c7` the
+**push** run `33318774164` measured `recommendations/mobile` **LCP 4971 ms** —
+above the old 3000 ms gate — and passed with the notice:
+
+```
+recommendations [mobile] LCP 4971ms — ABOVE the 3000ms contract threshold
+(CI tripwire 8000ms; contract verdict is captured on staging per IR-S4-001)
+```
+
+while the pull_request run `33318776392` on the identical tree measured
+**2125 ms**. Same commit, same code, 2.3x spread between two runs minutes
+apart — direct confirmation of the runner-contention diagnosis and of the
+retiering's value. (I initially reported these two runs the wrong way round;
+the supervisor's independent check caught it.)
+
+
+### DECISION — Option 3 taken (human, 2026-08-30). Status: RESOLVED-BY-DECISION.
+
+**Directive 4 re-scope.** Zero cost stands; HF PRO is **rejected**. Stage 4
+ships **no public URL**. The public demo moves to **Stage 5** on a
+client-funded host.
+
+Supervisor research on free alternatives found no viable candidate: Render free
+is 512 MB / 0.1 vCPU, sleeps after 15 min and requires a card for web services;
+Koyeb is 512 MB no-sleep but card-gated by region; Oracle and Cloud Run require
+a card; Railway and Fly are trial-only. All are card-gated or RAM-starved for a
+five-service container, with Iran reachability as a further filter.
+
+**Replacement scope — "runner-hosted staging equivalence" (D-4.5).** Rather
+than ship an unverified container, the demo image is built and run **on the
+GitHub runner** and every property that does not need a public host is proven
+there: `ci/stage4-verify.yml` (`demo-verify`, `g4x-contract`, `dr-drill`).
+
+**What that does NOT cover, and is not claimed:** DNS, TLS 1.3, HSTS, a real
+certificate, CDN behaviour, reachability from Iran, and cold-start latency on
+shared hosting. Those require a public host and move to Stage 5 (D-4c). The
+Stage-3 TLS item stays BLOCKED.
+
+**IR-S3-002 is NOT closed by this.** The G-4.x capture runs on a shared
+GitHub-hosted runner — the very hardware class IR-S3-002 flagged as unsuitable
+for a contract verdict — so its verdict is **PROVISIONAL** and the final number
+is taken on the Stage-5 host. Recorded rather than quietly satisfied.
+
+`ci/stage4-deploy.yml` stays **parked and unmodified** as the Stage-5 artifact:
+it is correct, and it fails fast with an accurate message on a free account.
+Its ACTIVE counterpart is removed in the same paste that activates the verify
+workflow, because backend/frontend pushes are currently firing doomed 402 runs.
+
+---
+
+### IR-S3-002 — Stage 4 update (2026-08-30): G-4.x measured, PROVISIONAL pass, IR stays OPEN
+
+G-4.x ran to completion for the first time in verification run
+[`33334578659`](https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/actions/runs/33334578659),
+against the demo **container** (nginx → uvicorn → PostgreSQL 16 + pgvector +
+Redis in one image). Verbatim from the job annotations:
+
+```
+p95-cells: n=200/cell conc=20 | cold p50=495.8 p95=701.3 p99=791.0 err=0 | warm p50=72.6 p95=111.2 p99=131.2 err=0 | gate_cold<2000ms cold_pass=True gate_warm<2000ms warm_pass=True
+p95-cells: n=250/cell conc=20 | cold p50=486.2 p95=706.4 p99=807.9 err=0 | warm p50=73.0 p95=181.6 p99=232.0 err=0 | gate_cold<2000ms cold_pass=True gate_warm<2000ms warm_pass=True
+```
+
+Worst observed p95 **706.4 ms** against the 2000 ms contract, **0 errors in 900
+measured samples**, across two independent cell sizes.
+
+**Status: OPEN — PROVISIONAL.** This IR objected to latency variance *on shared
+CI runners*, and this measurement was taken on exactly that hardware class, so
+it cannot be the evidence that closes it — however comfortable the margin. The
+restore condition is unchanged: a p95 measurement on the Stage-5 client-funded
+host. What Stage 4 does establish is that the full container path has no
+latency defect to find: the cold tail sits at roughly a third of the budget
+with no failed requests.
+
+Note on method: `RECOMMEND_RATE_LIMIT_PER_MINUTE=0` (the documented load-test
+switch, `config.py:95`) was set via `docker run -e` on the G-4.x container
+only. The shipped image and the `demo-verify` job keep the live rate limiter.

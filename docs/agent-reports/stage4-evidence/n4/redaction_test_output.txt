@@ -1,0 +1,11 @@
+PASS  access token gone
+PASS  refresh token gone
+PASS  csrf token gone
+PASS  url-encoded copy gone
+PASS  placeholder present
+PASS  perf number preserved
+PASS  still valid JSON
+PASS  sk- pattern matched BEFORE redaction
+PASS  sk- pattern clean AFTER redaction
+
+RESULT: PASS

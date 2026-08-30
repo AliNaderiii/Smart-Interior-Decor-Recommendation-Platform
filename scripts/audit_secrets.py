@@ -74,6 +74,10 @@ ACKNOWLEDGED_VALUES = {
 # Files that are, by design, allowed to carry placeholder credentials.
 PLACEHOLDER_FILES = {
     ".env.example",
+    # Stage 4 (T-4.1, decision D-4.2): the redacted STAGING template. Same
+    # nature as .env.example — placeholders and documented non-secret defaults
+    # only, with every real value marked [FILL] and generated on the host.
+    ".env.staging.example",
     "datasets/service_keys_template.env",
 }
 
@@ -83,9 +87,17 @@ PLACEHOLDER_FILES = {
 # application-code findings — a real credential in app code still fails.
 TEST_FIXTURE_ROOT = "backend/tests/"
 
+#: Tracked env files are forbidden EXCEPT the two documented redacted
+#: templates. This is a path-shape rule only — the content scan below still
+#: applies to those templates in full, so a real credential pasted into either
+#: one is still a CI failure. Stage 4 (D-4.2) added `.env.staging.example`;
+#: the exception is an explicit filename, never a wildcard, so `.env.staging`,
+#: `.env.production` and friends stay forbidden.
+_ALLOWED_ENV_TEMPLATES = r"example|staging\.example"
+
 FORBIDDEN_TRACKED = [
     re.compile(r"(^|/)\.env$"),
-    re.compile(r"(^|/)\.env\.(?!example)[A-Za-z0-9_.\-]+$"),
+    re.compile(rf"(^|/)\.env\.(?!(?:{_ALLOWED_ENV_TEMPLATES})$)[A-Za-z0-9_.\-]+$"),
     re.compile(r"\.(pem|key|p12|pfx|jks|keystore)$"),
     re.compile(r"\.(sqlite3?|db)$"),
     re.compile(r"(^|/)(dist|build|node_modules|coverage|htmlcov)/"),

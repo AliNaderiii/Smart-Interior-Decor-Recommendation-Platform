@@ -24,6 +24,16 @@ yarn-error.log*
 .env
 .env.*
 !.env.example
+# Stage 4 (T-4.1): redacted STAGING TEMPLATE, placeholders only. The narrow
+# negation is deliberate — it un-ignores exactly one committed filename and
+# leaves `.env`, `.env.staging`, `.env.production` etc. ignored. Every value in
+# it is a placeholder or a documented non-secret default, and
+# scripts/audit_secrets.py runs over it in the blocking CI security job.
+!.env.staging.example
+# Rendered on the host from the committed Caddyfile; embeds the real hostname.
+Caddyfile.staging
+# Host-side deploy fingerprints / transcripts produced by deploy_staging.sh.
+deploy-state/
 *.pem
 *.key
 *.p12
@@ -61,3 +71,7 @@ frontend/.playwright/
 
 # Stage 03 security probe scratch (never commit probe databases / uploads)
 docs/agent-reports/security-hardening-evidence/*.sqlite3
+
+# Diagnostic log written by scripts/run_local_demo.ps1 on a failed health wait.
+# Contains local container output; never belongs in the repo.
+demo-logs.txt

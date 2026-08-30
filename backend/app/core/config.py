@@ -166,6 +166,24 @@ class Settings(BaseSettings):
     #: collector is on a hostile network and the proxy cannot restrict it.
     METRICS_ENABLED: bool = True
 
+    # ---- Interactive API docs (Stage 4 — D-4.1 condition, Wave 2) ----
+    #: Explicit switch for /docs, /redoc and /openapi.json.
+    #:
+    #: Production has always disabled them (``is_production`` below). The
+    #: public demo container is the case that needed this knob: it runs
+    #: APP_ENV=development on purpose (mock AI + local storage are refused
+    #: under production by design — see docs/ops/DEPLOY_STAGING.md D-4.1), so
+    #: the environment default would have left an interactive attack-surface
+    #: map exposed on a public URL.
+    #:
+    #: Three states, so the demo does not depend on an env default:
+    #:   "auto"     -> current behaviour: off in production, on elsewhere
+    #:   "disabled" -> always off, in EVERY environment (the demo profile)
+    #:   "enabled"  -> on unless production (never overrides the production
+    #:                 lock; production always wins)
+    #: Anything else refuses to boot rather than guessing.
+    API_DOCS_MODE: Literal["auto", "disabled", "enabled"] = "auto"
+
     @property
     def is_postgres(self) -> bool:
         return self.DATABASE_URL.startswith(("postgresql", "postgres"))
@@ -173,6 +191,19 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.APP_ENV == "production"
+
+    @property
+    def api_docs_enabled(self) -> bool:
+        """Whether /docs, /redoc and /openapi.json are served.
+
+        Production is an unconditional lock: no value of ``API_DOCS_MODE`` can
+        turn the interactive docs on in production. ``"disabled"`` additionally
+        turns them off everywhere else, which is what the public demo
+        container sets (Stage 4, D-4.1 condition).
+        """
+        if self.is_production:
+            return False
+        return self.API_DOCS_MODE != "disabled"
 
     #: V2 (OWASP A02): refuse to boot production with a weak/default signing key.
     DEFAULT_SECRET: ClassVar[str] = "dev-only-secret-change-me"

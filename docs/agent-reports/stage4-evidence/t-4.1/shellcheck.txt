@@ -1,0 +1,6 @@
+=== shellcheck (all Stage-4 shell scripts, default severity) ===
+$ shellcheck --version
+version: 0.11.0
+
+$ shellcheck scripts/host_prep.sh scripts/deploy_staging.sh scripts/smoke_staging.sh scripts/render_caddyfile.sh scripts/prove_demo_refusal.sh
+exit=0 (0 = clean, no output above)

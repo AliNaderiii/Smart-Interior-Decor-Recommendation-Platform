@@ -36,6 +36,7 @@ import sys
 import time
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
 import httpx
 
@@ -100,6 +101,40 @@ async def run_cell(client: httpx.AsyncClient, token: str, n: int,
     return out
 
 
+def _demo_homeowner() -> tuple[str, str]:
+    """The seeded homeowner's credentials, read from their single source.
+
+    tests/test_demo_seeding.py asserts the demo passwords appear in exactly one
+    module - a second copy is how an earlier fix got undone - so this imports
+    from app.core.demo_seed rather than repeating the literal here.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from app.core.demo_seed import DEMO_ACCOUNTS
+    for account in DEMO_ACCOUNTS:
+        if account.role == "homeowner":
+            return account.email, account.password
+    raise RuntimeError("no seeded homeowner account found in DEMO_ACCOUNTS")
+
+
+def _report(msg: str, level: str = "error") -> None:
+    """Report a harness failure through every channel that survives.
+
+    Raw step logs and job artifacts cannot be downloaded from the supervising
+    sandbox, and annotations are capped per check-run and can be dropped. The
+    step summary is a separate, reliable channel - run #5 exited 2 with the
+    detail annotation missing, which is what motivated this.
+    """
+    print(f"::{level} title=load-harness::{msg}", flush=True)
+    print(f"[load-harness/{level}] {msg}", file=sys.stderr, flush=True)
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if path:
+        try:
+            with open(path, "a", encoding="utf-8") as fh:
+                fh.write(f"\n**load-harness {level}:** {msg}\n")
+        except OSError:
+            pass
+
+
 async def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base-url", default="http://127.0.0.1:8000")
@@ -118,13 +153,24 @@ async def main() -> int:
         r = await client.post("/api/v1/auth/register", json={
             "email": email, "password": password, "role": "homeowner",
             "full_name": "Load Test"})
-        if r.status_code not in (200, 201):
-            print(f"register failed: {r.status_code} {r.text[:300]}", file=sys.stderr)
+        # /register is rate limited to 3/min per IP (A07). On a CI runner every
+        # job shares one IP, so a burst of runs exhausts it and the harness dies
+        # before measuring anything. The seeded demo homeowner is equivalent for
+        # a latency measurement, so fall back to it rather than failing the
+        # contract gate on an anti-abuse control that is working correctly.
+        if r.status_code == 429:
+            _report("register rate-limited (429) - falling back to the demo account",
+                    level="notice")
+            email, password = _demo_homeowner()
+        if r.status_code not in (200, 201, 429):
+            _report(f"register failed: HTTP {r.status_code} "
+                    f"{r.text[:400]}".replace("\n", " "))
             return 2
         r = await client.post("/api/v1/auth/login",
                               json={"email": email, "password": password})
         if r.status_code != 200:
-            print(f"login failed: {r.status_code} {r.text[:300]}", file=sys.stderr)
+            _report(f"login failed for {email}: HTTP {r.status_code} "
+                    f"{r.text[:400]}".replace("\n", " "))
             return 2
         # Envelope: {"success": true, "data": {..., "access_token": ...}}
         token = r.json()["data"]["access_token"]
@@ -188,4 +234,18 @@ async def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(asyncio.run(main()))
+    # Run #4 lesson: this script exited 2 with no annotation at all, which
+    # means it died before reaching the instrumented register/login checks.
+    # Step logs are unreadable from the agent sandbox, so an uninstrumented
+    # exit is undiagnosable. Nothing may fail silently from here on.
+    try:
+        _rc = asyncio.run(main())
+    except BaseException as exc:  # noqa: BLE001 - deliberate: report, then re-raise
+        import traceback
+        _tb = traceback.format_exc().replace("\n", " ")[-700:]
+        print(f"::error title=load-harness-crashed::"
+              f"{type(exc).__name__}: {exc} | {_tb}")
+        raise
+    if _rc != 0:
+        print(f"::error title=load-harness-exit::exit code {_rc}")
+    raise SystemExit(_rc)

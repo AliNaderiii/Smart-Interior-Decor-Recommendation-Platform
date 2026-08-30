@@ -190,6 +190,59 @@ def test_hsts_is_sent_when_the_request_is_tls_terminated(client):
     assert "includeSubDomains" in resp.headers["Strict-Transport-Security"]
 
 
+def test_api_docs_mode_disabled_hides_docs_outside_production(reset_settings):
+    """D-4.1 condition (Stage 4 Wave 2): the public demo runs
+    APP_ENV=development on purpose, so "not production" is not a safe test for
+    a public host. API_DOCS_MODE=disabled must close the interactive docs in a
+    NON-production environment — this is the switch the demo container sets.
+    """
+    import importlib
+
+    reset_settings(APP_ENV="development", API_DOCS_MODE="disabled")
+    import app.main as main_mod
+
+    importlib.reload(main_mod)
+    demo_app = main_mod.app
+    assert demo_app.docs_url is None
+    assert demo_app.redoc_url is None
+    assert demo_app.openapi_url is None
+    paths = {getattr(r, "path", "") for r in demo_app.routes}
+    assert "/docs" not in paths
+    assert "/redoc" not in paths
+    assert "/openapi.json" not in paths
+
+
+def test_api_docs_mode_cannot_reopen_docs_in_production(reset_settings):
+    """API_DOCS_MODE must never be able to UNLOCK docs in production.
+
+    The property is a one-way lock: production wins over every mode value,
+    including the explicit "enabled".
+    """
+    from app.core.config import Settings
+
+    for mode in ("auto", "enabled", "disabled"):
+        prod = Settings(APP_ENV="production", API_DOCS_MODE=mode)
+        assert prod.api_docs_enabled is False, (
+            f"API_DOCS_MODE={mode!r} exposed docs in production"
+        )
+
+    # ...and outside production the mode is what decides.
+    assert Settings(APP_ENV="development", API_DOCS_MODE="auto").api_docs_enabled
+    assert Settings(APP_ENV="development", API_DOCS_MODE="enabled").api_docs_enabled
+    assert not Settings(APP_ENV="development", API_DOCS_MODE="disabled").api_docs_enabled
+
+
+def test_api_docs_mode_rejects_an_unknown_value():
+    """A typo must refuse to boot rather than silently defaulting to 'on'."""
+    import pytest as _pytest
+    from pydantic import ValidationError
+
+    from app.core.config import Settings
+
+    with _pytest.raises(ValidationError):
+        Settings(API_DOCS_MODE="off")      # a plausible typo for "disabled"
+
+
 def test_production_hides_the_api_surface_map(reset_settings):
     """Rebuild the app under production settings and inspect what it exposes.
 

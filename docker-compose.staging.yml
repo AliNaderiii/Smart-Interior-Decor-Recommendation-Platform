@@ -1,0 +1,117 @@
+# ============================================================================
+# STAGING OVERLAY — docker compose -f docker-compose.yml -f docker-compose.staging.yml
+# ============================================================================
+# Applied by scripts/deploy_staging.sh. Staging is a PUBLIC DEMO box, which is
+# a different shape from both dev and production:
+#
+#   * public HTTPS + real Let's Encrypt cert   -> like production
+#   * demo accounts must exist                 -> like development
+#   * AI_PROVIDER=mock, STORAGE_BACKEND=local  -> supervisor ruling R3
+#
+# WHY APP_ENV IS NOT "production" HERE (decision D-4.1, no gate weakened)
+# ----------------------------------------------------------------------
+# Settings.validate_runtime() REFUSES to boot APP_ENV=production when
+# AI_PROVIDER=mock or STORAGE_BACKEND=local, and demo_seed.demo_seeding_allowed()
+# refuses demo accounts under production unconditionally. Directive 1 R3
+# mandates exactly that mock/local/demo profile. The three ways out were:
+#
+#   (a) weaken validate_runtime for a "staging" env      -> FORBIDDEN (§2.8)
+#   (b) buy a Gemini key + S3 bucket for a demo box      -> deferred by R3
+#   (c) run APP_ENV=development and pin every production-shaped setting
+#       explicitly, then ASSERT them at deploy time      -> chosen
+#
+# (c) keeps every production fail-safe honest: no gate is relaxed, and
+# scripts/assert_staging_env.py re-implements the production checks that still
+# apply to a public host (strong SECRET_KEY, shared Redis, https origin,
+# secure cookies, non-default DB password) and FAILS THE DEPLOY if any is
+# missing. What we lose vs a true production boot is only the two checks that
+# R3 deliberately waives (real AI provider, S3 storage) — both are re-enabled
+# for the Stage-5 production cutover by simply using docker-compose.prod.yml.
+#
+# The invariant that matters is untouched and re-proven every deploy:
+# APP_ENV=production still refuses demo accounts (verified by
+# scripts/prove_demo_refusal.sh during deploy_staging.sh).
+# ============================================================================
+
+services:
+  backend:
+    environment:
+      APP_ENV: development          # see D-4.1 above — NOT a security relaxation
+      LOG_FORMAT: json
+      SEED_DEMO_ACCOUNTS: "true"    # staging-only demo logins (C-7)
+      COOKIE_SECURE: "true"         # public HTTPS: pinned as if production
+      COOKIE_SAMESITE: strict
+      AI_PROVIDER: mock             # R3 — no key on a public demo box
+      EMBEDDING_BACKEND: hash
+      STORAGE_BACKEND: local        # R3 — local media volume fallback
+      EMAIL_PROVIDER: mock
+      METRICS_ENABLED: "true"
+    volumes:
+      - media:/app/local_storage
+    deploy:
+      resources:
+        limits:
+          memory: 1400M
+          cpus: "1.5"
+
+  postgres:
+    deploy:
+      resources:
+        limits:
+          memory: 1200M
+          cpus: "1.5"
+
+  redis:
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: "0.5"
+
+  frontend:
+    build:
+      args:
+        # White-label switch (T-4.4). Baked at build time by Vite; changing the
+        # brand is `VITE_BRAND_NAME=... ./scripts/deploy_staging.sh`, no code edit.
+        VITE_BRAND_NAME: ${VITE_BRAND_NAME:-Smart Decor}
+        VITE_BRAND_COLOR: ${VITE_BRAND_COLOR:-}
+        VITE_BRAND_LOGO_URL: ${VITE_BRAND_LOGO_URL:-}
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.5"
+
+  caddy:
+    volumes:
+      # Rendered from the committed Caddyfile by scripts/render_caddyfile.sh;
+      # header block (incl. CSP) is byte-identical — only host + tls differ.
+      - ./Caddyfile.staging:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.5"
+
+  # Audit-log retention (IR-SEC-007 / client decision C-02, default 180 days).
+  maintenance:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    env_file: .env
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-decor}:${POSTGRES_PASSWORD:-decor}@postgres:5432/${POSTGRES_DB:-decor}
+      AUDIT_LOG_RETENTION_DAYS: ${AUDIT_LOG_RETENTION_DAYS:-180}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "while true; do python scripts/prune_audit_logs.py || echo 'prune failed' >&2; sleep 86400; done"
+
+volumes:
+  media:
