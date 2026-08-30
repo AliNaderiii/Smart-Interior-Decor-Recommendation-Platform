@@ -312,9 +312,28 @@ jobs:
 
       - name: Load test — defaults
         run: |
+          set -uo pipefail
+          # Capture in the SHELL, not in Python. Runs #5 and #6 proved that a
+          # ::error:: emitted from inside the harness can fail to reach the
+          # check-run, while the smoke script's shell-emitted annotation always
+          # arrived. Annotations are the only channel the agent can read (step
+          # logs and artifacts are not downloadable), so the last lines of the
+          # harness are re-emitted here, from bash, where it is known to work.
+          set +e
           python backend/scripts/load_recommend.py \
             --base-url "http://127.0.0.1:${DEMO_PORT}" \
-            --json /tmp/g4x-defaults.json
+            --json /tmp/g4x-defaults.json 2>&1 | tee /tmp/g4x-defaults.log
+          rc=${PIPESTATUS[0]}
+          set -e
+          if [ "$rc" -ne 0 ]; then
+            grep -aviE "^::(error|notice|warning)" /tmp/g4x-defaults.log \
+              | tail -12 \
+              | while IFS= read -r line; do
+                  [ -n "$line" ] && echo "::error title=g4x-defaults::${line}"
+                done
+            echo "::error title=g4x-defaults::harness exit ${rc}"
+            exit "$rc"
+          fi
 
       - name: Load test — 250 samples at concurrency 20
         run: |

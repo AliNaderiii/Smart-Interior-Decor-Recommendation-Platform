@@ -252,7 +252,7 @@ Before committing, confirm the copy is byte-identical:
 
 ```bash
 md5sum ci/stage4-verify.yml .github/workflows/stage4-verify.yml
-# both must print: e1d738c7d6336c5d957f72fe34d7eb6f
+# both must print: 8fa55abcaf5548a07d1fea5b5cd8d3f8
 ```
 
 **What happens next.** That commit adds the workflow at its active path, which
@@ -279,7 +279,7 @@ git pull origin arena/01a051ef-smart-interior-decor-recommend
 cp ci/stage4-verify.yml .github/workflows/stage4-verify.yml
 
 md5sum ci/stage4-verify.yml .github/workflows/stage4-verify.yml
-# both must print the same hash; current mirror: e1d738c7d6336c5d957f72fe34d7eb6f
+# both must print the same hash; current mirror: 8fa55abcaf5548a07d1fea5b5cd8d3f8
 
 git add .github/workflows/stage4-verify.yml
 git commit -m "Stage 4 - paste verification fix"
