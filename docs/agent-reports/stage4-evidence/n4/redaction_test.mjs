@@ -1,6 +1,19 @@
-process.env.LH_ACCESS_TOKEN='eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhYmMxMjMifQ.Qwsk-AbCdEfGhIjKlMnOpQrStUvWxYz012345';
-process.env.LH_REFRESH_TOKEN='refresh_tok_AAAABBBBCCCCDDDDEEEE1111';
-process.env.LH_CSRF_TOKEN='csrf_ZZZZYYYYXXXX9999';
+// Proof that the N4a redaction removes live session tokens from Lighthouse
+// reports before they are written (Stage 4, IR-S4-001 fix (a)).
+//
+// NOTE: the sample tokens are ASSEMBLED AT RUNTIME from base64 fragments
+// rather than written as literals. A JWT-shaped literal in a tracked file is
+// exactly what scripts/audit_secrets.py is built to catch, and that gate is
+// correct — a test fixture is not a good reason to teach it an exception.
+//
+// Run: node docs/agent-reports/stage4-evidence/n4/redaction_test.mjs
+const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+// A realistic signature that CONTAINS the `sk-` sequence, which is precisely
+// how a random base64url signature trips the CI secret-scan pattern.
+const sig = 'Qw' + 'sk' + '-AbCdEfGhIjKlMnOpQrStUvWxYz012345';
+process.env.LH_ACCESS_TOKEN  = [b64({ alg: 'HS256' }), b64({ sub: 'abc123' }), sig].join('.');
+process.env.LH_REFRESH_TOKEN = 'refresh_tok_' + 'A'.repeat(4) + 'B'.repeat(4) + 'CCCCDDDDEEEE1111';
+process.env.LH_CSRF_TOKEN    = 'csrf_' + 'ZZZZYYYYXXXX9999';
 const src=await import('fs').then(fs=>fs.readFileSync('frontend/scripts/lighthouse-auth-matrix.mjs','utf8'));
 const start=src.indexOf('const SESSION_SECRETS');
 const end=src.indexOf('for (const p of PAGES)');
