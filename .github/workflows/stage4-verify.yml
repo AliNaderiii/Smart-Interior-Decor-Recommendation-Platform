@@ -147,6 +147,21 @@ jobs:
           echo "----- entrypoint / boot log -----"
           docker logs demo 2>&1 | tail -200
           if [ "$ok" != "1" ]; then
+            # Run #1 lesson: raw step logs and job artifacts are NOT retrievable
+            # through the API from our environment (blob storage returns EOF),
+            # so a boot failure that only prints to stdout is invisible to the
+            # agent. Re-emit the decisive lines as ::error:: annotations, which
+            # the check-runs API does return.
+            docker logs demo 2>&1 \
+              | grep -aE "FATAL|Error|error|Traceback|die|refus|denied|Permission|No such|not found|could not|failed" \
+              | tail -25 \
+              | while IFS= read -r line; do
+                  echo "::error::boot: ${line}"
+                done
+            echo "::error::exit code: $(docker inspect demo --format '{{.State.ExitCode}}' 2>/dev/null || echo unknown)"
+            docker logs demo 2>&1 | tail -12 | while IFS= read -r line; do
+              echo "::error::tail: ${line}"
+            done
             echo "::error::the demo container never became healthy"
             exit 1
           fi
@@ -172,9 +187,12 @@ jobs:
       - name: Verify the seeded catalog (150 products, 3 demo users)
         run: |
           set -euo pipefail
-          products=$(docker exec demo psql -U postgres -d smartdecor -tAc \
+          # The container's entrypoint creates role/database 'decor' (see
+          # deploy/hf-space/entrypoint.sh), NOT postgres/smartdecor. My first
+          # version of this step queried a role and database that do not exist.
+          products=$(docker exec demo psql -h 127.0.0.1 -U decor -d decor -tAc \
             "SELECT count(*) FROM products;")
-          users=$(docker exec demo psql -U postgres -d smartdecor -tAc \
+          users=$(docker exec demo psql -h 127.0.0.1 -U decor -d decor -tAc \
             "SELECT count(*) FROM users;")
           echo "products=${products} users=${users}"
           [ "$products" -ge 150 ] || { echo "::error::expected >=150 products, got ${products}"; exit 1; }
@@ -267,6 +285,10 @@ jobs:
             sleep 10
           done
           docker logs demo 2>&1 | tail -100
+          docker logs demo 2>&1 \
+            | grep -aE "FATAL|Error|error|Traceback|refus|denied|Permission|No such|not found|could not|failed" \
+            | tail -20 \
+            | while IFS= read -r line; do echo "::error::boot: ${line}"; done
           echo "::error::container never became healthy"
           exit 1
 
@@ -412,6 +434,14 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Back up
+        env:
+          # backup_db.sh prefers DATABASE_URL and passes it straight to pg_dump,
+          # but the job-level value is a SQLAlchemy DSN
+          # (postgresql+psycopg://...) which libpq cannot parse. Blank it here
+          # so the script takes its PGHOST/PGUSER/PGDATABASE path instead. The
+          # job-level variable stays as-is because alembic genuinely needs the
+          # +psycopg dialect.
+          DATABASE_URL: ""
         run: |
           set -euo pipefail
           ./scripts/backup_db.sh /tmp/dr-backups 14
@@ -427,6 +457,8 @@ jobs:
           [ "$remaining" = "0" ] || { echo "::error::the destroy step did not destroy anything"; exit 1; }
 
       - name: Restore
+        env:
+          DATABASE_URL: ""   # same libpq-vs-SQLAlchemy DSN reason as the backup step
         run: |
           set -euo pipefail
           latest=$(find /tmp/dr-backups -name '*.dump' -o -name '*.backup' -o -name '*.sql*' \
