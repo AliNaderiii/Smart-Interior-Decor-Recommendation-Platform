@@ -1,0 +1,457 @@
+# =============================================================================
+# STAGED WORKFLOW — runner-hosted staging equivalence            [Stage 4, D-4.5]
+# =============================================================================
+# Directive 4, Option 3. Hugging Face now requires a paid plan to create Docker
+# Spaces (HTTP 402 — IR-S4-003), so Stage 4 has NO public URL. Instead of
+# shipping an unverified container, we build and run it ON THE GITHUB RUNNER and
+# prove every property that does not require a public host.
+#
+# This file is STAGED, not active: the repository token cannot push
+# `.github/workflows/*` (D-0 / IR-S1-009). A human pastes it to
+# `.github/workflows/stage4-verify.yml`.
+#
+# WHAT THIS PROVES — and what it explicitly does NOT:
+#
+#   PROVES   the image builds (apt + PGDG pgvector), the container boots
+#            (initdb as UID 1000, supervisord, nginx), migrations apply, the
+#            150-product catalog seeds, docs are OFF at the edge, the three
+#            demo accounts log in, the production demo-refusal invariant holds
+#            at boot, /recommend p95 under load, and a full backup/restore
+#            drill.
+#
+#   DOES NOT prove DNS, TLS 1.3, HSTS, a real certificate, CDN behaviour,
+#            reachability from Iran, or cold-start latency on shared hosting.
+#            Those need a public host and move to Stage 5 (D-4c). Nothing in
+#            this workflow may be reported as "the staging URL works".
+#
+# TRIGGERS: push on the paths that can change the demo, INCLUDING this
+# workflow's own active path — the 9fdc730 lesson: the paste commit adds only
+# the active file, so without that entry the first run would never fire and
+# `workflow_dispatch` is unavailable pre-merge. NO schedule: this is expensive
+# and there is nothing to keep awake.
+# =============================================================================
+name: Stage 4 — Runner-hosted verification
+
+on:
+  push:
+    branches: ["**"]
+    paths:
+      - "deploy/hf-space/**"
+      - "backend/**"
+      - "frontend/**"
+      - "datasets/**"
+      - "scripts/smoke_local_demo.sh"
+      - "ci/stage4-verify.yml"
+      - ".github/workflows/stage4-verify.yml"
+  workflow_dispatch:
+    inputs:
+      job:
+        description: "Which job to run"
+        type: choice
+        options: [all, demo-verify, g4x-contract, dr-drill]
+        default: all
+
+permissions:
+  contents: read
+
+env:
+  DEMO_PORT: "7860"
+  IMAGE_TAG: "smart-decor-demo:ci"
+
+jobs:
+  # ===========================================================================
+  # 1. demo-verify — build the real image, run it, prove the demo's promises.
+  # ===========================================================================
+  demo-verify:
+    name: Demo container — build, boot and verify
+    if: inputs.job == null || inputs.job == 'all' || inputs.job == 'demo-verify'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free disk space before building
+        run: |
+          # The image is ~500MB estimated but the BUILD needs far more
+          # (apt lists, wheels, node_modules, layer cache). Hosted runners ship
+          # with large preinstalled toolchains we do not need.
+          echo "before:"; df -h / | tail -1
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" || true
+          echo "after:"; df -h / | tail -1
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the demo image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/hf-space/Dockerfile
+          tags: ${{ env.IMAGE_TAG }}
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VITE_BRAND_NAME=Smart Decor
+
+      - name: Report the MEASURED image size
+        run: |
+          set -euo pipefail
+          # README-dev.md carries a ~500MB ESTIMATE derived from base-layer
+          # sizes. This is the first real measurement; the estimate must be
+          # corrected against it rather than left standing.
+          size=$(docker image inspect "${IMAGE_TAG}" --format '{{.Size}}')
+          human=$(numfmt --to=iec --suffix=B "$size")
+          echo "MEASURED image size: ${human} (${size} bytes)"
+          {
+            echo "### Demo image"
+            echo ""
+            echo "| metric | value |"
+            echo "|---|---|"
+            echo "| measured size | ${human} |"
+            echo "| estimate in README-dev.md | ~500 MB |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          docker history "${IMAGE_TAG}" --human --format '{{.Size}}\t{{.CreatedBy}}' | head -25
+
+      - name: Start the container
+        run: |
+          set -euo pipefail
+          docker run -d --name demo -p "127.0.0.1:${DEMO_PORT}:${DEMO_PORT}" \
+            "${IMAGE_TAG}"
+          echo "container started"
+
+      - name: Wait for the container to become healthy
+        id: wait
+        run: |
+          set -uo pipefail
+          # The entrypoint runs initdb, starts redis, applies migrations and
+          # seeds 150 products before supervisord serves anything, so first boot
+          # is slow. Poll rather than sleep, and surface the boot log on failure
+          # — this is the step where apt/pgvector and initdb-as-UID-1000 are
+          # exercised for the very first time anywhere.
+          deadline=$(( $(date +%s) + 600 ))
+          ok=0
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            if ! docker ps --filter name=demo --filter status=running -q | grep -q .; then
+              echo "::error::the container exited during boot"
+              break
+            fi
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+              "http://127.0.0.1:${DEMO_PORT}/api/v1/health/ready" || echo 000)
+            if [ "$code" = "200" ]; then ok=1; break; fi
+            sleep 10
+          done
+          echo "----- entrypoint / boot log -----"
+          docker logs demo 2>&1 | tail -200
+          if [ "$ok" != "1" ]; then
+            echo "::error::the demo container never became healthy"
+            exit 1
+          fi
+          echo "container healthy"
+
+      - name: Prove the boot-time demo-refusal invariant ran (D-4.4)
+        run: |
+          set -euo pipefail
+          log=$(docker logs demo 2>&1)
+          for marker in \
+            "proof 1: production boot refuses demo seeding" \
+            "proof 2: demo_seeding_allowed() -> False" \
+            "proof 3: DemoSeedRefused on the CLI opt-in" \
+            "INVARIANT HOLDS"; do
+            if printf '%s' "$log" | grep -qF "$marker"; then
+              echo "  PASS  ${marker}"
+            else
+              echo "::error::missing boot proof: ${marker}"
+              exit 1
+            fi
+          done
+
+      - name: Verify the seeded catalog (150 products, 3 demo users)
+        run: |
+          set -euo pipefail
+          products=$(docker exec demo psql -U postgres -d smartdecor -tAc \
+            "SELECT count(*) FROM products;")
+          users=$(docker exec demo psql -U postgres -d smartdecor -tAc \
+            "SELECT count(*) FROM users;")
+          echo "products=${products} users=${users}"
+          [ "$products" -ge 150 ] || { echo "::error::expected >=150 products, got ${products}"; exit 1; }
+          [ "$users" -ge 3 ] || { echo "::error::expected >=3 users, got ${users}"; exit 1; }
+
+      - name: Smoke test the container origin
+        run: ./scripts/smoke_local_demo.sh "http://127.0.0.1:${DEMO_PORT}"
+
+      - name: Verify docs are closed (D-4.1, binding)
+        run: |
+          set -euo pipefail
+          # Duplicated from the smoke script ON PURPOSE: this is a binding
+          # supervisor condition, so it gets its own unmissable step that a
+          # future edit to the smoke script cannot silently disable.
+          bad=0
+          for path in /docs /redoc /openapi.json /docs/ /docs/oauth2-redirect /metrics; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+              "http://127.0.0.1:${DEMO_PORT}${path}" || echo 000)
+            if [ "$code" = "404" ]; then
+              echo "  PASS  ${path} -> 404"
+            else
+              echo "::error::${path} returned ${code} — interactive docs MUST be closed"
+              bad=1
+            fi
+          done
+          exit "$bad"
+
+      - name: Collect diagnostics
+        if: always()
+        run: |
+          mkdir -p /tmp/demo-eviden
+          docker logs demo > /tmp/demo-eviden/container.log 2>&1 || true
+          docker exec demo supervisorctl status > /tmp/demo-eviden/supervisor.txt 2>&1 || true
+          docker image inspect "${IMAGE_TAG}" --format '{{.Size}}' > /tmp/demo-eviden/image-size.txt 2>&1 || true
+
+      - name: Upload diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: demo-verify-evidence
+          path: /tmp/demo-eviden/
+          retention-days: 30
+
+      - name: Tear down
+        if: always()
+        run: docker rm -f demo || true
+
+  # ===========================================================================
+  # 2. g4x-contract — p95 against the RUNNING demo container.
+  # ===========================================================================
+  g4x-contract:
+    name: G-4.x — /recommend p95 against the demo container
+    if: inputs.job == null || inputs.job == 'all' || inputs.job == 'g4x-contract'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                      "$AGENT_TOOLSDIRECTORY" || true
+          df -h / | tail -1
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the demo image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: deploy/hf-space/Dockerfile
+          tags: ${{ env.IMAGE_TAG }}
+          load: true
+          cache-from: type=gha
+          build-args: |
+            VITE_BRAND_NAME=Smart Decor
+
+      - name: Start and await the container
+        run: |
+          set -uo pipefail
+          docker run -d --name demo -p "127.0.0.1:${DEMO_PORT}:${DEMO_PORT}" "${IMAGE_TAG}"
+          deadline=$(( $(date +%s) + 600 ))
+          while [ "$(date +%s)" -lt "$deadline" ]; do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+              "http://127.0.0.1:${DEMO_PORT}/api/v1/health/ready" || echo 000)
+            [ "$code" = "200" ] && exit 0
+            docker ps --filter name=demo --filter status=running -q | grep -q . || break
+            sleep 10
+          done
+          docker logs demo 2>&1 | tail -100
+          echo "::error::container never became healthy"
+          exit 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the load-test dependencies
+        run: pip install httpx
+
+      - name: Load test — defaults
+        run: |
+          python backend/scripts/load_recommend.py \
+            --base-url "http://127.0.0.1:${DEMO_PORT}" \
+            --json /tmp/g4x-defaults.json
+
+      - name: Load test — 250 samples at concurrency 20
+        run: |
+          python backend/scripts/load_recommend.py \
+            --base-url "http://127.0.0.1:${DEMO_PORT}" \
+            --samples 250 --concurrency 20 \
+            --json /tmp/g4x-250x20.json
+
+      - name: Summarise (PROVISIONAL verdict)
+        if: always()
+        run: |
+          set -uo pipefail
+          {
+            echo "### G-4.x — /recommend latency on the demo container"
+            echo ""
+            echo "**PROVISIONAL.** Measured on a shared GitHub-hosted runner"
+            echo "(2 vCPU, noisy neighbours), which is the very hardware class"
+            echo "IR-S3-002 flagged as unsuitable for a contract verdict. The"
+            echo "FINAL verdict is taken on the Stage-5 client-funded host."
+            echo ""
+            for f in /tmp/g4x-defaults.json /tmp/g4x-250x20.json; do
+              [ -f "$f" ] || continue
+              echo "#### $(basename "$f")"
+              echo ""
+              echo '```json'
+              cat "$f"
+              echo '```'
+              echo ""
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the latency evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: g4x-evidence
+          path: /tmp/g4x-*.json
+          retention-days: 90
+
+      - name: Tear down
+        if: always()
+        run: docker rm -f demo || true
+
+  # ===========================================================================
+  # 3. dr-drill — backup and restore against a scratch stack.
+  # ===========================================================================
+  dr-drill:
+    name: DR drill — backup, destroy, restore, verify
+    if: inputs.job == null || inputs.job == 'all' || inputs.job == 'dr-drill'
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          # decor:decor — the throwaway credential this repo already uses for
+          # ephemeral CI databases (see .github/workflows/ci.yml). Using the
+          # same pair keeps scripts/audit_secrets.py's existing allowlist
+          # honest: the FIXTURE is aligned to the gate, the gate is NOT taught
+          # a new exception.
+          POSTGRES_USER: decor
+          POSTGRES_PASSWORD: decor
+          POSTGRES_DB: smartdecor
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U decor"
+          --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: "5432"
+      PGUSER: decor
+      PGPASSWORD: decor
+      PGDATABASE: smartdecor
+      DATABASE_URL: postgresql+psycopg://decor:decor@127.0.0.1:5432/smartdecor
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install the postgres client (version-matched to the server)
+        run: |
+          set -euo pipefail
+          # pg_dump refuses to dump from a NEWER server than itself, and the
+          # runner's default client can lag the pg16 service image.
+          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+            | sudo gpg --dearmor -o /etc/apt/trusted.gpg.d/pgdg.gpg
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-16
+          pg_dump --version
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install the backend
+        working-directory: backend
+        run: pip install -r requirements.lock.txt
+
+      - name: Migrate and seed
+        working-directory: backend
+        env:
+          APP_ENV: development
+          SECRET_KEY: dr-drill-not-a-real-secret-000000000000
+          SEED_DEMO_ACCOUNTS: "true"
+        run: |
+          set -euo pipefail
+          alembic upgrade head
+          python scripts/load_realistic_products.py --realistic --expand-to 150 --if-empty
+
+      - name: Write a canary row and record the pre-backup state
+        run: |
+          set -euo pipefail
+          psql -v ON_ERROR_STOP=1 -c \
+            "CREATE TABLE IF NOT EXISTS dr_canary(id serial primary key, note text, at timestamptz default now());"
+          psql -v ON_ERROR_STOP=1 -c \
+            "INSERT INTO dr_canary(note) VALUES ('written before the backup');"
+          # Capture into locals FIRST: GITHUB_ENV values are only visible to
+          # LATER steps, so echoing $PRODUCTS_BEFORE here would print nothing.
+          products=$(psql -tAc 'SELECT count(*) FROM products;')
+          canary=$(psql -tAc 'SELECT count(*) FROM dr_canary;')
+          echo "products=${products} canary=${canary}"
+          [ "$products" -ge 150 ] || { echo "::error::seed produced only ${products} products"; exit 1; }
+          {
+            echo "PRODUCTS_BEFORE=${products}"
+            echo "CANARY_BEFORE=${canary}"
+          } >> "$GITHUB_ENV"
+
+      - name: Back up
+        run: |
+          set -euo pipefail
+          ./scripts/backup_db.sh /tmp/dr-backups 14
+          ls -la /tmp/dr-backups
+
+      - name: Destroy the data (simulated loss)
+        run: |
+          set -euo pipefail
+          # A real disaster, not a polite truncate: drop the schema outright.
+          psql -v ON_ERROR_STOP=1 -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+          remaining=$(psql -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';")
+          echo "tables remaining after the drop: ${remaining}"
+          [ "$remaining" = "0" ] || { echo "::error::the destroy step did not destroy anything"; exit 1; }
+
+      - name: Restore
+        run: |
+          set -euo pipefail
+          latest=$(find /tmp/dr-backups -name '*.dump' -o -name '*.backup' -o -name '*.sql*' \
+            | sort | tail -1)
+          echo "restoring ${latest}"
+          ./scripts/restore_db.sh "$latest"
+
+      - name: Verify the restore
+        run: |
+          set -euo pipefail
+          after_products=$(psql -tAc 'SELECT count(*) FROM products;')
+          after_canary=$(psql -tAc "SELECT count(*) FROM dr_canary WHERE note='written before the backup';")
+          echo "products before=${PRODUCTS_BEFORE} after=${after_products}"
+          echo "canary   before=${CANARY_BEFORE} after=${after_canary}"
+          [ "$after_products" = "$PRODUCTS_BEFORE" ] \
+            || { echo "::error::product count differs after restore"; exit 1; }
+          [ "$after_canary" -ge 1 ] \
+            || { echo "::error::the canary row did not survive the restore"; exit 1; }
+          {
+            echo "### DR drill"
+            echo ""
+            echo "| stage | products | canary |"
+            echo "|---|---|---|"
+            echo "| before backup | ${PRODUCTS_BEFORE} | ${CANARY_BEFORE} |"
+            echo "| after restore | ${after_products} | ${after_canary} |"
+            echo ""
+            echo "Schema was dropped entirely between the two rows."
+          } >> "$GITHUB_STEP_SUMMARY"
