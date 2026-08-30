@@ -612,7 +612,7 @@ p95-cells: n=250/cell conc=20 | cold p50=486.2 p95=706.4 p99=807.9 err=0 | warm 
 ```
 
 **Worst p95 = 706.4 ms against a 2000 ms contract; 0 errors in 900 samples.**
-Full table: `stage4-evidence/g4x-p95-run7.md`.
+Full table: `docs/agent-reports/stage4-evidence/g4x-p95-run7.md`.
 
 The shell-level capture was the right call — the same run that would have been
 silent under the Python channels produced clean `::notice::` output through
@@ -622,6 +622,21 @@ Stage 2.
 **This does NOT close IR-S3-002.** A GitHub-hosted shared runner is precisely
 the hardware class that IR objected to. Verdict: **PROVISIONAL**, final on the
 Stage-5 host.
+
+### Same-day proof that the variance family is alive
+
+On this very commit (`7896b2e`), the CI `p95 evidence` PR job measured a cold
+p95 of **2733.9 ms against its 2800 ms tripwire — a 66 ms pass**, while the
+G-4.x job on the same commit measured 706.4 ms worst case. Nearly a 4x spread
+between two jobs of the same tree on the same day.
+
+That is IR-S3-002 in one picture, and it is the strongest argument for keeping
+the verdict provisional. A single comfortable number on shared infrastructure
+says little; the *distribution* is the property under contract, and on this
+hardware class it remains wide enough to graze a tripwire. Had G-4.x drawn the
+unlucky runner, the same code would have reported a figure several times worse
+without anything having changed. The Stage-5 measurement must be taken on
+dedicated hardware before IR-S3-002 can close.
 
 ---
 
@@ -662,7 +677,7 @@ Stage-5 host.
 
 ### 18.3 Evidence index
 
-- `stage4-evidence/g4x-p95-run7.md` — p95 table, verbatim annotations
+- `docs/agent-reports/stage4-evidence/g4x-p95-run7.md` — p95 table, verbatim annotations
 - `docs/agent-reports/stage4-report.md` §15–§17 — the seven-run red→green trail
 - Runs: #1 `33330969648` · #2 `33332217908` · #3 `33332542166` · #4 `33332769581` · #5 `33333143587` · #6 `33333452530` · **#7 `33334578659` (all green)**
 - `integration-request.md` — IR-S4-001/002/003, IR-S3-002
