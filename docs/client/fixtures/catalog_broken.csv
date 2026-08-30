@@ -1,0 +1,5 @@
+﻿id,title_fa,title_en,category,room_type,price_toman,seller,seller_link,image_url,dimensions_cm,color_palette,style_tags,material_tags,description_for_embedding
+chair-001,صندلی چوبی,Wooden chair,chair,living_room,1850000,فروشگاه,https://example.com/p/c1,https://example.com/i/c1.jpg,45x50x90,#8B5A2B,scandinavian,wood,صندلی چوبی با نشیمن پارچه‌ای و طراحی ساده.
+chair-001,صندلی دوم,Second chair,armchair,living_room,2000000,فروشگاه,http://example.com/p/c2,https://example.com/i/c2.jpg,45x50x90,#8B5A2B,modern,wood,صندلی دوم با شناسهٔ تکراری.
+table-003,میز جلومبلی,Coffee table,coffee_table,living_room,"4,500,000 تومان",فروشگاه,https://example.com/p/t3,https://example.com/i/t3.jpg,120 در 60,#GGGGGG,rustic,wood,میز جلومبلی چوبی.
+decor 004!,,Vase,decor,bedroom,95000000000,,https://example.com/p/d4,,,#FFFFFF,boho,ceramic,کوتاه
