@@ -97,11 +97,11 @@ Relay back: `deploy-run{1,2,3}.log`, `docker compose ps`, `curl -i https://stagi
 
 | Task | Deliverable | Owner |
 |---|---|---|
-| T-4.1 | `scripts/host_prep.sh`, `scripts/deploy_staging.sh`, `scripts/smoke_staging.sh`, `.env.staging.example`, `docs/ops/DEPLOY_STAGING.md`; shellcheck-clean locally | SA-2 |
-| T-4.3a | `scripts/uptime_probe.sh`, `scripts/backup_nightly.sh` (7-day retention), logrotate unit, `docs/ops/RUNBOOK_STAGING.md` | SA-3 |
+| T-4.1 | **scripts/host_prep.sh**, **scripts/deploy_staging.sh**, **scripts/smoke_staging.sh**, **.env.staging.example**, **docs/ops/DEPLOY_STAGING.md** (all planned, not yet created); shellcheck-clean locally | SA-2 |
+| T-4.3a | **scripts/uptime_probe.sh**, **scripts/backup_nightly.sh** (7-day retention), logrotate unit, **docs/ops/RUNBOOK_STAGING.md** (planned) | SA-3 |
 | T-4.4 | `VITE_BRAND_NAME` / logo slot / color-token override + Persian copy pass; `docs/DESIGN_SYSTEM.md` theming section; local before/after screenshots | SA-4 |
-| T-4.5 | Persian storyboard + narration + click-path; `docs/SALES_ONEPAGER.md` (evidence-backed numbers only) | SA-5 |
-| T-4.6 | `docs/CLIENT_ONBOARDING.md`, `datasets/catalog_template.{csv,json}`, `scripts/validate_catalog.py` + tests, SLA menu, ≤5-business-day timeline | SA-6 |
+| T-4.5 | Persian storyboard + narration + click-path; **docs/SALES_ONEPAGER.md** (planned; evidence-backed numbers only) | SA-5 |
+| T-4.6 | **docs/CLIENT_ONBOARDING.md**, **datasets/catalog_template.csv** + **datasets/catalog_template.json**, **scripts/validate_catalog.py** + tests (all planned), SLA menu, ≤5-business-day timeline | SA-6 |
 | T-4.9a | QA matrix harness + checklist, run locally against docker-compose as a dry run | SA-7 |
 | Regression | re-prove `APP_ENV=production` refuses demo seeding (invariant 3) | SA-7 |
 
@@ -123,11 +123,11 @@ Relay back: `deploy-run{1,2,3}.log`, `docker compose ps`, `curl -i https://stagi
 
 ## §4 T-4.6 outline — every open client decision mapped to a section
 
-| Section of `docs/CLIENT_ONBOARDING.md` (Persian) | Content | Open decision closed |
+| Section of **docs/CLIENT_ONBOARDING.md** (Persian, planned) | Content | Open decision closed |
 |---|---|---|
 | §1 کلید هوش مصنوعی | Gemini/OpenAI key how-to + Iran-access options (proxy / self-host / mock+manual review) + our recommendation | — (feeds C-01 context) |
 | §2 درگاه پرداخت | Zarinpal merchant steps, sandbox → live | — |
-| §3 کاتالوگ واقعی | `catalog_template.csv/.json` + `validate_catalog.py`, Persian error messages | — |
+| §3 کاتالوگ واقعی | catalog templates (CSV + JSON) + the catalog validator, Persian error messages | — |
 | §4 دامنه و DNS | domain/subdomain table + exact records + hosting form | — |
 | §5 ایمیل فرستنده | SMTP vs provider options | — |
 | §6 تصمیم‌های باز مشتری | plain-Persian one-pager per decision | **C-01** KMS provider · **C-02** audit retention 180d · **C-03** link-check policy · **C-6** recommender weights (`current` vs `client-ad`, with the 18/18 scenario evidence) · **C-7** demo-account policy on staging |
