@@ -421,3 +421,30 @@ fails.
 Process correction: the audits now run **after** any rebase, immediately before
 the push, not before. The re-clone behaviour of this sandbox makes
 pre-rebase verification worthless.
+
+### 13.8 Supervisor rulings on Wave 2
+
+Wave 2 accepted after independent byte-level verification (red `33313081702`
+on `b1f72e5`, green `33313118840` on `dfa524a` 9/9, and `33313206609` on
+`3dec794` SUCCESS). D-4.3 and D-4.4 accepted; IR-S4-002 accepted as logged.
+
+**Binding process rule added (second re-clone incident on record):** after ANY
+re-clone or rebase, re-run **all** in-repo audits on the final tree immediately
+before pushing. A re-clone invalidates every prior audit result by definition.
+
+**DEFERRED TO STAGE 5 — `docker-compose.staging.yml` is not validated by CI.**
+The `docker` job validates the dev, prod and test compose overlays but not the
+staging one. Ruling: leave it. The file is a parked artifact of the cancelled
+host track; adding it now would break `ci/ci.stage4.yml` byte-identity and drag
+a third change into the single paste sitting. **Stage 5 pickup item:** add
+`docker-compose.staging.yml` to the compose-validation step when the host track
+resumes, or delete the file if Stage 5 confirms the Space is the permanent
+demo target.
+
+**Required pre-sitting fix, applied.** The push paths filter listed
+`ci/stage4-deploy.yml` but not the workflow's own active path, so the paste
+commit — which adds only that active file — would have matched nothing and
+deploy #1 would never have fired. With `workflow_dispatch` unavailable
+pre-merge and dummy commits banned, that would have left no legitimate way to
+trigger the first deploy. The workflow now watches its own active path, so
+**the paste commit itself fires deploy #1 = the acceptance test.**

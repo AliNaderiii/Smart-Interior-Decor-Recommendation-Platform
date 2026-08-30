@@ -38,6 +38,12 @@ on:
       - "frontend/**"
       - "datasets/**"
       - "ci/stage4-deploy.yml"
+      # The paste commit itself must fire deploy #1. That commit adds ONLY
+      # `.github/workflows/stage4-deploy.yml`, which none of the paths above
+      # match — without this line the first deploy would never trigger, and
+      # `workflow_dispatch` cannot fire pre-merge (default-branch only) while
+      # dummy commits are banned. So the workflow watches its own active path.
+      - ".github/workflows/stage4-deploy.yml"
   schedule:
     # Uptime ping every 30 minutes. Default-branch only (see the note above).
     - cron: "*/30 * * * *"
