@@ -415,7 +415,7 @@ fails.
 
 | Push | Verdict |
 |---|---|
-| `b1f72e5` Wave 2 | **RED, my fault.** I ran the audits, they passed, then I rebased onto the re-cloned worktree and pushed — without re-running them on the rebased tree. Two real breaks: `audit_secrets.py [secret_var]` on an inline throwaway `SECRET_KEY` in `entrypoint.sh:126`, and `audit_docs_links.py` on a forward reference to `.github/workflows/stage4-deploy.yml`, which does not exist until the paste. |
+| `b1f72e5` Wave 2 | **RED, my fault.** I ran the audits, they passed, then I rebased onto the re-cloned worktree and pushed — without re-running them on the rebased tree. Two real breaks: `audit_secrets.py [secret_var]` on an inline throwaway `SECRET_KEY` in `entrypoint.sh:126`, and `audit_docs_links.py` on a forward reference to the deploy workflow's post-paste destination path, which does not exist until the paste happens. |
 | `dfa524a` fix | The `SECRET_KEY` is now built inside the Python heredoc via `os.environ` — the fixture was restructured, the gate was **not** given an exception, per the standing rule. The doc reference was reworded to carry no resolvable path token. Both audits PASS, shellcheck clean. |
 
 Process correction: the audits now run **after** any rebase, immediately before

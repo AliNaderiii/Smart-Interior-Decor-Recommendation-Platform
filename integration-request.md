@@ -1639,3 +1639,52 @@ random-base64url false-positive rate: 288/200000 = 0.14400% per 700 chars
 ### Restore condition
 
 When `recommendations/mobile` is measured on the deployed demo (T-4.9) rather than a shared CI runner, its contract verdict is recorded there. If a future runner tier removes the contention, the CI cell returns to the strict 3000 ms gate. **No gate is weakened by this entry** — the strict threshold still governs the contract; only the *place it is measured* changes for the one unstable cell.
+
+---
+
+## IR-S4-002 — Deviations D-4.2 / D-4.3 / D-4.4 · demo-container topology
+
+**Raised by:** agent, Stage 4 Wave 2
+**Status:** logged for supervisor ruling — **no gate semantics changed**
+**Affects:** the public demo target only; production topology is untouched.
+
+### D-4.2 — one additional tracked env template
+
+`.env.staging.example` is tracked alongside `.env.example`. It is redacted:
+placeholders only, no live values, and `audit_secrets.py` passes over it with
+zero findings. Rationale: the staging profile differs from both dev and prod in
+ways a reader cannot infer (public origin, cookie flags, sandbox payment
+sandbox, demo-account switch), and the alternative — documenting them in prose —
+is exactly how drift starts. Accepted risk: one more file to keep in sync;
+mitigated because `assert_staging_env.py` reads the same key list.
+
+### D-4.3 — the demo runs as a single container
+
+A Hugging Face Space runs exactly one container, so PostgreSQL, Redis, uvicorn
+and nginx share an image under supervisord. This is a **delivery constraint of
+the free tier, not an architecture decision**: `docker-compose.prod.yml` keeps
+the five-service topology and remains the Stage-5 target. The N3 asset-reuse map
+is honoured — `deploy_staging.sh` steps 1/5/6/7/9 are refolded into
+`entrypoint.sh`, `smoke_staging.sh` runs unchanged against the Space URL, and
+`host_prep.sh` / `render_caddyfile.sh` stay committed and parked.
+
+Consequences already recorded: **D-4a** the demo database is ephemeral; **D-4c**
+no origin-TLS evidence is obtainable because the HF edge terminates TLS, so the
+Stage-3 TLS item stays BLOCKED; **D-4d** the Space is shared CPU, so G-4.x does
+not deliver the separated hardware IR-S3-002 asked for — the number will be
+recorded with its tier stated.
+
+### D-4.4 — the production demo-refusal invariant runs on every boot
+
+Public demo accounts are only defensible if production genuinely cannot create
+them. Rather than trusting a CI-time proof, `entrypoint.sh` re-runs all three
+proofs (`validate_runtime()` refusal, `demo_seeding_allowed() -> False`,
+`DemoSeedRefused` on the CLI opt-in) at container startup and **refuses to
+serve** if any fails. This strengthens the existing guarantee; nothing is
+relaxed.
+
+### What is not being asked for
+
+No gate threshold, scan pattern or acceptance criterion changes in this entry.
+It exists so the topology deviation is on the record before the first
+activation, per the no-silent-deviation rule.
