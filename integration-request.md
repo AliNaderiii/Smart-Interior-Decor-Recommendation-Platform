@@ -1736,3 +1736,90 @@ untouched.
 contention, this cell returns to the strict 3000 ms CI gate. Evidence that the
 instability is environmental, not a regression: RenderDelay moved 739 ms ->
 4125 ms while TBT *fell* 113 ms -> 20 ms across doc-only runs.
+
+
+---
+
+## IR-S4-003 — BLOCKER: Docker Spaces now require a paid plan (HTTP 402)
+
+**Raised by:** agent, Stage 4 deploy fix loop, 2026-08-30
+**Status:** **BLOCKED — needs a human + supervisor decision.** No agent-side fix
+exists that respects Directive 3.
+**Blocks:** T-4.2 (live staging), T-4.8 (G-4.x staging p95, and therefore the
+closure of IR-S3-002), T-4.9 (QA against the public URL).
+
+### Evidence
+
+Deploy #7, run `33319446945`, step `Create the Space`, check-run annotation
+verbatim:
+
+```
+Could not create the Space — HfHubHTTPError (HTTP 402): 402 Client Error:
+Payment Required for url: https://huggingface.co/api/repos/create
+```
+
+Every earlier step passed: guard, trim, `Assert the target actually resolved`,
+SPA build, context assembly. The plumbing is correct; the account is not
+entitled.
+
+### Cause
+
+Hugging Face policy, quoted from the official Spaces Overview docs
+(read 2026-08-30):
+
+> Static Spaces are free for everyone. Gradio and Docker Spaces run on compute
+> and require a paid plan to create: PRO for personal accounts, Team or
+> Enterprise for organizations.
+
+Our demo must be a **Docker** Space — it runs PostgreSQL + pgvector, Redis,
+uvicorn and nginx in one container. Docker Spaces require **PRO (~$9/month)**.
+
+This invalidates the free-tier assumption behind the Directive 3 pivot (N1).
+When that pivot was chosen, a free Docker Space was believed available; it is
+not. **The plan was wrong, not the implementation.**
+
+### Not a token problem
+
+402 is billing, not authorization. A write-scoped token receives the same 402.
+`huggingface_hub` even ships a fix titled *"Do not fail on create space if
+exists_ok=True and 402 Payment required error"*, confirming this is the
+expected response for non-paid accounts.
+
+### Options (agent recommendation, decision NOT taken)
+
+| # | Option | Cost | Consequence |
+|---|---|---|---|
+| 1 | Another free host accepting a Docker container | 0 | Workflow logic ports with modest changes; needs verification that a genuinely free long-running-container tier exists |
+| 2 | HF PRO | ~$9/mo | **Reverses Directive 3**; fastest path, everything else is ready |
+| 3 | No public URL in Stage 4 | 0 | Demo via `run_local_demo.ps1` + recorded walkthrough; public URL deferred to Stage 5 |
+
+I recommend the human first confirm whether **option 1** has a real candidate,
+because Directive 3 has been binding all stage; **option 3** is the honest
+fallback that keeps the client meeting intact with zero spend, since the local
+launcher already exists and is frozen pending its Windows run.
+
+### What this does not change
+
+The deploy workflow stays committed and unmodified — it is correct, and it
+fails with an accurate message. The demo container remains **unbuilt and
+unverified**; apt/pgvector and initdb-as-UID-1000 are still untested and must
+not be reported otherwise. All Stage 4 work independent of the hosting target
+(docs-off switch, catalog validator, onboarding pack, IR-S4-001 CI retiering)
+is complete and green.
+
+### Live confirmation of IR-S4-001 (recorded here per supervisor request)
+
+The retiering proved itself the same day it landed. On commit `221c1c7` the
+**push** run `33318774164` measured `recommendations/mobile` **LCP 4971 ms** —
+above the old 3000 ms gate — and passed with the notice:
+
+```
+recommendations [mobile] LCP 4971ms — ABOVE the 3000ms contract threshold
+(CI tripwire 8000ms; contract verdict is captured on staging per IR-S4-001)
+```
+
+while the pull_request run `33318776392` on the identical tree measured
+**2125 ms**. Same commit, same code, 2.3x spread between two runs minutes
+apart — direct confirmation of the runner-contention diagnosis and of the
+retiering's value. (I initially reported these two runs the wrong way round;
+the supervisor's independent check caught it.)

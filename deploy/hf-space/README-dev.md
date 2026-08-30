@@ -149,3 +149,74 @@ inside the 5-iteration ceiling and neither risks anything outside the Space.
 
 Rollback is trivial and costs nothing: delete the Space in the HF UI, or push
 a revert. No infrastructure, no billing, nothing to clean up.
+
+
+---
+
+## 6. BLOCKER — HTTP 402 on Space creation (deploy #7, 2026-08-30)
+
+Deploy #7 (run `33319446945`) reached `Create the Space` with a correct
+`SPACE_ID` and the instrumentation returned the real cause verbatim:
+
+```
+Could not create the Space — HfHubHTTPError (HTTP 402): 402 Client Error:
+Payment Required for url: https://huggingface.co/api/repos/create
+(Request ID: Root=1-6a944ac7-3765db443549270f39f9821e;...)
+```
+
+**This is not a bug in the workflow, the token, or the container.** Hugging
+Face changed its Spaces policy. Per the official docs (Spaces Overview,
+"Creating a new Space", read 2026-08-30):
+
+> Static Spaces are free for everyone. Gradio and Docker Spaces run on compute
+> and require a paid plan to create: PRO for personal accounts, Team or
+> Enterprise for organizations. Free personal accounts in good standing can
+> still host up to 2 Gradio Spaces running on ZeroGPU.
+
+Our demo is a **Docker** Space (`space_sdk="docker"` — it must be, since it
+runs PostgreSQL + pgvector, Redis, uvicorn and nginx). Docker Spaces now
+require **HF PRO**, roughly **$9/month**. The 402 is the Hub correctly
+enforcing that on a free account.
+
+`huggingface_hub` itself acknowledges this shape: release note
+*"[Fix] Do not fail on create space if exists_ok=True and 402 Payment
+required error"* — the 402 on `create_repo` for Spaces is expected behaviour
+on non-paid accounts, not an anomaly.
+
+### Why no code fix was attempted
+
+**Directive 3 is ZERO paid host/domain/services.** Every "fix" inside the
+workflow would either spend money or defeat the demo:
+
+| Option | Verdict |
+|---|---|
+| Upgrade to HF PRO (~$9/mo) | **Violates Directive 3.** Requires an explicit human+supervisor decision, not an agent one. |
+| Switch to a **static** Space | Free, but serves only static files — no backend, no PostgreSQL, no `/api`. The demo's entire value is the live recommendation flow. Useless here. |
+| Switch to a **Gradio** Space | The free ZeroGPU allowance is for Gradio apps; it will not run our multi-service container, and rewriting the product as a Gradio app is a new build, not a deployment. |
+| Retry / different token scope | Pointless. 402 is a billing decision, not an auth failure. A write-scoped token still gets 402. |
+
+The workflow is therefore **correct and complete** — it fails exactly where it
+should, with an accurate message. It stays committed and unchanged, ready to
+run the moment a target that accepts a Docker container exists.
+
+### What is NOT affected
+
+* The demo container itself is unproven but untouched by this — no build has
+  ever run, so apt/pgvector and initdb-as-UID-1000 remain **unverified**.
+* `scripts/run_local_demo.ps1` (N2, frozen) still gives the client a working
+  local demo on the human's Windows laptop, with no hosting at all.
+* Everything else in Stage 4 — validator, onboarding pack, docs-off switch,
+  CI retiering — is independent of the hosting target and is done.
+
+### Decision required (human + supervisor)
+
+1. **Free alternative host** that accepts a Docker container — the workflow's
+   assemble/upload/probe logic ports with modest changes. Candidates need
+   checking for a free tier that permits a long-running container.
+2. **Accept HF PRO** as the one paid exception, which requires reversing
+   Directive 3 explicitly.
+3. **Drop public hosting for Stage 4** and demo from the local launcher plus a
+   recorded walkthrough, deferring the public URL to Stage 5.
+
+Until one is chosen, T-4.2 (live staging), T-4.8 (G-4.x staging p95) and T-4.9
+(QA against the public URL) cannot complete, and I will not claim otherwise.
