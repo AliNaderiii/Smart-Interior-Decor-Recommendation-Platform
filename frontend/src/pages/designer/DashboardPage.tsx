@@ -143,7 +143,7 @@ export default function DesignerDashboardPage() {
   });
 
   const create = useMutation({
-    mutationFn: () => post<Project>("/projects", form),
+    mutationFn: (variables: typeof form) => post<Project>("/projects", variables),
     onSuccess: (newProject) => {
       setOpen(false);
       setForm({ name: "", client_name: "", client_email: "" });
@@ -212,7 +212,7 @@ export default function DesignerDashboardPage() {
           form={form}
           setForm={setForm}
           onClose={() => setOpen(false)}
-          onSubmit={() => create.mutate()}
+          onSubmit={() => create.mutate(form)}
           isPending={create.isPending}
         />
       )}

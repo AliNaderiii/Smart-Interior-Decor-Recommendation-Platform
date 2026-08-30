@@ -112,12 +112,15 @@ test.describe.serial("designer journey", () => {
 
     for (let i = 1; i <= FREE_PLAN_QUOTA; i++) {
       const name = `E2E Project ${RUN}-${i}`;
-      await createProjectViaUi(page, name);
+      const res = await createProjectViaUi(page, name);
+      expect(res.status(), `Project ${i} should return 201`).toBe(201);
       // Success closes the modal and the new row appears in the list.
       await expect(page.getByRole("dialog", { name: /create project/i })).toHaveCount(0, {
         timeout: 20_000,
       });
-      await expect(page.getByText(name, { exact: true })).toBeVisible({ timeout: 20_000 });
+      await expect(page.getByRole("link", { name: new RegExp(name) })).toBeVisible({
+        timeout: 20_000,
+      });
     }
 
     // Multiple project management: both rows coexist and are navigable links.
