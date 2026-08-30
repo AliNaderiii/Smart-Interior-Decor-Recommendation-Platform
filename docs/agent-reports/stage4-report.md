@@ -294,6 +294,50 @@ Plus: compose availability, port-conflict check, readiness wait (up to 5 min), c
 
 ### Honest limitation
 
+### Local-boot incident #2 — stale `pgdata` volume (local state, NOT a repo defect)
+
+The launcher failed on the human's machine with a PostgreSQL password
+authentication error. **The repository is not at fault and was not changed for
+it.**
+
+Supervisor-verified: `docker-compose.yml` provisions PostgreSQL from
+`POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` and injects the *same*
+interpolation into the backend's `DATABASE_URL` (defaults `decor` / `decor` /
+`decor`). The wiring is self-consistent, so **a fresh install cannot produce
+this failure.**
+
+Cause: that machine had a `pgdata` volume initialised earlier with a different
+password. PostgreSQL applies `POSTGRES_PASSWORD` **only when it initialises a
+new data directory** — on an existing one the variable is ignored and the old
+credential persists. The image was right; the leftover state was stale.
+
+Resolution: `.\scripts\run_local_demo.ps1 -Reset`, whose `down -v` removes the
+volume so the next start initialises cleanly.
+
+**Deliberately not "fixed" in the repo.** There is nothing to correct in
+`docker-compose.yml` or `.env.example`; editing either to accommodate one
+machine's stale volume would be an unauthorised, gate-adjacent change that
+masked a local-state problem behind a repo change. Recorded here instead.
+
+What *was* authorised, and is now applied, are the two launcher improvements
+this incident argued for — see below.
+
+### Authorised launcher edit (the only change to the frozen file)
+
+1. **Database-password guidance on failure.** The health-wait failure path now
+   names the `password authentication failed` case in plain Persian and points
+   straight at `-Reset`, so incident #2 is self-diagnosing next time instead of
+   requiring a support round-trip.
+2. **Automatic log capture.** On a failed health wait the launcher writes the
+   full compose log to `demo-logs.txt` in the repo root and tells the user to
+   send that one file — previously they had to run `-Logs` separately and copy
+   text out of a console window, in a script whose entire purpose is to spare a
+   non-technical user exactly that. The file is git-ignored, since it contains
+   local container output.
+
+Both edits are inside the two authorised items; nothing else in the launcher
+changed. The BOM is intact, and `scripts/check_ps1.py` passes.
+
 **No PowerShell interpreter is installable in this sandbox** — `packages.microsoft.com`, the GitHub release CDN and nuget are all unreachable (verified: `SSL_ERROR_SYSCALL` on each). The script has therefore **never been executed**. I compensated with `scripts/check_ps1.py`, a static checker enforcing the BOM, console encoding, balanced braces/parens/quotes, that every declared switch is handled, absence of Windows-hostile Unix-isms, and that `ErrorActionPreference` is set — all passing. **First run on a real Windows machine is the acceptance test; please relay the console output.**
 
 ---

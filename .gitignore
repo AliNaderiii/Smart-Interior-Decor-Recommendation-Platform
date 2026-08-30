@@ -71,3 +71,7 @@ frontend/.playwright/
 
 # Stage 03 security probe scratch (never commit probe databases / uploads)
 docs/agent-reports/security-hardening-evidence/*.sqlite3
+
+# Diagnostic log written by scripts/run_local_demo.ps1 on a failed health wait.
+# Contains local container output; never belongs in the repo.
+demo-logs.txt

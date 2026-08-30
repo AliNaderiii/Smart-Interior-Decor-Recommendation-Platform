@@ -303,13 +303,28 @@ if (-not $ready) {
     Write-Host ""
     Write-Info "آخرین خطوط گزارش سرور:"
     & docker @ComposeArgs logs --tail 25 backend
+
+    # گزارش کامل را خودکار در یک فایل ذخیره می‌کنیم تا کاربر مجبور نباشد
+    # دستور دیگری اجرا کند و متن را از پنجره کپی کند.
+    $LogFile = Join-Path $RepoRoot "demo-logs.txt"
+    try {
+        $allLogs = & docker @ComposeArgs logs --tail 400 2>$null
+        Set-Content -Path $LogFile -Value $allLogs -Encoding UTF8
+        Write-Host ""
+        Write-Ok "گزارش کامل در این فایل ذخیره شد:"
+        Write-Host "    $LogFile" -ForegroundColor White
+        Write-Info "لطفاً همین فایل را برای تیم فنی بفرستید."
+    } catch {
+        Write-Warn "ذخیرهٔ خودکار گزارش ممکن نشد؛ لطفاً دستور -Logs را اجرا کنید."
+    }
+
     Stop-WithHelp "سرور بالا نیامد" @(
         "۱. چند دقیقه صبر کنید و دوباره اجرا کنید — گاهی بار اول کند است.",
-        "۲. اگر باز هم نشد، از صفر شروع کنید:",
+        "۲. اگر خطای رمز پایگاه داده (password authentication failed) دیدید،",
+        "   یعنی اطلاعات قدیمی روی کامپیوتر شما مانده است. از صفر شروع کنید:",
         "     .\scripts\run_local_demo.ps1 -Reset",
         "     .\scripts\run_local_demo.ps1",
-        "۳. اگر مشکل ادامه داشت، خروجی این دستور را برای تیم فنی بفرستید:",
-        "     .\scripts\run_local_demo.ps1 -Logs"
+        "۳. اگر مشکل ادامه داشت، فایل demo-logs.txt را برای تیم فنی بفرستید."
     )
 }
 Write-Ok "سرور آماده است"
@@ -357,6 +372,11 @@ Write-Host "      رمز   : Admin123!"
 Write-Host ""
 Write-Host "  توجه: این رمزها فقط برای نسخهٔ نمایشی روی کامپیوتر شماست." -ForegroundColor DarkYellow
 Write-Host "        روی نسخهٔ عمومی هرگز ساخته نمی‌شوند." -ForegroundColor DarkYellow
+Write-Host ""
+Write-Host "  هر حساب فقط به بخش‌های خودش دسترسی دارد:" -ForegroundColor DarkYellow
+Write-Host "        اگر پیام «دسترسی کافی نیست» یا خطای ۴۰۳ دیدید، ایراد نیست —" -ForegroundColor DarkYellow
+Write-Host "        یعنی آن صفحه برای نقش دیگری است. مثلاً مدیریت کاتالوگ فقط با" -ForegroundColor DarkYellow
+Write-Host "        حساب «مدیر سیستم» باز می‌شود، نه با حساب مشتری." -ForegroundColor DarkYellow
 Write-Host ""
 Write-Host ("-" * 66) -ForegroundColor DarkGray
 Write-Host "  دستورهای مفید:" -ForegroundColor Cyan
