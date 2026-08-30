@@ -220,3 +220,47 @@ run the moment a target that accepts a Docker container exists.
 
 Until one is chosen, T-4.2 (live staging), T-4.8 (G-4.x staging p95) and T-4.9
 (QA against the public URL) cannot complete, and I will not claim otherwise.
+
+---
+
+## 7. Final paste — activate verification, retire the doomed deploy workflow
+
+Directive 4 / D-4.5. **One sitting, one commit.** It activates the runner-hosted
+verification workflow and removes the deploy workflow, whose every run now fails
+with HTTP 402 (IR-S4-003).
+
+Run these from the repository root, on branch
+`arena/01a051ef-smart-interior-decor-recommend`:
+
+```bash
+git pull origin arena/01a051ef-smart-interior-decor-recommend
+
+# 1. activate the verification workflow
+cp ci/stage4-verify.yml .github/workflows/stage4-verify.yml
+
+# 2. retire the deploy workflow: every push currently fires a doomed 402 run.
+#    The MIRROR (ci/stage4-deploy.yml) stays committed as the Stage-5 artifact.
+git rm .github/workflows/stage4-deploy.yml
+
+# 3. commit and push
+git add .github/workflows/stage4-verify.yml
+git commit -m "Stage 4 - activate runner-hosted verification, retire the 402 deploy workflow"
+git push origin arena/01a051ef-smart-interior-decor-recommend
+```
+
+Before committing, confirm the copy is byte-identical:
+
+```bash
+md5sum ci/stage4-verify.yml .github/workflows/stage4-verify.yml
+# both must print: 26a52a5ce2017306645d1f08902e3c21
+```
+
+**What happens next.** That commit adds the workflow at its active path, which
+the workflow itself watches, so it fires the first verification run
+immediately. Expect it to take a while — it builds the demo image from scratch.
+
+**Expect failures on that first run, and do not be alarmed.** This is the first
+time the image has ever been built or booted anywhere. The two likeliest breaks
+are the PGDG apt line resolving `postgresql-16-pgvector`, and `initdb` running
+as UID 1000. Both are recoverable and neither can affect anything outside the
+runner. The agent owns that fix loop.

@@ -1823,3 +1823,36 @@ while the pull_request run `33318776392` on the identical tree measured
 apart — direct confirmation of the runner-contention diagnosis and of the
 retiering's value. (I initially reported these two runs the wrong way round;
 the supervisor's independent check caught it.)
+
+
+### DECISION — Option 3 taken (human, 2026-08-30). Status: RESOLVED-BY-DECISION.
+
+**Directive 4 re-scope.** Zero cost stands; HF PRO is **rejected**. Stage 4
+ships **no public URL**. The public demo moves to **Stage 5** on a
+client-funded host.
+
+Supervisor research on free alternatives found no viable candidate: Render free
+is 512 MB / 0.1 vCPU, sleeps after 15 min and requires a card for web services;
+Koyeb is 512 MB no-sleep but card-gated by region; Oracle and Cloud Run require
+a card; Railway and Fly are trial-only. All are card-gated or RAM-starved for a
+five-service container, with Iran reachability as a further filter.
+
+**Replacement scope — "runner-hosted staging equivalence" (D-4.5).** Rather
+than ship an unverified container, the demo image is built and run **on the
+GitHub runner** and every property that does not need a public host is proven
+there: `ci/stage4-verify.yml` (`demo-verify`, `g4x-contract`, `dr-drill`).
+
+**What that does NOT cover, and is not claimed:** DNS, TLS 1.3, HSTS, a real
+certificate, CDN behaviour, reachability from Iran, and cold-start latency on
+shared hosting. Those require a public host and move to Stage 5 (D-4c). The
+Stage-3 TLS item stays BLOCKED.
+
+**IR-S3-002 is NOT closed by this.** The G-4.x capture runs on a shared
+GitHub-hosted runner — the very hardware class IR-S3-002 flagged as unsuitable
+for a contract verdict — so its verdict is **PROVISIONAL** and the final number
+is taken on the Stage-5 host. Recorded rather than quietly satisfied.
+
+`ci/stage4-deploy.yml` stays **parked and unmodified** as the Stage-5 artifact:
+it is correct, and it fails fast with an accurate message on a free account.
+Its ACTIVE counterpart is removed in the same paste that activates the verify
+workflow, because backend/frontend pushes are currently firing doomed 402 runs.

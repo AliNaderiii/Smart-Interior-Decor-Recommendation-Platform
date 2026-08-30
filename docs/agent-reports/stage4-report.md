@@ -448,3 +448,48 @@ deploy #1 would never have fired. With `workflow_dispatch` unavailable
 pre-merge and dummy commits banned, that would have left no legitimate way to
 trigger the first deploy. The workflow now watches its own active path, so
 **the paste commit itself fires deploy #1 = the acceptance test.**
+
+
+---
+
+## §14 Directive 4 — no public URL in Stage 4 (D-4.5)
+
+`create_repo` for a Docker Space returns **HTTP 402 Payment Required** on a
+free account: Hugging Face now requires PRO for Gradio/Docker Spaces
+(IR-S4-003, reproduced on deploys #7 `33319446945` and #8 `33319614454`).
+Directive 3's zero-cost rule stands and PRO was rejected, so **Stage 4 ships no
+public URL**; it moves to Stage 5 on a client-funded host.
+
+### D-4.5 — runner-hosted staging equivalence
+
+The demo image is built and run **on the GitHub runner** and everything that
+does not require a public host is proven there, via `ci/stage4-verify.yml`:
+
+| Job | Proves |
+|---|---|
+| `demo-verify` | image builds (apt + PGDG pgvector), container boots (initdb as UID 1000, supervisord, nginx), migrations, 150-product seed + 3 users, **docs 404 on `/docs` `/redoc` `/openapi.json` + subpaths + `/metrics`** (D-4.1), all three demo accounts log in, boot-time refusal proofs (D-4.4), origin smoke |
+| `g4x-contract` | `/recommend` p50/p95/p99, defaults and `--samples 250 --concurrency 20`, **PROVISIONAL** verdict |
+| `dr-drill` | seed → canary write → backup → **drop schema** → restore → verify counts and canary |
+
+**Not covered, not claimed:** DNS, TLS 1.3, HSTS, certificates, CDN, Iran
+reachability, shared-host cold start. Stage 5 (D-4c); the Stage-3 TLS item
+stays BLOCKED.
+
+### Revised task map
+
+| Task | Stage 4 outcome |
+|---|---|
+| T-4.2 live staging | **Re-scoped** → runner-hosted equivalence (D-4.5). No public URL. |
+| T-4.8 G-4.x | Runner capture, **PROVISIONAL** verdict. **IR-S3-002 stays open** — a shared runner is exactly what it objected to. |
+| T-4.9 QA | Local demo acceptance via the frozen `run_local_demo.ps1` + a recorded walkthrough. Iran reachability is **moot** in Stage 4. |
+| T-4.1, T-4.3–T-4.7 | Unaffected. |
+
+The launcher's human Windows run is now a **stage gate**, not a nicety: it is
+the client-facing demo.
+
+### First real test of the container
+
+No image has ever been built. `demo-verify`'s first run is the acceptance test
+for the PGDG apt line and `initdb`-as-UID-1000 — my two predicted failures —
+and it also produces the first **measured** image size to replace the ~500 MB
+estimate in `deploy/hf-space/README-dev.md`.
