@@ -36,6 +36,7 @@ import sys
 import time
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
 import httpx
 
@@ -100,6 +101,21 @@ async def run_cell(client: httpx.AsyncClient, token: str, n: int,
     return out
 
 
+def _demo_homeowner() -> tuple[str, str]:
+    """The seeded homeowner's credentials, read from their single source.
+
+    tests/test_demo_seeding.py asserts the demo passwords appear in exactly one
+    module - a second copy is how an earlier fix got undone - so this imports
+    from app.core.demo_seed rather than repeating the literal here.
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from app.core.demo_seed import DEMO_ACCOUNTS
+    for account in DEMO_ACCOUNTS:
+        if account.role == "homeowner":
+            return account.email, account.password
+    raise RuntimeError("no seeded homeowner account found in DEMO_ACCOUNTS")
+
+
 def _report(msg: str, level: str = "error") -> None:
     """Report a harness failure through every channel that survives.
 
@@ -145,7 +161,7 @@ async def main() -> int:
         if r.status_code == 429:
             _report("register rate-limited (429) - falling back to the demo account",
                     level="notice")
-            email, password = "demo@smartdecor.dev", "Demo1234!"
+            email, password = _demo_homeowner()
         if r.status_code not in (200, 201, 429):
             _report(f"register failed: HTTP {r.status_code} "
                     f"{r.text[:400]}".replace("\n", " "))
