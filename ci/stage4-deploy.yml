@@ -79,8 +79,6 @@ jobs:
     if: github.event_name != 'schedule' && inputs.mode != 'ping'
     runs-on: ubuntu-latest
     timeout-minutes: 45
-    outputs:
-      space_url: ${{ steps.target.outputs.space_url }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -150,12 +148,42 @@ jobs:
         id: target
         run: |
           set -euo pipefail
-          # HF_USERNAME comes from GITHUB_ENV, already trimmed and validated by
-          # the guard step above, so these values cannot contain a newline.
-          # Not masked — see the guard step: masking it makes Actions drop these
-          # very outputs.
-          echo "space_id=${HF_USERNAME}/${SPACE_NAME}" >> "$GITHUB_OUTPUT"
-          echo "space_url=https://${HF_USERNAME}-${SPACE_NAME}.hf.space" >> "$GITHUB_OUTPUT"
+          # GITHUB_ENV, deliberately NOT GITHUB_OUTPUT.
+          #
+          # Deploys #2, #3 and #4 all died at "Create the Space" with
+          #     Skip output 'space_url' since it may contain secret
+          # HF_USERNAME is a repository SECRET, so Actions masks it
+          # AUTOMATICALLY and refuses to set any step OUTPUT whose value
+          # contains it. Removing my own ::add-mask:: (deploy #4) changed
+          # nothing, which proved the masking is intrinsic to secrets, not
+          # something the workflow opted into. Environment variables carry no
+          # such restriction, so the derived values are exported here instead
+          # and every consumer reads $SPACE_ID / $SPACE_URL directly.
+          {
+            echo "SPACE_ID=${HF_USERNAME}/${SPACE_NAME}"
+            echo "SPACE_URL=https://${HF_USERNAME}-${SPACE_NAME}.hf.space"
+          } >> "$GITHUB_ENV"
+          echo "Target resolved (values are masked in logs because the username is a secret)."
+
+      - name: Assert the target actually resolved
+        run: |
+          set -euo pipefail
+          # Three deploys were lost to SPACE_ID silently arriving EMPTY and the
+          # failure surfacing as an opaque Hub error four steps later. Fail here
+          # instead, with a message that names the cause.
+          if [ -z "${SPACE_ID:-}" ] || [ "${SPACE_ID}" = "/${SPACE_NAME}" ]; then
+            echo "::error::SPACE_ID did not resolve (got '${SPACE_ID:-<empty>}'). HF_USERNAME is empty or was dropped."
+            exit 1
+          fi
+          if [ -z "${SPACE_URL:-}" ]; then
+            echo "::error::SPACE_URL did not resolve."
+            exit 1
+          fi
+          case "${SPACE_ID}" in
+            */"${SPACE_NAME}") ;;
+            *) echo "::error::SPACE_ID has an unexpected shape."; exit 1 ;;
+          esac
+          echo "Target resolved and non-empty."
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -227,8 +255,6 @@ jobs:
           find /tmp/space -maxdepth 1 -printf '  %f\n' | sort
 
       - name: Create the Space if it does not exist
-        env:
-          SPACE_ID: ${{ steps.target.outputs.space_id }}
         run: |
           python - <<'PY'
           import os
@@ -252,8 +278,6 @@ jobs:
           PY
 
       - name: Set Space secrets (generated demo values only)
-        env:
-          SPACE_ID: ${{ steps.target.outputs.space_id }}
         run: |
           python - <<'PY'
           import os, secrets
@@ -289,8 +313,6 @@ jobs:
           PY
 
       - name: Upload the Space context
-        env:
-          SPACE_ID: ${{ steps.target.outputs.space_id }}
         run: |
           python - <<'PY'
           import os
@@ -308,8 +330,6 @@ jobs:
           PY
 
       - name: Wait for the Space build
-        env:
-          SPACE_ID: ${{ steps.target.outputs.space_id }}
         run: |
           python - <<'PY'
           import os, sys, time
@@ -338,8 +358,6 @@ jobs:
           PY
 
       - name: Probe the public URL until two consecutive 200s
-        env:
-          SPACE_URL: ${{ steps.target.outputs.space_url }}
         run: |
           set -uo pipefail
           # Same wake rule as G-4.x (T-4.8): a single 200 can come from the
@@ -367,8 +385,6 @@ jobs:
           curl -sSi --max-time 20 "${SPACE_URL}/api/v1/health/ready" | head -20
 
       - name: Verify the docs are closed (D-4.1 condition)
-        env:
-          SPACE_URL: ${{ steps.target.outputs.space_url }}
         run: |
           set -uo pipefail
           # BINDING: the public demo must not expose the interactive API map.
@@ -389,8 +405,6 @@ jobs:
 
       - name: Summary
         if: always()
-        env:
-          SPACE_URL: ${{ steps.target.outputs.space_url }}
         run: |
           {
             echo "### Demo Space deploy"
