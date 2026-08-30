@@ -1856,3 +1856,32 @@ is taken on the Stage-5 host. Recorded rather than quietly satisfied.
 it is correct, and it fails fast with an accurate message on a free account.
 Its ACTIVE counterpart is removed in the same paste that activates the verify
 workflow, because backend/frontend pushes are currently firing doomed 402 runs.
+
+---
+
+### IR-S3-002 — Stage 4 update (2026-08-30): G-4.x measured, PROVISIONAL pass, IR stays OPEN
+
+G-4.x ran to completion for the first time in verification run
+[`33334578659`](https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/actions/runs/33334578659),
+against the demo **container** (nginx → uvicorn → PostgreSQL 16 + pgvector +
+Redis in one image). Verbatim from the job annotations:
+
+```
+p95-cells: n=200/cell conc=20 | cold p50=495.8 p95=701.3 p99=791.0 err=0 | warm p50=72.6 p95=111.2 p99=131.2 err=0 | gate_cold<2000ms cold_pass=True gate_warm<2000ms warm_pass=True
+p95-cells: n=250/cell conc=20 | cold p50=486.2 p95=706.4 p99=807.9 err=0 | warm p50=73.0 p95=181.6 p99=232.0 err=0 | gate_cold<2000ms cold_pass=True gate_warm<2000ms warm_pass=True
+```
+
+Worst observed p95 **706.4 ms** against the 2000 ms contract, **0 errors in 900
+measured samples**, across two independent cell sizes.
+
+**Status: OPEN — PROVISIONAL.** This IR objected to latency variance *on shared
+CI runners*, and this measurement was taken on exactly that hardware class, so
+it cannot be the evidence that closes it — however comfortable the margin. The
+restore condition is unchanged: a p95 measurement on the Stage-5 client-funded
+host. What Stage 4 does establish is that the full container path has no
+latency defect to find: the cold tail sits at roughly a third of the budget
+with no failed requests.
+
+Note on method: `RECOMMEND_RATE_LIMIT_PER_MINUTE=0` (the documented load-test
+switch, `config.py:95`) was set via `docker run -e` on the G-4.x container
+only. The shipped image and the `demo-verify` job keep the live rate limiter.

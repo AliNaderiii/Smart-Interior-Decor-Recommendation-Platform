@@ -597,3 +597,104 @@ specific cause instead of a guess.
 
 **G-4.x has not yet produced a p95 number, so IR-S3-002 remains open and no
 latency figure may be quoted.**
+
+## 17. Verification run #7 — ALL THREE JOBS GREEN
+
+Run [`33334578659`](https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/actions/runs/33334578659)
+on `7896b2e` (paste #3). **demo-verify SUCCESS · g4x-contract SUCCESS ·
+dr-drill SUCCESS.** Seven runs, no gate weakened, no test taught an exception.
+
+### G-4.x — the first measured p95, verbatim
+
+```
+p95-cells: n=200/cell conc=20 | cold p50=495.8 p95=701.3 p99=791.0 err=0 | warm p50=72.6 p95=111.2 p99=131.2 err=0 | gate_cold<2000ms cold_pass=True gate_warm<2000ms warm_pass=True
+p95-cells: n=250/cell conc=20 | cold p50=486.2 p95=706.4 p99=807.9 err=0 | warm p50=73.0 p95=181.6 p99=232.0 err=0 | gate_cold<2000ms cold_pass=True gate_warm<2000ms warm_pass=True
+```
+
+**Worst p95 = 706.4 ms against a 2000 ms contract; 0 errors in 900 samples.**
+Full table: `stage4-evidence/g4x-p95-run7.md`.
+
+The shell-level capture was the right call — the same run that would have been
+silent under the Python channels produced clean `::notice::` output through
+bash. The `p95-cells` notices come from the harness itself, unchanged since
+Stage 2.
+
+**This does NOT close IR-S3-002.** A GitHub-hosted shared runner is precisely
+the hardware class that IR objected to. Verdict: **PROVISIONAL**, final on the
+Stage-5 host.
+
+---
+
+## 18. Stage 4 close-out — DRAFT for supervisor review
+
+> Prepared while run #7 executed. **Nothing merged, nothing tagged.**
+
+### 18.1 Every original T-4.x against its re-scoped outcome
+
+| Task | Original DoD | Outcome | Evidence |
+|---|---|---|---|
+| T-4.1 deploy automation | script + runbook, shellcheck-clean, idempotent | **COMPLETE** — mechanism built and self-verified; 3-run idempotency execution is host-side | §7 |
+| T-4.2 live staging, TLS 1.3, 150 products, demo accounts | public HTTPS URL | **RE-SCOPED (D-4.5)** — no public URL. Catalog (150) + 3 demo accounts + TLS-less origin **proven in-container**; TLS/DNS/HSTS → Stage 5 | run #7 demo-verify |
+| T-4.3 observability, backups, runbook | backup/restore + runbook | **COMPLETE** — scripts + `DISASTER_RECOVERY.md`, `DR_DRILL.md` | §16 |
+| T-4.4 white-label + Persian copy | brand switch, Persian pass | **COMPLETE** | §13 |
+| T-4.5 storyboard + Persian one-pager | demo script + sales sheet | **COMPLETE** | `docs/client/` |
+| T-4.6 onboarding pack + `validate_catalog.py` | templates + validator | **COMPLETE**; §4/§5 marked 🔵 فاز ۵; open client decisions unchanged | `ONBOARDING.fa.md` |
+| T-4.7 DR drill | backup → destroy → restore → verify | **COMPLETE, PROVEN** — green on 5 consecutive runs, ≥150-product canary intact | run #7 dr-drill |
+| T-4.8 G-4.x p95 gate, closes IR-S3-002 | p95 < 2 s on staging | **MEASURED, PASSES — PROVISIONAL.** 706.4 ms worst p95, 0 errors. **IR-S3-002 stays OPEN** (shared runner ≠ staging host) | §17 |
+| T-4.9 QA sweep | full sweep on staging | **RE-SCOPED** — container-level sweep done (D-4.1 docs-off, D-4.4 refusal, smoke, seed); edge-level sweep → Stage 5 | run #7 |
+
+### 18.2 Deviation register
+
+| ID | Subject | Status |
+|---|---|---|
+| D-4a | Ephemeral `/data`; DB re-seeded each restart | ACCEPTED, documented |
+| D-4b | Single-container topology | ACCEPTED |
+| D-4c | DNS/TLS 1.3/HSTS/http→https/CDN/Iran reachability/cold start **not tested** | ACCEPTED — must never be claimed |
+| D-4.1 | Docs + `/metrics` OFF via explicit switch, not env default | **VERIFIED** through container nginx, run #7 |
+| D-4.2 | Demo-container topology | logged, IR-S4-002 |
+| D-4.3 | Demo-container topology | logged, IR-S4-002 |
+| D-4.4 | `APP_ENV=production` refuses demo accounts | **RE-PROVEN at boot**, run #7 |
+| D-4.5 | Runner-hosted staging equivalence; no public URL | **ACCEPTED**, delivered |
+| IR-S4-001 | Lighthouse nondeterminism; secret-scan base64url | ROOT-CAUSED; tiering applied (`221c1c7`) |
+| IR-S4-002 | D-4.2/4.3/4.4 topology | logged for ruling; no gate semantics changed |
+| IR-S4-003 | Docker Spaces 402 | **RESOLVED-BY-DECISION** (Option 3) |
+| IR-S3-002 | `/recommend` p95 contract | **OPEN — PROVISIONAL pass**, final on the Stage-5 host |
+
+### 18.3 Evidence index
+
+- `stage4-evidence/g4x-p95-run7.md` — p95 table, verbatim annotations
+- `docs/agent-reports/stage4-report.md` §15–§17 — the seven-run red→green trail
+- Runs: #1 `33330969648` · #2 `33332217908` · #3 `33332542166` · #4 `33332769581` · #5 `33333143587` · #6 `33333452530` · **#7 `33334578659` (all green)**
+- `integration-request.md` — IR-S4-001/002/003, IR-S3-002
+
+### 18.4 Merge checklist — supervisor action
+
+1. **PR #18 title must be changed to exactly `Stage 4 — staging deployment & demo`** (currently the auto-generated `Arena/01a051ef smart interior decor recommend`). Required by the brief; I have not edited it.
+2. Confirm CI green and verification run #7 green on the merge commit.
+3. Merge PR #18.
+4. Tag `v0.8.0` **after** merge. Draft message:
+
+```
+v0.8.0 — Stage 4: staging deployment & demo
+
+Runner-hosted staging equivalence (D-4.5): the demo container builds,
+boots and is verified end to end in CI. No public URL in Stage 4 —
+Hugging Face now requires a paid plan for Docker Spaces (IR-S4-003) and
+Directive 3 mandates zero cost; a public URL moves to Stage 5.
+
+Proven on a real runner (run 33334578659, all three jobs green):
+  * image builds; container boots; health, migrations, seeding
+  * 150-product catalog and 3 demo accounts
+  * D-4.1: /docs, /redoc, /openapi.json, /metrics are 404 at the edge
+  * D-4.4: APP_ENV=production refuses demo accounts, re-proven at boot
+  * G-4.x: /recommend p95 706.4 ms worst case vs a 2000 ms contract,
+    0 errors in 900 samples — PROVISIONAL (shared runner)
+  * T-4.7 DR drill: backup, destroy, restore, verify
+
+NOT covered, and not to be claimed: DNS, TLS 1.3, HSTS, http→https, CDN,
+reachability from Iran, shared-host cold start (D-4c). IR-S3-002 remains
+open pending the Stage-5 client-funded host.
+```
+
+5. **Stage gate, unchanged:** the N2 launcher's human acceptance test is still outstanding and is client-facing.
+6. Stage-5 artifacts stay parked: `ci/stage4-deploy.yml`, `scripts/smoke_staging.sh`, host_prep/Caddy.
