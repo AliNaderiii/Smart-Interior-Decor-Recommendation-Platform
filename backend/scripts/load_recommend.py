@@ -100,6 +100,25 @@ async def run_cell(client: httpx.AsyncClient, token: str, n: int,
     return out
 
 
+def _report(msg: str, level: str = "error") -> None:
+    """Report a harness failure through every channel that survives.
+
+    Raw step logs and job artifacts cannot be downloaded from the supervising
+    sandbox, and annotations are capped per check-run and can be dropped. The
+    step summary is a separate, reliable channel - run #5 exited 2 with the
+    detail annotation missing, which is what motivated this.
+    """
+    print(f"::{level} title=load-harness::{msg}", flush=True)
+    print(f"[load-harness/{level}] {msg}", file=sys.stderr, flush=True)
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if path:
+        try:
+            with open(path, "a", encoding="utf-8") as fh:
+                fh.write(f"\n**load-harness {level}:** {msg}\n")
+        except OSError:
+            pass
+
+
 async def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base-url", default="http://127.0.0.1:8000")
@@ -118,21 +137,24 @@ async def main() -> int:
         r = await client.post("/api/v1/auth/register", json={
             "email": email, "password": password, "role": "homeowner",
             "full_name": "Load Test"})
-        if r.status_code not in (200, 201):
-            print(f"register failed: {r.status_code} {r.text[:300]}", file=sys.stderr)
-            # Annotations are the only channel back to the sandbox.
-            _m = f"HTTP {r.status_code} {r.text[:400]}".replace("\n", " ")
-            print(f"::error title=register-failed::{_m}", flush=True)
-            print(f"[register-failed] {_m}", file=sys.stderr, flush=True)
+        # /register is rate limited to 3/min per IP (A07). On a CI runner every
+        # job shares one IP, so a burst of runs exhausts it and the harness dies
+        # before measuring anything. The seeded demo homeowner is equivalent for
+        # a latency measurement, so fall back to it rather than failing the
+        # contract gate on an anti-abuse control that is working correctly.
+        if r.status_code == 429:
+            _report("register rate-limited (429) - falling back to the demo account",
+                    level="notice")
+            email, password = "demo@smartdecor.dev", "Demo1234!"
+        if r.status_code not in (200, 201, 429):
+            _report(f"register failed: HTTP {r.status_code} "
+                    f"{r.text[:400]}".replace("\n", " "))
             return 2
         r = await client.post("/api/v1/auth/login",
                               json={"email": email, "password": password})
         if r.status_code != 200:
-            print(f"login failed: {r.status_code} {r.text[:300]}", file=sys.stderr)
-            # Annotations are the only channel back to the sandbox.
-            _m = f"HTTP {r.status_code} {r.text[:400]}".replace("\n", " ")
-            print(f"::error title=login-failed::{_m}", flush=True)
-            print(f"[login-failed] {_m}", file=sys.stderr, flush=True)
+            _report(f"login failed for {email}: HTTP {r.status_code} "
+                    f"{r.text[:400]}".replace("\n", " "))
             return 2
         # Envelope: {"success": true, "data": {..., "access_token": ...}}
         token = r.json()["data"]["access_token"]
