@@ -25,7 +25,9 @@
 #
 # SECRETS: HF_TOKEN (write-scoped PAT) and HF_USERNAME come from repository
 # secrets. HF_TOKEN is never echoed, never passed on a command line, and is
-# additionally registered with ::add-mask::. The GITHUB_TOKEN is read-only.
+# additionally registered with ::add-mask::. HF_USERNAME is NOT masked: it is
+# public (it is in the Space URL), and masking it makes Actions silently drop
+# every step output built from it. The GITHUB_TOKEN is read-only.
 # =============================================================================
 name: Stage 4 — Deploy demo Space
 
@@ -83,32 +85,75 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Guard — required secrets are present
+      - name: Guard — required secrets are present and well-formed
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_USERNAME: ${{ secrets.HF_USERNAME }}
+          HF_TOKEN_RAW: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME_RAW: ${{ secrets.HF_USERNAME }}
         run: |
           set -euo pipefail
           missing=""
-          [ -n "${HF_TOKEN:-}" ]    || missing="${missing} HF_TOKEN"
-          [ -n "${HF_USERNAME:-}" ] || missing="${missing} HF_USERNAME"
+          [ -n "${HF_TOKEN_RAW:-}" ]    || missing="${missing} HF_TOKEN"
+          [ -n "${HF_USERNAME_RAW:-}" ] || missing="${missing} HF_USERNAME"
           if [ -n "$missing" ]; then
             echo "::error::Missing repository secret(s):${missing}"
             echo "Add them under Settings -> Secrets and variables -> Actions."
             echo "Step-by-step guide: docs/ops/HF_SPACE_SETUP.fa.md"
             exit 1
           fi
-          echo "Required secrets are present."
+
+          # Deploy #1 (run 33317208180) died here-ish: the pasted HF_USERNAME
+          # carried a trailing newline, so `space_id=user\n/smart-decor-demo`
+          # split across two lines in GITHUB_OUTPUT and Actions rejected it with
+          # "Invalid format '/smart-decor-demo'". A non-emptiness check cannot
+          # catch that. Assume secrets are dirty forever: strip ALL whitespace
+          # (neither a HF username nor a HF token may contain any), then hand
+          # the CLEAN values to every later step via GITHUB_ENV.
+          HF_USERNAME="$(printf '%s' "${HF_USERNAME_RAW}" | tr -d '[:space:]')"
+          HF_TOKEN="$(printf '%s' "${HF_TOKEN_RAW}" | tr -d '[:space:]')"
+
+          # Re-mask the trimmed TOKEN: the runner masks the raw secret, but the
+          # trimmed value is a different string and would NOT be masked.
+          echo "::add-mask::${HF_TOKEN}"
+          # The USERNAME is deliberately NOT masked. Deploy #2 (run 33317879016)
+          # failed because it was: Actions refuses to set any step output whose
+          # value contains a masked string ("Skip output 'space_url' since it may
+          # contain secret"), so space_id/space_url silently became empty and the
+          # Space-creation step got an empty repo_id. The username is not a
+          # secret in any case — it is the public demo URL the client visits.
+
+          if [ -z "${HF_USERNAME}" ] || [ -z "${HF_TOKEN}" ]; then
+            echo "::error::A required secret is only whitespace. Re-save it per docs/ops/HF_SPACE_SETUP.fa.md"
+            exit 1
+          fi
+
+          # Catch a pasted profile URL or e-mail early, with a Persian-friendly
+          # pointer, rather than failing later inside the Hub API.
+          if ! printf '%s' "${HF_USERNAME}" | grep -qE '^[A-Za-z0-9][A-Za-z0-9._-]*$'; then
+            echo "::error::HF_USERNAME is not a bare username. Use just the username, not a URL or e-mail. See docs/ops/HF_SPACE_SETUP.fa.md"
+            exit 1
+          fi
+          if [ "${#HF_TOKEN}" -lt 8 ]; then
+            echo "::error::HF_TOKEN looks truncated. Re-copy it with the Copy button; it is shown only once."
+            exit 1
+          fi
+
+          {
+            echo "HF_USERNAME=${HF_USERNAME}"
+            echo "HF_TOKEN=${HF_TOKEN}"
+          } >> "$GITHUB_ENV"
+
+          echo "Required secrets are present, trimmed, and well-formed."
+          echo "  HF_USERNAME length after trim: ${#HF_USERNAME}"
+          echo "  HF_TOKEN length after trim:    ${#HF_TOKEN}"
 
       - name: Resolve target
         id: target
-        env:
-          HF_USERNAME: ${{ secrets.HF_USERNAME }}
         run: |
           set -euo pipefail
-          # The username is not secret, but keep it out of the logs anyway so a
-          # screenshot of a failed run does not leak the account name.
-          echo "::add-mask::${HF_USERNAME}"
+          # HF_USERNAME comes from GITHUB_ENV, already trimmed and validated by
+          # the guard step above, so these values cannot contain a newline.
+          # Not masked — see the guard step: masking it makes Actions drop these
+          # very outputs.
           echo "space_id=${HF_USERNAME}/${SPACE_NAME}" >> "$GITHUB_OUTPUT"
           echo "space_url=https://${HF_USERNAME}-${SPACE_NAME}.hf.space" >> "$GITHUB_OUTPUT"
 
@@ -183,7 +228,6 @@ jobs:
 
       - name: Create the Space if it does not exist
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
           SPACE_ID: ${{ steps.target.outputs.space_id }}
         run: |
           python - <<'PY'
@@ -209,7 +253,6 @@ jobs:
 
       - name: Set Space secrets (generated demo values only)
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
           SPACE_ID: ${{ steps.target.outputs.space_id }}
         run: |
           python - <<'PY'
@@ -247,7 +290,6 @@ jobs:
 
       - name: Upload the Space context
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
           SPACE_ID: ${{ steps.target.outputs.space_id }}
         run: |
           python - <<'PY'
@@ -267,7 +309,6 @@ jobs:
 
       - name: Wait for the Space build
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
           SPACE_ID: ${{ steps.target.outputs.space_id }}
         run: |
           python - <<'PY'
@@ -374,14 +415,19 @@ jobs:
     steps:
       - name: Probe the Space
         env:
-          HF_USERNAME: ${{ secrets.HF_USERNAME }}
+          HF_USERNAME_RAW: ${{ secrets.HF_USERNAME }}
         run: |
           set -uo pipefail
-          if [ -z "${HF_USERNAME:-}" ]; then
+          # Same trim as the deploy guard: this job runs independently on a
+          # schedule, so it cannot rely on the deploy job's GITHUB_ENV. A
+          # trailing newline here would build a URL with an embedded newline.
+          HF_USERNAME="$(printf '%s' "${HF_USERNAME_RAW:-}" | tr -d '[:space:]')"
+          if [ -z "${HF_USERNAME}" ]; then
             echo "::warning::HF_USERNAME is not set — skipping the uptime probe"
             exit 0
           fi
-          echo "::add-mask::${HF_USERNAME}"
+          # Not masked: it is the public demo URL, and masking it would hide the
+          # probe target from the very log meant to diagnose an outage.
           URL="https://${HF_USERNAME}-${SPACE_NAME}.hf.space"
 
           stamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
