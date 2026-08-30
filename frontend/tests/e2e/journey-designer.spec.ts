@@ -49,11 +49,12 @@ async function createProjectViaUi(page: Page, name: string) {
   await expect(dialog).toBeVisible();
   await dialog.getByLabel(/project name/i).fill(name);
   await dialog.getByLabel(/^client name$/i).fill("E2E Client");
-  const postResponse = page.waitForResponse(
+  const postPromise = page.waitForResponse(
     (r) => r.url().includes("/api/v1/projects") && r.request().method() === "POST",
     { timeout: 20_000 },
   );
   await dialog.getByRole("button", { name: /^create$/i }).click({ timeout: 15_000 });
+  const postResponse = await postPromise;
   return postResponse;
 }
 

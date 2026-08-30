@@ -144,9 +144,12 @@ export default function DesignerDashboardPage() {
 
   const create = useMutation({
     mutationFn: () => post<Project>("/projects", form),
-    onSuccess: () => {
+    onSuccess: (newProject) => {
       setOpen(false);
       setForm({ name: "", client_name: "", client_email: "" });
+      qc.setQueryData<Project[]>(["projects"], (old) =>
+        old ? [newProject, ...old.filter((p) => p.id !== newProject.id)] : [newProject],
+      );
       qc.invalidateQueries({ queryKey: ["projects"] });
       toast.success("Project created.");
     },
