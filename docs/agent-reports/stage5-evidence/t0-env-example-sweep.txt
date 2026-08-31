@@ -1,0 +1,5 @@
+=== supervisor pattern (expect NO matches) ===
+NO MATCHES
+
+=== wider assignment+comment pattern (expect NO matches) ===
+NO MATCHES

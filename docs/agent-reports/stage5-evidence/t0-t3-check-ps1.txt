@@ -1,0 +1,16 @@
+  [0;32mPASS[0m  UTF-8 BOM: present — Windows PowerShell 5.1 will render the Persian text
+  [0;32mPASS[0m  console encoding: set explicitly
+  [0;32mPASS[0m  line endings: consistent
+  [0;32mPASS[0m  balanced braces: 65 open / 65 close
+  [0;32mPASS[0m  balanced parens: 78 open / 78 close
+  [0;32mPASS[0m  balanced single quotes: 52 occurrences
+  [0;32mPASS[0m  balanced double quotes: 318 occurrences
+  [0;32mPASS[0m  switch -Stop: handled in the body
+  [0;32mPASS[0m  switch -Reset: handled in the body
+  [0;32mPASS[0m  switch -Logs: handled in the body
+  [0;32mPASS[0m  switch -Check: handled in the body
+  [0;32mPASS[0m  no unix-ism (b): none found
+  [0;32mPASS[0m  no unix-ism (b): none found
+  [0;32mPASS[0m  no unix-ism (s+-): none found
+  [0;32mPASS[0m  error preference: set
+[0;32mRESULT: PASS[0m
