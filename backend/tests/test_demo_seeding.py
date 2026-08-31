@@ -55,6 +55,41 @@ def test_development_with_opt_in_is_allowed(reset_settings):
     assert demo_seed.demo_seeding_allowed() is True
 
 
+# --------------------------------------------------------- BUG-401 regression
+# An env-file loader that does not strip inline comments can fold a `# comment`
+# into DEMO_ACCOUNT_PASSWORD, so every demo account was seeded with the comment
+# string as its password. `_password_for` must treat a value that (stripped)
+# begins with `#` as unset and fall back to the documented dev default — while
+# a legitimate non-comment override keeps working unchanged.
+
+def test_poisoned_demo_password_is_ignored(reset_settings):
+    reset_settings(
+        DEMO_ACCOUNT_PASSWORD="# [OPTIONAL] test-only override",
+    )
+    for account in demo_seed.DEMO_ACCOUNTS:
+        assert demo_seed._password_for(account) == account.password
+
+
+def test_poisoned_demo_password_with_leading_whitespace_is_ignored(reset_settings):
+    reset_settings(
+        DEMO_ACCOUNT_PASSWORD="   # [OPTIONAL] test-only override",
+    )
+    account = demo_seed.DEMO_ACCOUNTS[0]
+    assert demo_seed._password_for(account) == account.password
+
+
+def test_legitimate_demo_password_override_still_works(reset_settings):
+    reset_settings(DEMO_ACCOUNT_PASSWORD="a-real-override-123")
+    account = demo_seed.DEMO_ACCOUNTS[0]
+    assert demo_seed._password_for(account) == "a-real-override-123"
+
+
+def test_empty_demo_password_falls_back_to_documented_default(reset_settings):
+    reset_settings(DEMO_ACCOUNT_PASSWORD="")
+    account = demo_seed.DEMO_ACCOUNTS[0]
+    assert demo_seed._password_for(account) == account.password
+
+
 def test_ensure_demo_accounts_returns_nothing_in_production(reset_settings, db):
     reset_settings(APP_ENV="production", SEED_DEMO_ACCOUNTS=True)
     before = db.scalar(select(User).where(User.email == "admin@smartdecor.dev"))

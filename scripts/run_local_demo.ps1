@@ -180,6 +180,29 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Ok "Docker Compose آماده است"
 
+# پاک‌سازی دفاعی (BUG-401): docker-compose هنگام خواندن env_file کامنت‌های
+# داخلِ مقدار را حذف نمی‌کند؛ یعنی الگوی `KEY=value # comment` باعث می‌شود
+# مقدار متغیر به‌جای value، رشتهٔ `# comment` شود. این تابع کامنت‌های کنارِ
+# مقدار را می‌زند تا یک قالبِ خراب هرگز نتواند رشتهٔ کامنت را وارد متغیر کند.
+function Convert-EnvTemplateToSafeEnv {
+    param(
+        [string]$TemplatePath,
+        [string]$EnvPath
+    )
+    $lines   = Get-Content -Path $TemplatePath
+    $cleaned = @()
+    foreach ($line in $lines) {
+        if ($line -match '^[ \t]*[A-Za-z0-9_]+=.*?[ \t]+\x23') {
+            $cleaned += ($line -replace '[ \t]+\x23.*$', '')
+        } else {
+            $cleaned += $line
+        }
+    }
+    # بدون BOM بنویس تا دقیقاً مثل Copy-Item قبلی رفتار کند.
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllLines($EnvPath, $cleaned, $utf8NoBom)
+}
+
 # ---------------------------------------------------------------------------
 # ۴) فایل تنظیمات .env  (دومین چیزی که کار را متوقف کرده بود)
 # ---------------------------------------------------------------------------
@@ -195,7 +218,7 @@ if (-not (Test-Path $envPath)) {
             "پوشه را دوباره از GitHub دریافت کنید."
         )
     }
-    Copy-Item $envTemplate $envPath
+    Convert-EnvTemplateToSafeEnv $envTemplate $envPath
     Write-Ok "فایل .env ساخته شد (از روی .env.example)"
     Write-Info "برای نسخهٔ نمایشی هیچ تغییری لازم نیست — همه‌چیز آفلاین کار می‌کند."
 } else {
