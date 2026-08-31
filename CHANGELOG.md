@@ -22,6 +22,23 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Fixed
+
+- **BUG-401 (hotfix): env-file inline-comment poisoning of demo passwords.**
+  `.env.example` carried value-side inline comments (e.g.
+  `DEMO_ACCOUNT_PASSWORD=  # [OPTIONAL] test-only override`). Docker Compose's
+  `env_file` does not strip inline `#` comments from values, so the comment
+  string became the literal `DEMO_ACCOUNT_PASSWORD` and all three demo accounts
+  were seeded with it (login with that exact string returned `success:true`).
+  Three layers of fix: (a) `.env.example` now keeps every comment on its own
+  dedicated line — no value-side inline comment anywhere in the file;
+  (b) `scripts/run_local_demo.ps1` strips value-side comments when it generates
+  `.env` from the template (defense-in-depth, BOM/line-endings preserved);
+  (c) `backend/app/core/demo_seed.py::_password_for()` treats a
+  `DEMO_ACCOUNT_PASSWORD` whose stripped value begins with `#` as unset, logs
+  loudly, and falls back to the documented dev default. Pinned by regression
+  tests (`backend/tests/test_env_template.py`, `test_demo_seeding.py`).
+
 ## [0.7.0] — 2026-08-28 (Stage 3: Security Penetration Testing & Compliance Hardening)
 
 Tagged on the merge commit of the Stage-3 PR (#17); see

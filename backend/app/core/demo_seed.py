@@ -98,7 +98,24 @@ def demo_seeding_allowed(*, strict: bool = False) -> bool:
 
 
 def _password_for(account: DemoAccount) -> str:
-    return settings.DEMO_ACCOUNT_PASSWORD or account.password
+    override = settings.DEMO_ACCOUNT_PASSWORD or ""
+    # BUG-401 hardening: some env-file loaders (notably Docker Compose's
+    # `env_file`) do NOT strip inline `#` comments from values, so a template
+    # line like `DEMO_ACCOUNT_PASSWORD=  # comment` reaches us with the comment
+    # text as the literal password. Treat a value whose stripped form begins
+    # with `#` as unset and fall back to the documented dev default — loudly,
+    # so a poisoned deployment is visible instead of silently seeding accounts
+    # with a comment string as the password.
+    if override.strip().startswith("#"):
+        logger.warning(
+            "Ignoring DEMO_ACCOUNT_PASSWORD: its value starts with '#' and "
+            "looks like an inline comment folded in by an env-file loader "
+            "(BUG-401), not a real password. Falling back to the documented "
+            "development default for %s.",
+            account.email,
+        )
+        return account.password
+    return override or account.password
 
 
 def ensure_demo_accounts(db: Session, *, strict: bool = False) -> list[str]:

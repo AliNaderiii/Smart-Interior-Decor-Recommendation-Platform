@@ -180,6 +180,29 @@ if ($LASTEXITCODE -ne 0) {
 }
 Write-Ok "Docker Compose آماده است"
 
+# پاک‌سازی دفاعی (BUG-401): docker-compose هنگام خواندن env_file کامنت‌های
+# داخلِ مقدار را حذف نمی‌کند؛ یعنی الگوی `KEY=value # comment` باعث می‌شود
+# مقدار متغیر به‌جای value، رشتهٔ `# comment` شود. این تابع کامنت‌های کنارِ
+# مقدار را می‌زند تا یک قالبِ خراب هرگز نتواند رشتهٔ کامنت را وارد متغیر کند.
+function Convert-EnvTemplateToSafeEnv {
+    param(
+        [string]$TemplatePath,
+        [string]$EnvPath
+    )
+    $lines   = Get-Content -Path $TemplatePath
+    $cleaned = @()
+    foreach ($line in $lines) {
+        if ($line -match '^[ \t]*[A-Za-z0-9_]+=.*?[ \t]+\x23') {
+            $cleaned += ($line -replace '[ \t]+\x23.*$', '')
+        } else {
+            $cleaned += $line
+        }
+    }
+    # بدون BOM بنویس تا دقیقاً مثل Copy-Item قبلی رفتار کند.
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllLines($EnvPath, $cleaned, $utf8NoBom)
+}
+
 # ---------------------------------------------------------------------------
 # ۴) فایل تنظیمات .env  (دومین چیزی که کار را متوقف کرده بود)
 # ---------------------------------------------------------------------------
@@ -195,7 +218,7 @@ if (-not (Test-Path $envPath)) {
             "پوشه را دوباره از GitHub دریافت کنید."
         )
     }
-    Copy-Item $envTemplate $envPath
+    Convert-EnvTemplateToSafeEnv $envTemplate $envPath
     Write-Ok "فایل .env ساخته شد (از روی .env.example)"
     Write-Info "برای نسخهٔ نمایشی هیچ تغییری لازم نیست — همه‌چیز آفلاین کار می‌کند."
 } else {
@@ -333,15 +356,26 @@ Write-Ok "سرور آماده است"
 # ۸) بررسی بارگذاری محصولات
 # ---------------------------------------------------------------------------
 Write-Step "بررسی داده‌های نمونه"
-try {
-    $count = (& docker @ComposeArgs exec -T postgres `
-              psql -U decor -d decor -tAc 'select count(*) from products' 2>$null).Trim()
-    if ($count -match '^\d+$' -and [int]$count -ge 1) {
-        Write-Ok "$count محصول در کاتالوگ بارگذاری شد"
-    } else {
-        Write-Warn "کاتالوگ هنوز خالی است — ممکن است چند لحظه دیگر پر شود."
-    }
-} catch {
+# اجرای exec می‌تواند بلافاصله بعد از آماده‌شدن سرور یک لحظه خطا بدهد؛ چند بار
+# با فاصلهٔ کوتاه تلاش می‌کنیم تا هشدار کاذب نشان داده نشود و «خطای واقعی» از
+# «کاتالوگ واقعاً خالی» قابل تشخیص بماند. بررسی همچنان انجام می‌شود (ضعیف نشده).
+$count = $null
+for ($i = 1; $i -le 5; $i++) {
+    try {
+        $raw = (& docker @ComposeArgs exec -T postgres `
+                psql -U decor -d decor -tAc 'select count(*) from products' 2>$null)
+        if ($null -ne $raw) {
+            $text = ([string]($raw -join '')).Trim()
+            if ($text -match '^\d+$') { $count = [int]$text; break }
+        }
+    } catch { }
+    if ($i -lt 5) { Start-Sleep -Seconds 3 }
+}
+if ($null -ne $count -and $count -ge 1) {
+    Write-Ok "$count محصول در کاتالوگ بارگذاری شد"
+} elseif ($null -ne $count) {
+    Write-Warn "کاتالوگ خالی است — ممکن است چند لحظه دیگر پر شود."
+} else {
     Write-Warn "شمارش محصولات ممکن نشد (مهم نیست، برنامه کار می‌کند)."
 }
 

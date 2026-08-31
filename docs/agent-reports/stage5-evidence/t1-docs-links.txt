@@ -1,0 +1,8 @@
+external links (not fetched): 16
+audit reports excluded from the file-reference check: 9 (use --include-reports to audit them too)
+
+[BROKEN LINKS] 0
+
+[MISSING FILE REFERENCES] 0
+
+RESULT: PASS
