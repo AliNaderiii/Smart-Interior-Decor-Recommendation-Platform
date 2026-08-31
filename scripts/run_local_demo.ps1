@@ -356,15 +356,26 @@ Write-Ok "سرور آماده است"
 # ۸) بررسی بارگذاری محصولات
 # ---------------------------------------------------------------------------
 Write-Step "بررسی داده‌های نمونه"
-try {
-    $count = (& docker @ComposeArgs exec -T postgres `
-              psql -U decor -d decor -tAc 'select count(*) from products' 2>$null).Trim()
-    if ($count -match '^\d+$' -and [int]$count -ge 1) {
-        Write-Ok "$count محصول در کاتالوگ بارگذاری شد"
-    } else {
-        Write-Warn "کاتالوگ هنوز خالی است — ممکن است چند لحظه دیگر پر شود."
-    }
-} catch {
+# اجرای exec می‌تواند بلافاصله بعد از آماده‌شدن سرور یک لحظه خطا بدهد؛ چند بار
+# با فاصلهٔ کوتاه تلاش می‌کنیم تا هشدار کاذب نشان داده نشود و «خطای واقعی» از
+# «کاتالوگ واقعاً خالی» قابل تشخیص بماند. بررسی همچنان انجام می‌شود (ضعیف نشده).
+$count = $null
+for ($i = 1; $i -le 5; $i++) {
+    try {
+        $raw = (& docker @ComposeArgs exec -T postgres `
+                psql -U decor -d decor -tAc 'select count(*) from products' 2>$null)
+        if ($null -ne $raw) {
+            $text = ([string]($raw -join '')).Trim()
+            if ($text -match '^\d+$') { $count = [int]$text; break }
+        }
+    } catch { }
+    if ($i -lt 5) { Start-Sleep -Seconds 3 }
+}
+if ($null -ne $count -and $count -ge 1) {
+    Write-Ok "$count محصول در کاتالوگ بارگذاری شد"
+} elseif ($null -ne $count) {
+    Write-Warn "کاتالوگ خالی است — ممکن است چند لحظه دیگر پر شود."
+} else {
     Write-Warn "شمارش محصولات ممکن نشد (مهم نیست، برنامه کار می‌کند)."
 }
 
