@@ -585,6 +585,26 @@ jobs:
             -f docker-compose.yml \
             -f docker-compose.test.yml \
             config -q
+          # Stage 5 Phase 0 (T-2): validate the staging overlay too — it was a
+          # parked Stage-4 artifact, deferred because the host track was
+          # cancelled. Config/schema-level only; no build, no paid services.
+          docker compose \
+            -f docker-compose.yml \
+            -f docker-compose.staging.yml \
+            config -q
+
+      - name: Self-test — staging validation catches breakage
+        run: |
+          # Prove the staging-validation line above actually validates: inject an
+          # invalid YAML (tab indentation) into a copy of the overlay and assert
+          # `docker compose config -q` rejects it.
+          cp docker-compose.staging.yml /tmp/staging-broken.yml
+          printf '\tBAD_TAB_INDENT: true\n' >> /tmp/staging-broken.yml
+          if docker compose -f docker-compose.yml -f /tmp/staging-broken.yml config -q; then
+            echo "SELF-TEST FAILED: a broken staging overlay passed validation" >&2
+            exit 1
+          fi
+          echo "SELF-TEST PASSED: broken staging overlay was rejected"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -604,6 +624,62 @@ jobs:
           push: false
           load: true
           tags: decor-frontend:ci
+
+  nginx-path:
+    name: Nginx request-path smoke (advisory)
+    runs-on: ubuntu-latest
+    needs:
+      - backend
+      - frontend
+    # Stage 5 Phase 0 (T-4): ADVISORY. Exercises the production request path
+    # browser -> frontend nginx container -> /api proxy -> backend
+    # (frontend/nginx.conf `proxy_pass http://backend:8000`), which the e2e and
+    # lighthouse jobs bypass — they target vite dev/preview on :5173/:4173.
+    # Non-blocking (`continue-on-error: true`) until it has proven stable across
+    # runs; PROMOTE TO BLOCKING in Phase 1 (see stage5-phase0-report.md).
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Provide placeholder environment
+        run: cp .env.example .env
+
+      - name: Build and start the stack (nginx frontend)
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+
+      - name: Wait for backend readiness
+        run: |
+          set -e
+          for i in $(seq 1 60); do
+            if curl -fsS http://localhost:8000/api/v1/health/ready >/tmp/backend-ready.json 2>&1; then
+              echo "backend ready after ${i} attempt(s)"; exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::backend never became ready"
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml logs --tail 40 backend
+          exit 1
+
+      - name: Exercise the nginx -> /api proxy path
+        run: |
+          set -e
+          # SPA index served by the nginx container (not vite).
+          curl -fsS http://localhost:5173/ | grep -q '<div id="root"></div>'
+          # /api/* proxied by frontend/nginx.conf to backend:8000 — the exact
+          # production route the e2e/lighthouse jobs never touch.
+          curl -fsS http://localhost:5173/api/v1/health/ready | tee /tmp/nginx-ready.json
+          curl -fsS http://localhost:5173/api/v1/health | tee /tmp/nginx-health.json
+          echo "nginx -> /api proxy path PASSED"
+
+      - name: Show diagnostics
+        if: always()
+        run: |
+          echo "backend-ready:"; cat /tmp/backend-ready.json 2>/dev/null || true
+          echo "nginx-ready:"; cat /tmp/nginx-ready.json 2>/dev/null || true
+          echo "nginx-health:"; cat /tmp/nginx-health.json 2>/dev/null || true
+          docker compose -f docker-compose.yml -f docker-compose.dev.yml logs --tail 40 2>/dev/null || true
 
   lighthouse:
     name: Lighthouse CI — performance and accessibility
