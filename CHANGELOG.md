@@ -93,6 +93,33 @@ capability · PATCH = fix, docs, dependency or CI change).
   clean before the release commit". The log now goes to a per-run temp
   location by default; writing into the tracked evidence directory is an
   explicit opt-in (`PENTEST_EVIDENCE=repo`) for deliberate evidence passes.
+
+- **B-5 enforced: a degraded REAL extraction run can no longer print PASS.**
+  When image fetching failed in REAL mode (e.g. the synthetic
+  `images.smartdecor.dev` fixture URLs without `--images-dir`), every item
+  silently degraded to the filename-keyword fallback (`provider="mock-fallback"`),
+  and — because the ground truth is encoded in those slugs — the run printed a
+  fabricated **100 % “PASS”**. `scripts/evaluate_extraction.py` now declares any
+  REAL-mode run in which a non-real provider label (`failed` / `mock-fallback` /
+  `mock` / `exception`) appears as **“INVALID REAL RUN”** (exit 2) with an
+  explicit remedy, instead of a quotable result. Verified: forced-failure run
+  exits 2 with the loud message; MOCK baseline still exits 0.
+
+- **`--images-dir` now actually feeds local pixels to the vision provider.**
+  `_fetch_image_bytes()` accepted only absolute http(s) URLs, so the documented
+  real-benchmark path (local photos for the synthetic `images.smartdecor.dev`
+  fixture) always failed with “must be an absolute http(s) URL” and silently
+  fell back. Existing local paths are now read from disk (size-capped, MIME by
+  extension); remote URLs keep the full per-hop SSRF guard. The Gemini request
+  shape (base64 `inline_data`) is unchanged.
+- **Benchmark v1.1: ground-truth materials re-labelled to real reference
+  photographs.** The synthetic slugs encoded implausible combinations
+  (e.g. leather and glass *rugs*), which would unfairly penalise a correct
+  vision model. Each item’s `material` list now matches the visible materials
+  of the paired real photo (`tests/benchmark_50_images.json`; the photo set is
+  distributed out-of-tree as `benchmark-images.zip`, not committed). Styles and
+  categories are unchanged; MOCK harness re-run stays at 100% (slugs carry the
+  same keywords as the corrected ground truth).
 - **`scripts/enable_ci.sh` can no longer regress an evolved workflow.** The
   script blindly copied `ci/github-ci.yml` over `.github/workflows/ci.yml`;
   after direct workflow edits (Stage 1 onwards) the staged copy had become

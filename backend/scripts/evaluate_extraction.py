@@ -309,6 +309,31 @@ def main() -> int:
     if is_mock:
         print("RESULT: MOCK BASELINE — " + ("harness sane (>= 0.80)" if accuracy >= 0.80 else "HARNESS REGRESSION (< 0.80)"))
         return 0 if accuracy >= 0.80 else 1
+
+    # --- B-5 guard (added 2026-09-01): a REAL-mode run is only meaningful if
+    # the live vision provider actually analyzed pixels for EVERY image.
+    # Previously, when image fetching failed (the committed fixture URLs are
+    # synthetic — images.smartdecor.dev — and --images-dir was not passed),
+    # every item silently degraded to the filename-keyword fallback; because
+    # the ground truth is encoded in those slugs, the run printed a perfect
+    # but fabricated "100% PASS". That must be impossible: degrade → INVALID.
+    real_labels = {"gemini", "openai"}
+    degraded = [p["id"] for p in per_item if p.get("provider") not in real_labels]
+    if degraded:
+        shown = degraded[:6]
+        print(
+            f"RESULT: INVALID REAL RUN — {len(degraded)}/{len(per_item)} images "
+            f"were NOT analyzed by the vision provider "
+            f"(labels seen: {sorted({p['provider'] for p in per_item if p.get('provider') not in real_labels})}; "
+            f"ids {shown}{'...' if len(degraded) > 6 else ''}). The accuracy above "
+            "comes from the filename-keyword fallback, NOT from the model — do "
+            "not quote it. Remedy: (1) ensure the provider key is set correctly "
+            "(no extra whitespace), (2) pass --images-dir DIR with real photos "
+            "named {id:02d}-*.jpg matching tests/benchmark_50_images.json, and "
+            "(3) rerun --real."
+        )
+        return 2
+
     if accuracy >= 0.80:
         print("RESULT: PASS (>= 80% required)")
         return 0

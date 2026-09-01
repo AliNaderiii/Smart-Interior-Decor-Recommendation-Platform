@@ -50,6 +50,7 @@ import json
 import logging
 import re
 from abc import ABC, abstractmethod
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -61,6 +62,17 @@ from app.core.config import ai_provider_problems, settings
 from app.core.url_safety import UnsafeUrl, validate_public_url
 
 logger = logging.getLogger(__name__)
+
+#: Cap for on-disk benchmark images (the harness resizes to ~768 px anyway).
+_MAX_LOCAL_IMAGE_BYTES = 10 * 1024 * 1024
+
+#: MIME lookup for local benchmark images.
+_MIME_BY_EXT = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+}
 
 
 class ProviderConfigurationError(RuntimeError):
@@ -143,7 +155,14 @@ class BaseProvider(ABC):
 
 
 def _fetch_image_bytes(url: str, timeout: float = 30.0) -> tuple[bytes, str]:
-    """Download ``url`` for the vision model, SSRF-guarded on every hop.
+    """Read image bytes for the vision model.
+
+    Two input kinds, strictly separated:
+
+    * **Local files** — an existing on-disk path (the offline benchmark
+      harness passes these via ``--images-dir``). Read directly; no URL
+      parsing, no network. Size-capped; MIME from the extension.
+    * **Remote http(s) URLs** — downloaded with SSRF guarding on every hop:
 
     The pre-Stage-04 code called ``httpx.get(url, follow_redirects=True)``:
     a public URL that 302s to ``http://169.254.169.254/...`` turned the
@@ -151,6 +170,19 @@ def _fetch_image_bytes(url: str, timeout: float = 30.0) -> tuple[bytes, str]:
     seller-link checker before T-35. Same fix, same pattern: manual redirect
     following with per-hop validation.
     """
+    if not url.startswith(("http://", "https://")):
+        p = Path(url)
+        if p.is_file():
+            size = p.stat().st_size
+            if size > _MAX_LOCAL_IMAGE_BYTES:
+                raise UnsafeUrl(
+                    f"local image too large ({size} bytes > {_MAX_LOCAL_IMAGE_BYTES})"
+                )
+            mime = _MIME_BY_EXT.get(p.suffix.lower())
+            if mime is None:
+                raise UnsafeUrl(f"unsupported local image extension: {p.suffix!r}")
+            return p.read_bytes(), mime
+        # fall through to URL validation for a precise, fielded error
     target = validate_public_url(url, resolve=True, field="image_url")
     with httpx.Client(follow_redirects=False, timeout=timeout) as client:
         for _ in range(5):

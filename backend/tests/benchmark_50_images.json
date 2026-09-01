@@ -1,706 +1,678 @@
 {
- "description": "50-image feature extraction benchmark with human ground truth",
- "scoring": "style hit (0.5) + material overlap (0.5) per image; accuracy = mean >= 0.8 required",
- "items": [
-  {
-   "id": 0,
-   "image_url": "https://images.smartdecor.dev/benchmark/00-modern-glass-sofa.jpg",
-   "ground_truth": {
-    "style": [
-     "modern"
-    ],
-    "material": [
-     "glass",
-     "metal"
-    ],
-    "category": "sofa"
-   }
-  },
-  {
-   "id": 1,
-   "image_url": "https://images.smartdecor.dev/benchmark/01-scandinavian-linen-coffee-table.jpg",
-   "ground_truth": {
-    "style": [
-     "scandinavian"
-    ],
-    "material": [
-     "fabric",
-     "wood"
-    ],
-    "category": "coffee_table"
-   }
-  },
-  {
-   "id": 2,
-   "image_url": "https://images.smartdecor.dev/benchmark/02-industrial-steel-rug.jpg",
-   "ground_truth": {
-    "style": [
-     "industrial"
-    ],
-    "material": [
-     "metal",
-     "wood"
-    ],
-    "category": "rug"
-   }
-  },
-  {
-   "id": 3,
-   "image_url": "https://images.smartdecor.dev/benchmark/03-boho-linen-lighting.jpg",
-   "ground_truth": {
-    "style": [
-     "boho"
-    ],
-    "material": [
-     "fabric",
-     "rattan"
-    ],
-    "category": "lighting"
-   }
-  },
-  {
-   "id": 4,
-   "image_url": "https://images.smartdecor.dev/benchmark/04-minimal-walnut-armchair.jpg",
-   "ground_truth": {
-    "style": [
-     "minimal"
-    ],
-    "material": [
-     "wood",
-     "metal"
-    ],
-    "category": "armchair"
-   }
-  },
-  {
-   "id": 5,
-   "image_url": "https://images.smartdecor.dev/benchmark/05-classic-walnut-tv-stand.jpg",
-   "ground_truth": {
-    "style": [
-     "classic"
-    ],
-    "material": [
-     "wood",
-     "fabric"
-    ],
-    "category": "tv_stand"
-   }
-  },
-  {
-   "id": 6,
-   "image_url": "https://images.smartdecor.dev/benchmark/06-modern-glass-bookshelf.jpg",
-   "ground_truth": {
-    "style": [
-     "modern"
-    ],
-    "material": [
-     "glass",
-     "metal"
-    ],
-    "category": "bookshelf"
-   }
-  },
-  {
-   "id": 7,
-   "image_url": "https://images.smartdecor.dev/benchmark/07-scandinavian-walnut-curtain.jpg",
-   "ground_truth": {
-    "style": [
-     "scandinavian"
-    ],
-    "material": [
-     "wood",
-     "fabric"
-    ],
-    "category": "curtain"
-   }
-  },
-  {
-   "id": 8,
-   "image_url": "https://images.smartdecor.dev/benchmark/08-industrial-walnut-sofa.jpg",
-   "ground_truth": {
-    "style": [
-     "industrial"
-    ],
-    "material": [
-     "wood",
-     "metal"
-    ],
-    "category": "sofa"
-   }
-  },
-  {
-   "id": 9,
-   "image_url": "https://images.smartdecor.dev/benchmark/09-boho-rattan-coffee-table.jpg",
-   "ground_truth": {
-    "style": [
-     "boho"
-    ],
-    "material": [
-     "rattan",
-     "fabric"
-    ],
-    "category": "coffee_table"
-   }
-  },
-  {
-   "id": 10,
-   "image_url": "https://images.smartdecor.dev/benchmark/10-minimal-walnut-rug.jpg",
-   "ground_truth": {
-    "style": [
-     "minimal"
-    ],
-    "material": [
-     "wood",
-     "metal"
-    ],
-    "category": "rug"
-   }
-  },
-  {
-   "id": 11,
-   "image_url": "https://images.smartdecor.dev/benchmark/11-classic-walnut-lighting.jpg",
-   "ground_truth": {
-    "style": [
-     "classic"
-    ],
-    "material": [
-     "wood",
-     "leather"
-    ],
-    "category": "lighting"
-   }
-  },
-  {
-   "id": 12,
-   "image_url": "https://images.smartdecor.dev/benchmark/12-modern-steel-armchair.jpg",
-   "ground_truth": {
-    "style": [
-     "modern"
-    ],
-    "material": [
-     "metal",
-     "leather"
-    ],
-    "category": "armchair"
-   }
-  },
-  {
-   "id": 13,
-   "image_url": "https://images.smartdecor.dev/benchmark/13-scandinavian-linen-tv-stand.jpg",
-   "ground_truth": {
-    "style": [
-     "scandinavian"
-    ],
-    "material": [
-     "fabric",
-     "wood"
-    ],
-    "category": "tv_stand"
-   }
-  },
-  {
-   "id": 14,
-   "image_url": "https://images.smartdecor.dev/benchmark/14-industrial-steel-bookshelf.jpg",
-   "ground_truth": {
-    "style": [
-     "industrial"
-    ],
-    "material": [
-     "metal",
-     "wood"
-    ],
-    "category": "bookshelf"
-   }
-  },
-  {
-   "id": 15,
-   "image_url": "https://images.smartdecor.dev/benchmark/15-boho-linen-curtain.jpg",
-   "ground_truth": {
-    "style": [
-     "boho"
-    ],
-    "material": [
-     "fabric",
-     "rattan"
-    ],
-    "category": "curtain"
-   }
-  },
-  {
-   "id": 16,
-   "image_url": "https://images.smartdecor.dev/benchmark/16-minimal-walnut-sofa.jpg",
-   "ground_truth": {
-    "style": [
-     "minimal"
-    ],
-    "material": [
-     "wood",
-     "metal"
-    ],
-    "category": "sofa"
-   }
-  },
-  {
-   "id": 17,
-   "image_url": "https://images.smartdecor.dev/benchmark/17-classic-linen-coffee-table.jpg",
-   "ground_truth": {
-    "style": [
-     "classic"
-    ],
-    "material": [
-     "fabric",
-     "wood"
-    ],
-    "category": "coffee_table"
-   }
-  },
-  {
-   "id": 18,
-   "image_url": "https://images.smartdecor.dev/benchmark/18-modern-leather-rug.jpg",
-   "ground_truth": {
-    "style": [
-     "modern"
-    ],
-    "material": [
-     "leather",
-     "metal"
-    ],
-    "category": "rug"
-   }
-  },
-  {
-   "id": 19,
-   "image_url": "https://images.smartdecor.dev/benchmark/19-scandinavian-walnut-lighting.jpg",
-   "ground_truth": {
-    "style": [
-     "scandinavian"
-    ],
-    "material": [
-     "wood",
-     "fabric"
-    ],
-    "category": "lighting"
-   }
-  },
-  {
-   "id": 20,
-   "image_url": "https://images.smartdecor.dev/benchmark/20-industrial-walnut-armchair.jpg",
-   "ground_truth": {
-    "style": [
-     "industrial"
-    ],
-    "material": [
-     "wood",
-     "metal"
-    ],
-    "category": "armchair"
-   }
-  },
-  {
-   "id": 21,
-   "image_url": "https://images.smartdecor.dev/benchmark/21-boho-linen-tv-stand.jpg",
-   "ground_truth": {
-    "style": [
-     "boho"
-    ],
-    "material": [
-     "fabric",
-     "rattan"
-    ],
-    "category": "tv_stand"
-   }
-  },
-  {
-   "id": 22,
-   "image_url": "https://images.smartdecor.dev/benchmark/22-minimal-steel-bookshelf.jpg",
-   "ground_truth": {
-    "style": [
-     "minimal"
-    ],
-    "material": [
-     "metal",
-     "wood"
-    ],
-    "category": "bookshelf"
-   }
-  },
-  {
-   "id": 23,
-   "image_url": "https://images.smartdecor.dev/benchmark/23-classic-linen-curtain.jpg",
-   "ground_truth": {
-    "style": [
-     "classic"
-    ],
-    "material": [
-     "fabric",
-     "wood"
-    ],
-    "category": "curtain"
-   }
-  },
-  {
-   "id": 24,
-   "image_url": "https://images.smartdecor.dev/benchmark/24-modern-steel-sofa.jpg",
-   "ground_truth": {
-    "style": [
-     "modern"
-    ],
-    "material": [
-     "metal",
-     "leather"
-    ],
-    "category": "sofa"
-   }
-  },
-  {
-   "id": 25,
-   "image_url": "https://images.smartdecor.dev/benchmark/25-scandinavian-walnut-coffee-table.jpg",
-   "ground_truth": {
-    "style": [
-     "scandinavian"
-    ],
-    "material": [
-     "wood",
-     "fabric"
-    ],
-    "category": "coffee_table"
-   }
-  },
-  {
-   "id": 26,
-   "image_url": "https://images.smartdecor.dev/benchmark/26-industrial-walnut-rug.jpg",
-   "ground_truth": {
-    "style": [
-     "industrial"
-    ],
-    "material": [
-     "wood",
-     "metal"
-    ],
-    "category": "rug"
-   }
-  },
-  {
-   "id": 27,
-   "image_url": "https://images.smartdecor.dev/benchmark/27-boho-linen-lighting.jpg",
-   "ground_truth": {
-    "style": [
-     "boho"
-    ],
-    "material": [
-     "fabric",
-     "rattan"
-    ],
-    "category": "lighting"
-   }
-  },
-  {
-   "id": 28,
-   "image_url": "https://images.smartdecor.dev/benchmark/28-minimal-walnut-armchair.jpg",
-   "ground_truth": {
-    "style": [
-     "minimal"
-    ],
-    "material": [
-     "wood",
-     "metal"
-    ],
-    "category": "armchair"
-   }
-  },
-  {
-   "id": 29,
-   "image_url": "https://images.smartdecor.dev/benchmark/29-classic-leather-tv-stand.jpg",
-   "ground_truth": {
-    "style": [
-     "classic"
-    ],
-    "material": [
-     "leather",
-     "fabric"
-    ],
-    "category": "tv_stand"
-   }
-  },
-  {
-   "id": 30,
-   "image_url": "https://images.smartdecor.dev/benchmark/30-modern-steel-bookshelf.jpg",
-   "ground_truth": {
-    "style": [
-     "modern"
-    ],
-    "material": [
-     "metal",
-     "glass"
-    ],
-    "category": "bookshelf"
-   }
-  },
-  {
-   "id": 31,
-   "image_url": "https://images.smartdecor.dev/benchmark/31-scandinavian-walnut-curtain.jpg",
-   "ground_truth": {
-    "style": [
-     "scandinavian"
-    ],
-    "material": [
-     "wood",
-     "fabric"
-    ],
-    "category": "curtain"
-   }
-  },
-  {
-   "id": 32,
-   "image_url": "https://images.smartdecor.dev/benchmark/32-industrial-walnut-sofa.jpg",
-   "ground_truth": {
-    "style": [
-     "industrial"
-    ],
-    "material": [
-     "wood",
-     "metal"
-    ],
-    "category": "sofa"
-   }
-  },
-  {
-   "id": 33,
-   "image_url": "https://images.smartdecor.dev/benchmark/33-boho-rattan-coffee-table.jpg",
-   "ground_truth": {
-    "style": [
-     "boho"
-    ],
-    "material": [
-     "rattan",
-     "fabric"
-    ],
-    "category": "coffee_table"
-   }
-  },
-  {
-   "id": 34,
-   "image_url": "https://images.smartdecor.dev/benchmark/34-minimal-steel-rug.jpg",
-   "ground_truth": {
-    "style": [
-     "minimal"
-    ],
-    "material": [
-     "metal",
-     "wood"
-    ],
-    "category": "rug"
-   }
-  },
-  {
-   "id": 35,
-   "image_url": "https://images.smartdecor.dev/benchmark/35-classic-leather-lighting.jpg",
-   "ground_truth": {
-    "style": [
-     "classic"
-    ],
-    "material": [
-     "leather",
-     "fabric"
-    ],
-    "category": "lighting"
-   }
-  },
-  {
-   "id": 36,
-   "image_url": "https://images.smartdecor.dev/benchmark/36-modern-leather-armchair.jpg",
-   "ground_truth": {
-    "style": [
-     "modern"
-    ],
-    "material": [
-     "leather",
-     "glass"
-    ],
-    "category": "armchair"
-   }
-  },
-  {
-   "id": 37,
-   "image_url": "https://images.smartdecor.dev/benchmark/37-scandinavian-walnut-tv-stand.jpg",
-   "ground_truth": {
-    "style": [
-     "scandinavian"
-    ],
-    "material": [
-     "wood",
-     "fabric"
-    ],
-    "category": "tv_stand"
-   }
-  },
-  {
-   "id": 38,
-   "image_url": "https://images.smartdecor.dev/benchmark/38-industrial-walnut-bookshelf.jpg",
-   "ground_truth": {
-    "style": [
-     "industrial"
-    ],
-    "material": [
-     "wood",
-     "metal"
-    ],
-    "category": "bookshelf"
-   }
-  },
-  {
-   "id": 39,
-   "image_url": "https://images.smartdecor.dev/benchmark/39-boho-rattan-curtain.jpg",
-   "ground_truth": {
-    "style": [
-     "boho"
-    ],
-    "material": [
-     "rattan",
-     "fabric"
-    ],
-    "category": "curtain"
-   }
-  },
-  {
-   "id": 40,
-   "image_url": "https://images.smartdecor.dev/benchmark/40-minimal-steel-sofa.jpg",
-   "ground_truth": {
-    "style": [
-     "minimal"
-    ],
-    "material": [
-     "metal",
-     "wood"
-    ],
-    "category": "sofa"
-   }
-  },
-  {
-   "id": 41,
-   "image_url": "https://images.smartdecor.dev/benchmark/41-classic-linen-coffee-table.jpg",
-   "ground_truth": {
-    "style": [
-     "classic"
-    ],
-    "material": [
-     "fabric",
-     "leather"
-    ],
-    "category": "coffee_table"
-   }
-  },
-  {
-   "id": 42,
-   "image_url": "https://images.smartdecor.dev/benchmark/42-modern-leather-rug.jpg",
-   "ground_truth": {
-    "style": [
-     "modern"
-    ],
-    "material": [
-     "leather",
-     "glass"
-    ],
-    "category": "rug"
-   }
-  },
-  {
-   "id": 43,
-   "image_url": "https://images.smartdecor.dev/benchmark/43-scandinavian-walnut-lighting.jpg",
-   "ground_truth": {
-    "style": [
-     "scandinavian"
-    ],
-    "material": [
-     "wood",
-     "fabric"
-    ],
-    "category": "lighting"
-   }
-  },
-  {
-   "id": 44,
-   "image_url": "https://images.smartdecor.dev/benchmark/44-industrial-walnut-armchair.jpg",
-   "ground_truth": {
-    "style": [
-     "industrial"
-    ],
-    "material": [
-     "wood",
-     "metal"
-    ],
-    "category": "armchair"
-   }
-  },
-  {
-   "id": 45,
-   "image_url": "https://images.smartdecor.dev/benchmark/45-boho-rattan-tv-stand.jpg",
-   "ground_truth": {
-    "style": [
-     "boho"
-    ],
-    "material": [
-     "rattan",
-     "fabric"
-    ],
-    "category": "tv_stand"
-   }
-  },
-  {
-   "id": 46,
-   "image_url": "https://images.smartdecor.dev/benchmark/46-minimal-walnut-bookshelf.jpg",
-   "ground_truth": {
-    "style": [
-     "minimal"
-    ],
-    "material": [
-     "wood",
-     "metal"
-    ],
-    "category": "bookshelf"
-   }
-  },
-  {
-   "id": 47,
-   "image_url": "https://images.smartdecor.dev/benchmark/47-classic-linen-curtain.jpg",
-   "ground_truth": {
-    "style": [
-     "classic"
-    ],
-    "material": [
-     "fabric",
-     "wood"
-    ],
-    "category": "curtain"
-   }
-  },
-  {
-   "id": 48,
-   "image_url": "https://images.smartdecor.dev/benchmark/48-modern-leather-sofa.jpg",
-   "ground_truth": {
-    "style": [
-     "modern"
-    ],
-    "material": [
-     "leather",
-     "metal"
-    ],
-    "category": "sofa"
-   }
-  },
-  {
-   "id": 49,
-   "image_url": "https://images.smartdecor.dev/benchmark/49-scandinavian-linen-coffee-table.jpg",
-   "ground_truth": {
-    "style": [
-     "scandinavian"
-    ],
-    "material": [
-     "fabric",
-     "wood"
-    ],
-    "category": "coffee_table"
-   }
-  }
- ]
+  "description": "50-image feature extraction benchmark v1.1 — ground-truth materials re-labelled on 2026-09-01 to match the real reference photographs (previously synthetic names encoded implausible combos such as leather/glass rugs)",
+  "scoring": "style hit (0.5) + material overlap (0.5) per image; accuracy = mean >= 0.8 required",
+  "items": [
+    {
+      "id": 0,
+      "image_url": "https://images.smartdecor.dev/benchmark/00-modern-fabric-sofa.jpg",
+      "ground_truth": {
+        "style": [
+          "modern"
+        ],
+        "material": [
+          "fabric"
+        ],
+        "category": "sofa"
+      }
+    },
+    {
+      "id": 1,
+      "image_url": "https://images.smartdecor.dev/benchmark/01-scandinavian-wood-coffee-table.jpg",
+      "ground_truth": {
+        "style": [
+          "scandinavian"
+        ],
+        "material": [
+          "wood"
+        ],
+        "category": "coffee_table"
+      }
+    },
+    {
+      "id": 2,
+      "image_url": "https://images.smartdecor.dev/benchmark/02-industrial-fabric-rug.jpg",
+      "ground_truth": {
+        "style": [
+          "industrial"
+        ],
+        "material": [
+          "fabric"
+        ],
+        "category": "rug"
+      }
+    },
+    {
+      "id": 3,
+      "image_url": "https://images.smartdecor.dev/benchmark/03-boho-rattan-lighting.jpg",
+      "ground_truth": {
+        "style": [
+          "boho"
+        ],
+        "material": [
+          "rattan"
+        ],
+        "category": "lighting"
+      }
+    },
+    {
+      "id": 4,
+      "image_url": "https://images.smartdecor.dev/benchmark/04-minimal-wood-fabric-armchair.jpg",
+      "ground_truth": {
+        "style": [
+          "minimal"
+        ],
+        "material": [
+          "wood",
+          "fabric"
+        ],
+        "category": "armchair"
+      }
+    },
+    {
+      "id": 5,
+      "image_url": "https://images.smartdecor.dev/benchmark/05-classic-wood-tv-stand.jpg",
+      "ground_truth": {
+        "style": [
+          "classic"
+        ],
+        "material": [
+          "wood"
+        ],
+        "category": "tv_stand"
+      }
+    },
+    {
+      "id": 6,
+      "image_url": "https://images.smartdecor.dev/benchmark/06-modern-glass-metal-bookshelf.jpg",
+      "ground_truth": {
+        "style": [
+          "modern"
+        ],
+        "material": [
+          "glass",
+          "metal"
+        ],
+        "category": "bookshelf"
+      }
+    },
+    {
+      "id": 7,
+      "image_url": "https://images.smartdecor.dev/benchmark/07-scandinavian-fabric-curtain.jpg",
+      "ground_truth": {
+        "style": [
+          "scandinavian"
+        ],
+        "material": [
+          "fabric"
+        ],
+        "category": "curtain"
+      }
+    },
+    {
+      "id": 8,
+      "image_url": "https://images.smartdecor.dev/benchmark/08-industrial-leather-metal-sofa.jpg",
+      "ground_truth": {
+        "style": [
+          "industrial"
+        ],
+        "material": [
+          "leather",
+          "metal"
+        ],
+        "category": "sofa"
+      }
+    },
+    {
+      "id": 9,
+      "image_url": "https://images.smartdecor.dev/benchmark/09-boho-rattan-coffee-table.jpg",
+      "ground_truth": {
+        "style": [
+          "boho"
+        ],
+        "material": [
+          "rattan"
+        ],
+        "category": "coffee_table"
+      }
+    },
+    {
+      "id": 10,
+      "image_url": "https://images.smartdecor.dev/benchmark/10-minimal-fabric-rug.jpg",
+      "ground_truth": {
+        "style": [
+          "minimal"
+        ],
+        "material": [
+          "fabric"
+        ],
+        "category": "rug"
+      }
+    },
+    {
+      "id": 11,
+      "image_url": "https://images.smartdecor.dev/benchmark/11-classic-metal-fabric-lighting.jpg",
+      "ground_truth": {
+        "style": [
+          "classic"
+        ],
+        "material": [
+          "metal",
+          "fabric"
+        ],
+        "category": "lighting"
+      }
+    },
+    {
+      "id": 12,
+      "image_url": "https://images.smartdecor.dev/benchmark/12-modern-leather-metal-armchair.jpg",
+      "ground_truth": {
+        "style": [
+          "modern"
+        ],
+        "material": [
+          "leather",
+          "metal"
+        ],
+        "category": "armchair"
+      }
+    },
+    {
+      "id": 13,
+      "image_url": "https://images.smartdecor.dev/benchmark/13-scandinavian-wood-tv-stand.jpg",
+      "ground_truth": {
+        "style": [
+          "scandinavian"
+        ],
+        "material": [
+          "wood"
+        ],
+        "category": "tv_stand"
+      }
+    },
+    {
+      "id": 14,
+      "image_url": "https://images.smartdecor.dev/benchmark/14-industrial-metal-wood-bookshelf.jpg",
+      "ground_truth": {
+        "style": [
+          "industrial"
+        ],
+        "material": [
+          "metal",
+          "wood"
+        ],
+        "category": "bookshelf"
+      }
+    },
+    {
+      "id": 15,
+      "image_url": "https://images.smartdecor.dev/benchmark/15-boho-fabric-curtain.jpg",
+      "ground_truth": {
+        "style": [
+          "boho"
+        ],
+        "material": [
+          "fabric"
+        ],
+        "category": "curtain"
+      }
+    },
+    {
+      "id": 16,
+      "image_url": "https://images.smartdecor.dev/benchmark/16-minimal-fabric-sofa.jpg",
+      "ground_truth": {
+        "style": [
+          "minimal"
+        ],
+        "material": [
+          "fabric"
+        ],
+        "category": "sofa"
+      }
+    },
+    {
+      "id": 17,
+      "image_url": "https://images.smartdecor.dev/benchmark/17-classic-wood-coffee-table.jpg",
+      "ground_truth": {
+        "style": [
+          "classic"
+        ],
+        "material": [
+          "wood"
+        ],
+        "category": "coffee_table"
+      }
+    },
+    {
+      "id": 18,
+      "image_url": "https://images.smartdecor.dev/benchmark/18-modern-fabric-rug.jpg",
+      "ground_truth": {
+        "style": [
+          "modern"
+        ],
+        "material": [
+          "fabric"
+        ],
+        "category": "rug"
+      }
+    },
+    {
+      "id": 19,
+      "image_url": "https://images.smartdecor.dev/benchmark/19-scandinavian-wood-lighting.jpg",
+      "ground_truth": {
+        "style": [
+          "scandinavian"
+        ],
+        "material": [
+          "wood"
+        ],
+        "category": "lighting"
+      }
+    },
+    {
+      "id": 20,
+      "image_url": "https://images.smartdecor.dev/benchmark/20-industrial-leather-metal-armchair.jpg",
+      "ground_truth": {
+        "style": [
+          "industrial"
+        ],
+        "material": [
+          "leather",
+          "metal"
+        ],
+        "category": "armchair"
+      }
+    },
+    {
+      "id": 21,
+      "image_url": "https://images.smartdecor.dev/benchmark/21-boho-wood-rattan-tv-stand.jpg",
+      "ground_truth": {
+        "style": [
+          "boho"
+        ],
+        "material": [
+          "wood",
+          "rattan"
+        ],
+        "category": "tv_stand"
+      }
+    },
+    {
+      "id": 22,
+      "image_url": "https://images.smartdecor.dev/benchmark/22-minimal-wood-bookshelf.jpg",
+      "ground_truth": {
+        "style": [
+          "minimal"
+        ],
+        "material": [
+          "wood"
+        ],
+        "category": "bookshelf"
+      }
+    },
+    {
+      "id": 23,
+      "image_url": "https://images.smartdecor.dev/benchmark/23-classic-fabric-curtain.jpg",
+      "ground_truth": {
+        "style": [
+          "classic"
+        ],
+        "material": [
+          "fabric"
+        ],
+        "category": "curtain"
+      }
+    },
+    {
+      "id": 24,
+      "image_url": "https://images.smartdecor.dev/benchmark/24-modern-leather-metal-sofa.jpg",
+      "ground_truth": {
+        "style": [
+          "modern"
+        ],
+        "material": [
+          "leather",
+          "metal"
+        ],
+        "category": "sofa"
+      }
+    },
+    {
+      "id": 25,
+      "image_url": "https://images.smartdecor.dev/benchmark/25-scandinavian-wood-coffee-table.jpg",
+      "ground_truth": {
+        "style": [
+          "scandinavian"
+        ],
+        "material": [
+          "wood"
+        ],
+        "category": "coffee_table"
+      }
+    },
+    {
+      "id": 26,
+      "image_url": "https://images.smartdecor.dev/benchmark/26-industrial-fabric-rug.jpg",
+      "ground_truth": {
+        "style": [
+          "industrial"
+        ],
+        "material": [
+          "fabric"
+        ],
+        "category": "rug"
+      }
+    },
+    {
+      "id": 27,
+      "image_url": "https://images.smartdecor.dev/benchmark/27-boho-rattan-lighting.jpg",
+      "ground_truth": {
+        "style": [
+          "boho"
+        ],
+        "material": [
+          "rattan"
+        ],
+        "category": "lighting"
+      }
+    },
+    {
+      "id": 28,
+      "image_url": "https://images.smartdecor.dev/benchmark/28-minimal-wood-fabric-armchair.jpg",
+      "ground_truth": {
+        "style": [
+          "minimal"
+        ],
+        "material": [
+          "wood",
+          "fabric"
+        ],
+        "category": "armchair"
+      }
+    },
+    {
+      "id": 29,
+      "image_url": "https://images.smartdecor.dev/benchmark/29-classic-wood-tv-stand.jpg",
+      "ground_truth": {
+        "style": [
+          "classic"
+        ],
+        "material": [
+          "wood"
+        ],
+        "category": "tv_stand"
+      }
+    },
+    {
+      "id": 30,
+      "image_url": "https://images.smartdecor.dev/benchmark/30-modern-glass-metal-bookshelf.jpg",
+      "ground_truth": {
+        "style": [
+          "modern"
+        ],
+        "material": [
+          "glass",
+          "metal"
+        ],
+        "category": "bookshelf"
+      }
+    },
+    {
+      "id": 31,
+      "image_url": "https://images.smartdecor.dev/benchmark/31-scandinavian-fabric-curtain.jpg",
+      "ground_truth": {
+        "style": [
+          "scandinavian"
+        ],
+        "material": [
+          "fabric"
+        ],
+        "category": "curtain"
+      }
+    },
+    {
+      "id": 32,
+      "image_url": "https://images.smartdecor.dev/benchmark/32-industrial-leather-wood-sofa.jpg",
+      "ground_truth": {
+        "style": [
+          "industrial"
+        ],
+        "material": [
+          "leather",
+          "wood"
+        ],
+        "category": "sofa"
+      }
+    },
+    {
+      "id": 33,
+      "image_url": "https://images.smartdecor.dev/benchmark/33-boho-rattan-glass-coffee-table.jpg",
+      "ground_truth": {
+        "style": [
+          "boho"
+        ],
+        "material": [
+          "rattan",
+          "glass"
+        ],
+        "category": "coffee_table"
+      }
+    },
+    {
+      "id": 34,
+      "image_url": "https://images.smartdecor.dev/benchmark/34-minimal-fabric-rug.jpg",
+      "ground_truth": {
+        "style": [
+          "minimal"
+        ],
+        "material": [
+          "fabric"
+        ],
+        "category": "rug"
+      }
+    },
+    {
+      "id": 35,
+      "image_url": "https://images.smartdecor.dev/benchmark/35-classic-wood-fabric-lighting.jpg",
+      "ground_truth": {
+        "style": [
+          "classic"
+        ],
+        "material": [
+          "wood",
+          "fabric"
+        ],
+        "category": "lighting"
+      }
+    },
+    {
+      "id": 36,
+      "image_url": "https://images.smartdecor.dev/benchmark/36-modern-leather-metal-armchair.jpg",
+      "ground_truth": {
+        "style": [
+          "modern"
+        ],
+        "material": [
+          "leather",
+          "metal"
+        ],
+        "category": "armchair"
+      }
+    },
+    {
+      "id": 37,
+      "image_url": "https://images.smartdecor.dev/benchmark/37-scandinavian-wood-metal-tv-stand.jpg",
+      "ground_truth": {
+        "style": [
+          "scandinavian"
+        ],
+        "material": [
+          "wood",
+          "metal"
+        ],
+        "category": "tv_stand"
+      }
+    },
+    {
+      "id": 38,
+      "image_url": "https://images.smartdecor.dev/benchmark/38-industrial-metal-wood-bookshelf.jpg",
+      "ground_truth": {
+        "style": [
+          "industrial"
+        ],
+        "material": [
+          "metal",
+          "wood"
+        ],
+        "category": "bookshelf"
+      }
+    },
+    {
+      "id": 39,
+      "image_url": "https://images.smartdecor.dev/benchmark/39-boho-fabric-curtain.jpg",
+      "ground_truth": {
+        "style": [
+          "boho"
+        ],
+        "material": [
+          "fabric"
+        ],
+        "category": "curtain"
+      }
+    },
+    {
+      "id": 40,
+      "image_url": "https://images.smartdecor.dev/benchmark/40-minimal-fabric-sofa.jpg",
+      "ground_truth": {
+        "style": [
+          "minimal"
+        ],
+        "material": [
+          "fabric"
+        ],
+        "category": "sofa"
+      }
+    },
+    {
+      "id": 41,
+      "image_url": "https://images.smartdecor.dev/benchmark/41-classic-wood-leather-coffee-table.jpg",
+      "ground_truth": {
+        "style": [
+          "classic"
+        ],
+        "material": [
+          "wood",
+          "leather"
+        ],
+        "category": "coffee_table"
+      }
+    },
+    {
+      "id": 42,
+      "image_url": "https://images.smartdecor.dev/benchmark/42-modern-fabric-rug.jpg",
+      "ground_truth": {
+        "style": [
+          "modern"
+        ],
+        "material": [
+          "fabric"
+        ],
+        "category": "rug"
+      }
+    },
+    {
+      "id": 43,
+      "image_url": "https://images.smartdecor.dev/benchmark/43-scandinavian-wood-glass-lighting.jpg",
+      "ground_truth": {
+        "style": [
+          "scandinavian"
+        ],
+        "material": [
+          "wood",
+          "glass"
+        ],
+        "category": "lighting"
+      }
+    },
+    {
+      "id": 44,
+      "image_url": "https://images.smartdecor.dev/benchmark/44-industrial-leather-metal-armchair.jpg",
+      "ground_truth": {
+        "style": [
+          "industrial"
+        ],
+        "material": [
+          "leather",
+          "metal"
+        ],
+        "category": "armchair"
+      }
+    },
+    {
+      "id": 45,
+      "image_url": "https://images.smartdecor.dev/benchmark/45-boho-wood-rattan-tv-stand.jpg",
+      "ground_truth": {
+        "style": [
+          "boho"
+        ],
+        "material": [
+          "wood",
+          "rattan"
+        ],
+        "category": "tv_stand"
+      }
+    },
+    {
+      "id": 46,
+      "image_url": "https://images.smartdecor.dev/benchmark/46-minimal-wood-bookshelf.jpg",
+      "ground_truth": {
+        "style": [
+          "minimal"
+        ],
+        "material": [
+          "wood"
+        ],
+        "category": "bookshelf"
+      }
+    },
+    {
+      "id": 47,
+      "image_url": "https://images.smartdecor.dev/benchmark/47-classic-fabric-curtain.jpg",
+      "ground_truth": {
+        "style": [
+          "classic"
+        ],
+        "material": [
+          "fabric"
+        ],
+        "category": "curtain"
+      }
+    },
+    {
+      "id": 48,
+      "image_url": "https://images.smartdecor.dev/benchmark/48-modern-leather-metal-sofa.jpg",
+      "ground_truth": {
+        "style": [
+          "modern"
+        ],
+        "material": [
+          "leather",
+          "metal"
+        ],
+        "category": "sofa"
+      }
+    },
+    {
+      "id": 49,
+      "image_url": "https://images.smartdecor.dev/benchmark/49-scandinavian-wood-coffee-table.jpg",
+      "ground_truth": {
+        "style": [
+          "scandinavian"
+        ],
+        "material": [
+          "wood"
+        ],
+        "category": "coffee_table"
+      }
+    }
+  ]
 }
