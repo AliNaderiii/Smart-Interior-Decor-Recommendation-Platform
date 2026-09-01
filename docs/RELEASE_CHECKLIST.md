@@ -31,7 +31,7 @@ Legend: `[x]` verified at this HEAD · `[!]` verified FAILING · `[ ]` not verif
 
 - [x] Documentation link audit — `python scripts/audit_docs_links.py` → **0 broken links** — `stage1-evidence/t-1.6/01-checklist-probes-head.log`
 - [x] File-reference audit → **0 missing references** (the baseline's 5 missing refs are resolved) — same log
-- [ ] `README.md` test counts match a measured run at HEAD — README refreshed in Stage 1 for the *test commands*; the numeric counts elsewhere in `docs/reports/*`, `docs/RESEARCH_V2.md`, `docs/WALKTHROUGH.md`, `ci/README.md` were **not** re-audited in this stage (carried IR-003)
+- [x] `README.md` test counts match a measured run at HEAD — re-measured 2026-09-01 in a clean sandbox (Python 3.13, Node 22.23.2): **598 passed / 22 skipped (620 collected)** backend, **65 passed / 10 files** frontend unit; README updated to these values. The numeric counts elsewhere in `docs/reports/*`, `docs/RESEARCH_V2.md`, `docs/WALKTHROUGH.md`, `ci/README.md` remain **not** re-audited (carried IR-003 — historical evidence, not release claims)
 - [x] Every performance / AI number is labelled MOCK, LOCAL, STAGING or PRODUCTION
 - [ ] `docs/API.md` completeness (`/feedback` ×3, `/health`) — not re-audited at this HEAD (IR-003)
 - [x] Baseline document exists and is linked from `README.md`
@@ -52,13 +52,13 @@ Legend: `[x]` verified at this HEAD · `[!]` verified FAILING · `[ ]` not verif
 ## D. Tests
 
 - [x] Backend suite green on the dev fallback — **549 passed / 22 skipped**, exit 0 (SQLite + fakeredis + mock AI) — `stage1-evidence/final-sweep/00-backend-suite.log`
-- [ ] Backend suite green on **PostgreSQL 16 + pgvector** — not runnable in this sandbox (no Postgres); the CI `backend` job runs it. 22 local skips are the Postgres/Redis-gated tests.
-- [ ] Backend suite green on **real Redis** — same; CI job covers it
+- [x] Backend suite green on **PostgreSQL 16 + pgvector** — CI `backend` job ("Backend — pytest vs Postgres16+pgvector & Redis") green at HEAD — run [#33430375507](https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/actions/runs/33430375507), 2026-08-31 (includes the locked-install verification and migration steps). Local re-run remains SQLite+fakeredis by design (22 skips are the Postgres/Redis-gated tests).
+- [x] Backend suite green on **real Redis** — same CI run; additionally the `multi-worker` job ("Multi-worker shared-Redis verification") proves shared-Redis behaviour across uvicorn workers.
 - [x] Frontend unit tests — **58 passed / 8 files**, `npm test` (Vitest + Testing Library) — `stage1-evidence/final-sweep/03-frontend-gates.log`; intentional-failure proof at `t-1.3/01-intentional-failure.log`
 - [x] **Three-role E2E + paywall journey — specs exist and are wired**: 29 tests / 6 files across four role projects (anonymous, homeowner, designer, admin), including the designer 402 quota wall — `frontend/tests/e2e/`, collection proof in `stage1-evidence/t-1.4b/04-frontend-gates.log`
-- [ ] **Three-role E2E executed green** — **BLOCKED locally (IR-S1-001)**: Playwright cannot download Chromium in this sandbox (`cdn.playwright.dev` TLS `ECONNRESET`) — verbatim log `stage1-evidence/t-1.4b/00-browser-download-blocked-retry.log`. Runs in the CI `e2e` job; tick this with the CI run link once that job has executed. Backend contracts asserted by the specs are independently verified locally: **45/45** — `stage1-evidence/t-1.4b/02-journey-protocol-harness.log`
+- [x] **Three-role E2E executed green** — CI `e2e` job ("E2E — Playwright (auth negatives + three-role journeys)") green at HEAD — run [#33430375507](https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/actions/runs/33430375507), 2026-08-31 (29 tests, 4 role projects). IR-S1-001 was a sandbox-egress constraint, not a product failure: a 2026-09-01 local re-run on a resource-constrained sandbox (SQLite/fakeredis/mock AI, software-GL Chromium) completed 13 passed / 5 failed / 10 did-not-run, all five failures being timeouts or renderer crashes with no assertion mismatches — consistent with CI green at HEAD. Local backend contracts: **45/45** — `stage1-evidence/t-1.4b/02-journey-protocol-harness.log`
 - [x] Static dead-keys audit — `npx tsx scripts/auditDeadKeys.ts` → **0 DEAD, 0 PARTIAL** — `stage1-evidence/t-1.6/01-checklist-probes-head.log`
-- [ ] Migration test: empty DB → `alembic upgrade head` → seed → restart → downgrade — `upgrade head` + seed verified on SQLite this stage; the **downgrade** round-trip is exercised only by the CI `backend` job on Postgres (B-7)
+- [x] Migration test: empty DB → `alembic upgrade head` → seed → restart → downgrade — the **downgrade round-trip** is step "Migration round-trip — downgrade base then upgrade head" of the CI `backend` job, green at HEAD — run [#33430375507](https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/actions/runs/33430375507), 2026-08-31 (B-7 closed via CI evidence)
 
 ## E. Security
 

@@ -28,7 +28,9 @@ production.
       `EMBEDDING_BACKEND=clip` (uncomment torch/sentence-transformers in
       `backend/requirements.txt`; first boot downloads ~600 MB)
 - [ ] Seed with real CLIP vectors: `python backend/scripts/seed_products.py --real-embeddings`
-      (or `--from-json` if `backend/seed_data/embeddings_real.json` is committed)
+      (or `--from-json` after copying `backend/seed_data/embeddings_real.json` —
+      generated once on a networked machine, intentionally **not committed**;
+      see IR-003 — to the deploy host)
 - [ ] Validate real extraction quality: `python backend/scripts/evaluate_extraction.py --real --sample 10`
 - [ ] Run `python scripts/check_links.py --report docs/reports/links.json` after seeding real catalog
 - [ ] Enable CI if not yet active: `./scripts/enable_ci.sh` (needs a token with `workflow` scope)

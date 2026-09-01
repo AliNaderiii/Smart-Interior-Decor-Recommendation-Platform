@@ -10,6 +10,7 @@ import io
 import json
 import logging
 import os
+import tempfile
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -31,9 +32,18 @@ from app.models.user import User
 
 logger = logging.getLogger("penetration_test")
 
-EVIDENCE_DIR = os.path.join(
-    os.path.dirname(__file__), "..", "..", "docs", "agent-reports", "stage3-evidence", "t-3.1-attacks"
-)
+# The session log is per-run telemetry, not versioned evidence. Previously it
+# appended to a TRACKED file on every pytest run, silently dirtying the working
+# tree and mutating the Stage-3 historical evidence pack (also breaking the
+# release-gate invariant "working tree clean"). Default to a runtime temp
+# location; only a deliberate evidence-generation pass opts into the tracked
+# path with PENTEST_EVIDENCE=repo.
+if os.environ.get("PENTEST_EVIDENCE") == "repo":
+    EVIDENCE_DIR = os.path.join(
+        os.path.dirname(__file__), "..", "..", "docs", "agent-reports", "stage3-evidence", "t-3.1-attacks"
+    )
+else:
+    EVIDENCE_DIR = os.path.join(tempfile.gettempdir(), "pentest-evidence")
 os.makedirs(EVIDENCE_DIR, exist_ok=True)
 SESSION_LOG = os.path.join(EVIDENCE_DIR, "attack_session.jsonl")
 

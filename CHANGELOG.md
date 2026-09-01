@@ -22,6 +22,34 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Changed
+
+- **README re-synced to the actual HEAD (2026-09-01 re-verification).** Test
+  counts updated to freshly measured values (backend 620 collected —
+  598 passed / 22 skipped; frontend 65 unit tests across 10 files;
+  `test_projects_quota.py` 13 → 14); the quick-start paragraph no longer
+  claims the backend seeds the catalog on every boot (Stage-04 removed that
+  path — production boot is migrations-only, catalog loading is the explicit
+  `catalog-bootstrap` profile job); the stale B-1 "production warning" is
+  replaced by a description of the enforced protection (boot-time refusal in
+  production); the layout/security sections now state CI is active
+  (`.github/workflows/`) instead of "move to enable"; Node ≥ 22 documented as
+  a frontend prerequisite (with `.nvmrc`).
+- **IR-003 closed.** The two remaining references that implied
+  `backend/seed_data/embeddings_real.json` is committed
+  (`docs/ARCHITECTURE.md`, `docs/DEPLOYMENT.md`) now state the artefact is
+  generated on a networked machine and intentionally not committed.
+- **`ci/github-ci.yml` synced from the active workflow** (it had drifted
+  behind `.github/workflows/ci.yml` — actions versions and the Stage-1
+  locked-install verification step were missing from the canonical copy).
+- **`docs/RELEASE_CHECKLIST.md`: four previously open items ticked with CI
+  evidence at HEAD** — Postgres 16 + pgvector suite, real-Redis suite,
+  three-role E2E executed green, and the migration downgrade round-trip (B-7) —
+  all backed by run
+  [#33430375507](https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/actions/runs/33430375507)
+  (2026-08-31, all jobs green); README test-count parity tick re-measured
+  locally on 2026-09-01.
+
 ### Fixed
 
 - **BUG-401 (hotfix): env-file inline-comment poisoning of demo passwords.**
@@ -38,6 +66,39 @@ capability · PATCH = fix, docs, dependency or CI change).
   `DEMO_ACCOUNT_PASSWORD` whose stripped value begins with `#` as unset, logs
   loudly, and falls back to the documented dev default. Pinned by regression
   tests (`backend/tests/test_env_template.py`, `test_demo_seeding.py`).
+
+- **Frontend toolchain pin: Node ≥ 22.** `npm test` crashed on Node 20 with
+  `TypeError: webidl.util.markAsUncloneable is not a function` (locked
+  jsdom/undici stack), while CI silently used Node 22 — a fresh clone on a
+  Node-20 machine could not run the unit suites at all. `package.json` now
+  declares `engines.node >=22` / `engines.npm >=10` (lockfile synced) and the
+  repo ships `.nvmrc` (`22`); README documents the prerequisite.
+- **Deprecated Starlette status-code constants replaced** —
+  `HTTP_413_REQUEST_ENTITY_TOO_LARGE` → `HTTP_413_CONTENT_TOO_LARGE`
+  (4 sites in `backend/app/core/uploads.py`) and
+  `HTTP_422_UNPROCESSABLE_ENTITY` → `HTTP_422_UNPROCESSABLE_CONTENT`
+  (1 site in `backend/app/api/routes/quiz.py`, 2 in
+  `backend/app/core/uploads.py`). Behaviour is identical (same status codes);
+  the noisy `StarletteDeprecationWarning` stream in test/server output is
+  gone and the code is safe against the constants' future removal.
+- **Vite/Vitest native-config warning removed** — `__dirname` does not exist
+  in ESM configs once Vite switches to `configLoader: 'native'`; both
+  `vite.config.ts` and `vitest.config.ts` now use `import.meta.dirname`
+  (valid under the pinned Node ≥ 22 toolchain).
+- **Penetration-test telemetry no longer mutates a tracked evidence file.**
+  `tests/test_stage3_penetration.py` appended its attack session log to the
+  tracked `docs/agent-reports/stage3-evidence/t-3.1-attacks/attack_session.jsonl`
+  on *every* run — silently dirtying the working tree, rewriting Stage-3
+  historical evidence, and breaking the release-gate invariant "working tree
+  clean before the release commit". The log now goes to a per-run temp
+  location by default; writing into the tracked evidence directory is an
+  explicit opt-in (`PENTEST_EVIDENCE=repo`) for deliberate evidence passes.
+- **`scripts/enable_ci.sh` can no longer regress an evolved workflow.** The
+  script blindly copied `ci/github-ci.yml` over `.github/workflows/ci.yml`;
+  after direct workflow edits (Stage 1 onwards) the staged copy had become
+  *older* than the active one, so running the script would have silently
+  downgraded CI. It now refuses when the two files differ and offers
+  `--sync-canonical` to adopt the active copy instead.
 
 ## [0.7.0] — 2026-08-28 (Stage 3: Security Penetration Testing & Compliance Hardening)
 

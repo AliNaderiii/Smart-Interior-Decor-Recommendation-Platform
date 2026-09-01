@@ -20,6 +20,24 @@ if [[ ! -f ci/github-ci.yml ]]; then
   exit 1
 fi
 
+# Safety guard (added 2026-09-01): the workflow may have been activated already
+# and *evolved past* the staged copy (e.g. by a direct edit with the workflow
+# scope). Overwriting it with the older canonical file would silently regress
+# CI. Refuse in that case; ask the operator to reconcile first.
+if [[ -f .github/workflows/ci.yml ]] && ! cmp -s ci/github-ci.yml .github/workflows/ci.yml; then
+  if [[ "${1:-}" == "--sync-canonical" ]]; then
+    # Active workflow is newer — adopt it as the canonical copy instead.
+    cp .github/workflows/ci.yml ci/github-ci.yml
+    echo "Synced canonical ci/github-ci.yml from the active workflow."
+  else
+    echo "ERROR: .github/workflows/ci.yml already exists and differs from ci/github-ci.yml." >&2
+    echo "       Refusing to overwrite (would possibly regress an evolved workflow)." >&2
+    echo "       Reconcile, then either rerun, or adopt the active copy with:" >&2
+    echo "         ./scripts/enable_ci.sh --sync-canonical" >&2
+    exit 1
+  fi
+fi
+
 mkdir -p .github/workflows
 cp ci/github-ci.yml .github/workflows/ci.yml
 git add .github/workflows/ci.yml

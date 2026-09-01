@@ -62,8 +62,11 @@ the platform never hard-fails on missing internet.
   1. On a networked machine: `python scripts/seed_products.py --real-embeddings`
      — forces CLIP (fails loudly if unavailable), seeds the DB, and exports
      `backend/seed_data/embeddings_real.json` for reuse.
-  2. Offline deploys: commit that JSON once, then seed anywhere with
-     `python scripts/seed_products.py --from-json`.
+  2. Offline deploys: copy that JSON (generated once on a networked machine) to
+     the deploy host, then seed with
+     `python scripts/seed_products.py --from-json`. The artefact is
+     intentionally **not committed** to the repository (IR-003 — never-commit
+     policy for large generated binary-derived assets).
 - Real extraction quality: `python scripts/evaluate_extraction.py --real
   [--sample N]` with `AI_PROVIDER=gemini` + `GEMINI_API_KEY` scores the same
   50-image ground truth against the live model and writes

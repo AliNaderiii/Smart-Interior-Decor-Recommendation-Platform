@@ -113,7 +113,7 @@ def recommend_endpoint(
     elif body is not None:
         payload = body.model_dump(exclude={"project_id", "client_name"})
     else:
-        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "quiz_id or body required")
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "quiz_id or body required")
 
     result = recommend(db, payload, user_id=str(user.id))
 

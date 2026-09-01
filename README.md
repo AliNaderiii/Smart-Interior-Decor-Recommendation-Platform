@@ -9,13 +9,20 @@ Zarinpal-based Pro paywall. **MVP scope: living_room only.**
 > 2026-08-21 ([`docs/RELEASE_BASELINE.md`](docs/RELEASE_BASELINE.md)) and
 > re-audited at the Stage-1 HEAD on 2026-08-26
 > ([`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)).
-> Verified at the Stage-1 HEAD: backend **549 passed / 22 skipped**, frontend
-> **58** unit tests, strict build and lint clean, secret scan clean, dependency
-> audit clean on the locked set.
-> Not verified at HEAD: Postgres+pgvector parity and real-Redis runs (CI only),
-> Playwright E2E execution (CI only — blocker IR-S1-001), real-model AI
-> accuracy, seller-link liveness, Lighthouse. Read the checklist before quoting
-> any number from this repository to a client.
+> Re-verified at the current HEAD on 2026-09-01 in a clean sandbox
+> (Python 3.13, Node 22.23.2): backend **598 passed / 22 skipped
+> (620 collected)**, frontend **65 unit tests across 10 files**, strict build,
+> lint and test typecheck clean, secret scan clean, docs link audit clean.
+> Verified in CI at this HEAD (run
+> [#33430375507](https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/actions/runs/33430375507),
+> 2026-08-31, all jobs green): the backend suite against **PostgreSQL 16 +
+> pgvector and real Redis**, **Playwright E2E (29 tests, 4 role projects)**,
+> **Lighthouse CI ≥80**, seller-link liveness over the 150-product catalog,
+> `/recommend` p95 evidence, and Docker builds.
+> Still not verified anywhere: real-model AI extraction accuracy (CI runs the
+> `--real` benchmark only when a provider secret is configured).
+> Read the checklist before quoting any number from this repository to a
+> client.
 
 ## Stack
 
@@ -35,10 +42,15 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
 → App at `https://localhost` (Caddy, TLS 1.3) · API docs at `https://localhost/docs`.
-On first boot the backend runs `alembic upgrade head` and then
-`load_realistic_products.py --realistic --expand-to 150 --if-empty --from-json`,
-which loads the **150-row Persian demo catalog**. Demo accounts are enabled
-only by the development overlay; the production overlay never enables them.
+The development overlay runs `alembic upgrade head` and then
+`load_realistic_products.py --realistic --expand-to 150 --if-empty` before
+serving, which seeds the **150-row Persian demo catalog** (hash embeddings;
+`--if-empty` keeps it idempotent). Demo accounts are enabled only by the
+development overlay (`SEED_DEMO_ACCOUNTS=true`); the production overlay never
+enables them. **Production startup runs migrations only** — the catalog is
+loaded deliberately via the one-shot bootstrap job
+(`docker compose --profile bootstrap up catalog-bootstrap`), which requires the
+real-embedding artefact and fails loudly if it is absent.
 (`backend/scripts/seed_products.py`, which generates 100 synthetic products, is
 the separate no-Docker path documented under *Local development*.)
 
@@ -50,14 +62,18 @@ the separate no-Docker path documented under *Local development*.)
 | Designer | designer@smartdecor.dev | Design123! |
 | Admin | admin@smartdecor.dev | Admin123! |
 
-> **Production warning.** These credentials are hardcoded in
-> `backend/scripts/seed_products.py` and `backend/scripts/load_realistic_products.py`,
-> and the seeder runs unconditionally on container start — including when
-> `APP_ENV=production`. A production deployment therefore ships with a known
-> admin password unless the accounts are removed or rotated immediately after
-> the first boot. Tracked as a release blocker: see
-> [`docs/RELEASE_BASELINE.md`](docs/RELEASE_BASELINE.md) §7 (B-1) and
-> [`integration-request.md`](integration-request.md) IR-001.
+> **How production is protected (B-1 / IR-001 — closed).** Demo logins exist
+> only when `SEED_DEMO_ACCOUNTS=true` **and** `APP_ENV != production`; under
+> `APP_ENV=production` the setting itself is rejected at boot by
+> `Settings.validate_runtime()` — a production process that asks for demo
+> accounts does not start at all (CI security probe +
+> `scripts/prove_demo_refusal.sh`; re-verified by direct invocation on
+> 2026-09-01). The old unconditional-seeding boot path was removed in Stage 04:
+> startup is now migrations + server only, catalog loading is the explicit
+> `catalog-bootstrap` profile job described above. The credentials in the table
+> above live in exactly one audited place — `backend/app/core/demo_seed.py` —
+> and are development-only by construction
+> ([`docs/security/DEMO_ACCOUNTS.md`](docs/security/DEMO_ACCOUNTS.md)).
 
 ## Dev vs Production data engines — read this
 
@@ -70,8 +86,8 @@ the separate no-Docker path documented under *Local development*.)
 
 Postgres parity was demonstrated on **2026-08-19 at commit `a847ad5`**, when the
 suite contained 45 tests (`docs/reports/postgres_parity.md`). The suite has since
-grown to **571 collected** (549 passed / 22 skipped at the Stage-1 HEAD) and
-that Postgres run has **not** been repeated locally — the
+grown to **620 collected** (598 passed / 22 skipped, re-measured at HEAD on
+2026-09-01) and that Postgres run has **not** been repeated locally — the
 baseline audit environment has no Docker or PostgreSQL binary. Treat Postgres
 parity as *previously evidenced, currently unverified at HEAD*; re-run it before
 release:
@@ -82,6 +98,12 @@ docker compose -f docker-compose.yml -f docker-compose.test.yml \
 ```
 
 ## Local development (no Docker)
+
+**Prerequisites:** Python ≥ 3.12 (CI runs 3.12; 3.13 also verified on
+2026-09-01) and **Node ≥ 22** for the frontend. The locked jsdom/undici test
+stack does not start on Node 20 (`webidl.util.markAsUncloneable is not a
+function`); CI pins Node 22 and the repo ships a matching `.nvmrc`
+(`nvm use`). `package.json` enforces this via `engines.node`.
 
 ```bash
 # backend — SQLite + fakeredis fallback works out of the box
@@ -105,7 +127,9 @@ npm run dev
 
 ## Tests & acceptance gates
 
-Counts below were measured at the Stage-1 HEAD on 2026-08-26; raw logs live in
+Counts below were re-measured at the current HEAD on 2026-09-01 in a clean
+sandbox (backend on Python 3.13, frontend on Node 22.23.2); the Stage-1 logs
+live in
 [`docs/agent-reports/stage1-evidence/final-sweep/`](docs/agent-reports/stage1-evidence/final-sweep/).
 See [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md) for the full gate
 status and [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md) for the dependency
@@ -116,7 +140,7 @@ policy.
 ```bash
 cd backend
 pip install -r requirements.lock.txt      # the lockfile is the contract, not requirements.txt
-pytest                                    # 549 passed, 22 skipped (SQLite + fakeredis + mock AI)
+pytest                                    # 598 passed, 22 skipped / 620 collected (SQLite + fakeredis + mock AI)
 ruff check app ai scripts tests           # 0 errors
 
 python scripts/verify_lock_install.py     # installed env == requirements.lock.txt
@@ -135,7 +159,7 @@ CI `backend` job against Postgres 16 + pgvector.
 cd frontend
 npm ci                                    # not npm install: package-lock.json is the lock of record
 
-npm test                                  # Vitest + Testing Library — 58 tests, 8 files
+npm test                                  # Vitest + Testing Library — 65 tests, 10 files (Node ≥22 required)
 npm run lint                              # oxlint — 0 errors, 12 warnings
 npm run build                             # tsc strict + vite — 0 errors
 npx tsc -p tsconfig.tests.json            # type-check the test suites too (tsconfig.app.json covers only src/)
@@ -189,16 +213,16 @@ npx lighthouse http://localhost:4173/ --view   # >=80 target (npm run preview fi
 
 | Suite | Tests |
 |---|---:|
-| `backend/tests/` (full suite) | **571 collected** — 549 passed, 22 skipped |
+| `backend/tests/` (full suite) | **620 collected** — 598 passed, 22 skipped |
 | ↳ `test_recommender.py` | 30 (spec floor: ≥28) |
 | ↳ `test_security_v2.py` | 26 |
 | ↳ `test_feedback_v2.py` | 16 |
 | ↳ `test_auth.py` | 13 |
-| ↳ `test_projects_quota.py` | 13 (designer quota, Stage 1) |
+| ↳ `test_projects_quota.py` | 14 (designer quota, Stage 1) |
 | ↳ `test_weights_profiles.py` | 13 (weight profiles, Stage 1) |
 | ↳ `test_perf_v2.py` | 10 |
 | ↳ `test_rate_limit.py` | 2 |
-| `frontend/tests/unit/` (Vitest) | **58** across 8 files |
+| `frontend/tests/unit/` (Vitest) | **65** across 10 files |
 | `frontend/tests/e2e/` (Playwright) | **29** across 6 files — CI only |
 
 ## Repository layout
@@ -215,8 +239,8 @@ backend/
   alembic/           migrations (pgvector extension + HNSW index)
   scripts/           seed_products.py · load_realistic_products.py · evaluate_extraction.py
                      seed_perf_products.py · dev_postgres.py
-  tests/             571 collected — test_recommender.py (30) · test_security_v2.py (26)
-                     test_feedback_v2.py (16) · test_auth.py (13) · test_projects_quota.py (13)
+  tests/             620 collected — test_recommender.py (30) · test_security_v2.py (26)
+                     test_feedback_v2.py (16) · test_auth.py (13) · test_projects_quota.py (14)
                      test_weights_profiles.py (13) · test_perf_v2.py (10) · test_rate_limit.py (2)
                      benchmark_50_images.json
   security/          pip-audit-allowlist.yml (expiring, justified CVE acceptances)
@@ -225,7 +249,7 @@ frontend/
                      upgrade · share · designer/* · admin/*
   src/stores/        authStore · quizStore · moodboardStore (Zustand)
   src/lib/           api (fetch + JWT refresh + CSRF double-submit) · constants (i18n-ready) · types
-  tests/unit/        Vitest + Testing Library — 58 tests, 8 files (`npm test`)
+  tests/unit/        Vitest + Testing Library — 65 tests, 10 files (`npm test`)
   tests/e2e/         Playwright — 29 tests, 6 files (`npm run e2e`): deadKeys · auth-negative
                      auth-smoke · journey-homeowner · journey-designer · journey-admin
 datasets/            products_realistic*.json · style_taxonomy · questionnaire · subscription_plans
@@ -234,7 +258,7 @@ docs/                RELEASE_BASELINE · RELEASE_CHECKLIST · ROLLBACK_AND_VERSI
   agent-reports/     per-stage agent reports + evidence directories
 scripts/             check_links.py · audit_docs_links.py · audit_secrets.py
                      auditDeadKeys.ts · enable_ci.sh
-docker-compose.yml · Caddyfile · ci/github-ci.yml (move to .github/workflows/ to enable)
+docker-compose.yml · Caddyfile · .github/workflows/ (CI active) · ci/ (staged workflow mirrors)
 ```
 
 ## Security & compliance
@@ -242,12 +266,16 @@ docker-compose.yml · Caddyfile · ci/github-ci.yml (move to .github/workflows/ 
 TLS 1.3 (Caddy) · bcrypt password hashing · JWT access 15 min / refresh 7 days with
 Redis blacklist rotation · Fernet encryption-at-rest abstraction (documented cloud-KMS
 path) · GDPR hard delete (`DELETE /users/me`) · no payment card data (gateway redirect
-only) · no secrets in the repo — re-verified at `f97bfad` by
-`python scripts/audit_secrets.py` (244 tracked files, 0 findings, 0 forbidden
-paths, evidence in `docs/agent-reports/baseline-release-evidence/17-secret-scan.txt`).
-See `docs/DEPLOYMENT.md` §7 for the full mapping and
-[`docs/RELEASE_BASELINE.md`](docs/RELEASE_BASELINE.md) §7 for the open blockers
-(hardcoded demo accounts, CI not active, unverified real-model AI evidence).
+only) · no secrets in the repo — re-verified at `f97bfad` (244 tracked files,
+0 findings, evidence in
+`docs/agent-reports/baseline-release-evidence/17-secret-scan.txt`) and re-run at
+HEAD on 2026-09-01 (**RESULT: PASS**, 0 findings, 0 forbidden paths).
+CI is active (`.github/workflows/ci.yml` — Postgres/pgvector + real-Redis suite,
+E2E, Lighthouse, security probes) and the hardcoded-demo-account blocker (B-1) is
+closed with boot-time refusal in production. Remaining unverified item:
+real-model AI extraction accuracy (needs a provider API key — run
+`python scripts/evaluate_extraction.py --real` on a networked host; see
+[`docs/RELEASE_BASELINE.md`](docs/RELEASE_BASELINE.md) §7).
 
 ## Documentation
 

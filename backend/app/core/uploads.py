@@ -115,10 +115,10 @@ def read_bounded(upload: UploadFile, max_bytes: int | None = None) -> bytes:
         if len(buffer) > limit:
             raise UploadRejected(
                 f"File exceeds the {limit // (1024 * 1024)} MB upload limit",
-                status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                status.HTTP_413_CONTENT_TOO_LARGE,
             )
     if not buffer:
-        raise UploadRejected("Empty upload", status.HTTP_422_UNPROCESSABLE_ENTITY)
+        raise UploadRejected("Empty upload", status.HTTP_422_UNPROCESSABLE_CONTENT)
     return bytes(buffer)
 
 
@@ -166,18 +166,18 @@ def validate_image_upload(upload: UploadFile) -> ValidatedImage:
             width, height = image.size
             if width <= 0 or height <= 0:
                 raise UploadRejected("Image has no pixels",
-                                     status.HTTP_422_UNPROCESSABLE_ENTITY)
+                                     status.HTTP_422_UNPROCESSABLE_CONTENT)
             if max(width, height) > settings.MAX_UPLOAD_EDGE_PX:
                 raise UploadRejected(
                     f"Image edge exceeds {settings.MAX_UPLOAD_EDGE_PX}px "
                     f"({width}x{height})",
-                    status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    status.HTTP_413_CONTENT_TOO_LARGE,
                 )
             if width * height > settings.MAX_UPLOAD_PIXELS:
                 raise UploadRejected(
                     f"Image exceeds {settings.MAX_UPLOAD_PIXELS} pixels "
                     f"({width}x{height}) — possible decompression bomb",
-                    status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    status.HTTP_413_CONTENT_TOO_LARGE,
                 )
             fmt = image.format
             extension, content_type = ALLOWED_IMAGE_FORMATS[fmt]
@@ -192,7 +192,7 @@ def validate_image_upload(upload: UploadFile) -> ValidatedImage:
         raise UploadRejected(
             "Image exceeds the maximum allowed pixel count "
             "— possible decompression bomb",
-            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            status.HTTP_413_CONTENT_TOO_LARGE,
         )
     except Exception as exc:
         logger.warning("rejected upload: %s: %s", exc.__class__.__name__, exc)
