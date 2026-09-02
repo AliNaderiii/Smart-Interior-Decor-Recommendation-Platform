@@ -22,8 +22,73 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Fixed
+
+- **Gemini resilience + pacing for the offline real benchmark.** The first
+  real 50-image run attempts (free-tier Gemini key over a VPN tunnel) died
+  to a mix of `429 Too Many Requests` (per-minute quota) and transport
+  resets (SSL EOF, `WinError 10053/10061`), each previously degrading that
+  image to the labelled mock fallback and therefore invalidating the whole
+  run under the real-run guard. `GeminiProvider.extract` now retries
+  transient failures — 429, 5xx and `httpx.TransportError` — with
+  exponential backoff honouring the server's `Retry-After` header
+  (attempt budget via env `GEMINI_MAX_ATTEMPTS`, default 5); 4xx other
+  than 429 still fail fast as configuration errors.
+  `evaluate_extraction.py` additionally accepts `--sleep SECONDS` to pace
+  calls under a per-minute quota and prints the pacing/retry policy in the
+  report header.
+
+### Added
+
+- **OpenAI-compatible gateways + local images for `OpenAIProvider`.**
+  `OPENAI_BASE_URL` (env) now overrides the default
+  `https://api.openai.com/v1`, so any Chat Completions-compatible gateway
+  can serve the vision calls (regional aggregators included) with the same
+  Bearer-auth contract. Local files passed via the benchmark's
+  `--images-dir` are read and inlined as `data:` URLs instead of being
+  rejected by URL validation. The provider applies the same transient
+  retry/backoff policy as Gemini (429 / 5xx / transport resets,
+  `OPENAI_MAX_ATTEMPTS`, default 5).
+
 ### Changed
 
+- **Extraction prompt p5: up-to-3 style hedge, co-dominance wording, typed
+  arrays.** The p4 full-50 real runs (valid evidence, no fallbacks) landed
+  at 79.2% (`gemini-3.5-flash-lite`) — 0.8 points under contract — with
+  14/50 style misses at the 2-slot hedge and phantom minority materials
+  (a fabric sofa's "wood legs"). p5 allows up to 3 listed styles (free
+  under the contract's overlap-based style term; review-gated downstream),
+  reframes material as "structurally dominant, co-dominance test, never
+  more than 2", and states that every classification field is a JSON
+  array. Also hardened `_sanitize`: scalar values where a list was asked
+  (e.g. `"patterns": "geometric"`, observed live) are wrapped into a
+  one-item list instead of being shredded into single characters.
+- **Extraction prompt p4: synonym translation map + 1-2 style hedge.** The
+  first p3 real sample (`gemini-3.5-flash`, 5 images) confirmed the
+  material fix (micro F1 0.65 → 0.92) but exposed that the model can still
+  emit off-list style words ("contemporary"-class synonyms) that
+  `_sanitize` then drops — style recall fell to 0.2 and every affected
+  item hit the review queue (3/5). p4 embeds an explicit translation map
+  (minimalist→minimal, scandi/nordic→scandinavian, contemporary/mid-century
+  →modern, traditional→classic, rustic/eclectic/coastal→boho, loft/urban→
+  industrial) and allows 1-2 listed styles (best first) — free under the
+  contract's overlap-based style term. `evaluate_extraction.py` now also
+  embeds per-item predictions (`items[].predicted_*` +
+  `unknown_taxonomy_values`) in the report so prompt tuning reads evidence
+  straight from the artefact.
+- **Extraction prompt p3: strict vocabulary + cardinality lock.** The first
+  valid real benchmark run (50 local photos, `qwen3.6-35b` via an
+  OpenAI-compatible gateway, prompt p2) measured **70.7%** mean accuracy —
+  usable but below the ≥80% contract. The failure signature was
+  diagnostic-precision collapse, not mis-seeing: style micro recall 0.72
+  (models emit off-list synonyms like "contemporary"/"mid-century" that
+  `_sanitize` clamps to nothing) and material micro precision 0.645 with
+  recall 0.958 (the p2 wording "pick all that apply" invited over-listing,
+  and the benchmark scores material as precision-only). p3 therefore
+  demands exactly one listed style (nearest canonical mapping, never a
+  synonym), only the 1-2 clearly visible/dominant materials, exactly one
+  dominant pattern, and an honest confidence. Bumped
+  `EXTRACTION_PROMPT_VERSION` per the versioning rules.
 - **README re-synced to the actual HEAD (2026-09-01 re-verification).** Test
   counts updated to freshly measured values (backend 620 collected —
   598 passed / 22 skipped; frontend 65 unit tests across 10 files;

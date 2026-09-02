@@ -18,7 +18,14 @@ Versioning rules
 * Bump ``AI_STACK_VERSION`` when any stamped artefact below changes.
 * Extraction prompt: semantic change to ``EXTRACTION_PROMPT`` bumps
   ``EXTRACTION_PROMPT_VERSION`` (``p1`` = the original baseline prompt,
-  ``p2`` = current, with taxonomy-driven pattern list and review fields).
+  ``p2`` = taxonomy-driven pattern list and review fields,
+  ``p3`` = strict vocabulary + cardinality lock after the first real
+  50-image benchmark measured style-synonym misses and material
+  over-listing as the dominant failure modes,
+  ``p4`` = synonym translation map + allow the 1-2 style hedge after p3's
+  real sample showed models still emitting off-list style words,
+  ``p5`` = up-to-3 style hedge, co-dominance wording for materials, and
+  explicit JSON-array typing after the p4 full run ended at 79.2%).
 * Taxonomy: ``TAXONOMY_VERSION`` is read from ``seed_data/style_taxonomy.json``
   (additive change → minor bump; removing/renaming a stable ID → major bump and
   a migration note).
@@ -34,7 +41,7 @@ from app.core.config import settings
 AI_STACK_VERSION = "2026-08-26.1"
 
 #: Version of the extraction prompt template in ``ai.feature_extractor``.
-EXTRACTION_PROMPT_VERSION = "p2"
+EXTRACTION_PROMPT_VERSION = "p5"
 
 #: Version of the recommender configuration (weights + knobs) in
 #: ``ai/recommender_config.json``. 2026-08-26.1 = Stage 1 (T-1.2): switchable,

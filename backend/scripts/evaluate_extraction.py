@@ -45,6 +45,7 @@ Acceptance criterion: mean accuracy >= 0.80 in REAL mode.
 from __future__ import annotations
 
 import json
+import os
 import statistics
 import sys
 import time
@@ -178,6 +179,9 @@ def main() -> int:
     images_dir = Path("")
     if "--images-dir" in sys.argv:
         images_dir = Path(sys.argv[sys.argv.index("--images-dir") + 1])
+    sleep_s = 0.0
+    if "--sleep" in sys.argv:
+        sleep_s = float(sys.argv[sys.argv.index("--sleep") + 1])
 
     mode = resolve_mode(force_real)
     is_mock = mode == "MOCK"
@@ -191,7 +195,7 @@ def main() -> int:
     style_pairs: list[tuple[set, set]] = []
     material_pairs: list[tuple[set, set]] = []
 
-    for item in items:
+    for idx, item in enumerate(items):
         target = item["image_url"]
         if not is_mock:
             local = _local_image(images_dir, item["id"])
@@ -218,7 +222,13 @@ def main() -> int:
             "needs_review": bool(pred.get("needs_review")),
             "predicted_style": pred.get("style", []),
             "predicted_material": pred.get("material", []),
+            "unknown_taxonomy_values": pred.get("unknown_taxonomy_values"),
         })
+        # Pace calls for provider rate limits (free-tier Gemini per-minute
+        # quota). The provider's own 429 retry handles bursts; --sleep keeps
+        # the whole run under the cap in the first place.
+        if sleep_s and idx < len(items) - 1:
+            time.sleep(sleep_s)
 
     accuracy = sum(p["score"] for p in per_item) / len(per_item)
     below = [p["id"] for p in per_item if p["score"] < 0.8]
@@ -265,6 +275,7 @@ def main() -> int:
                      "items": failures},
         "human_review": {"count": needs_review_count,
                          "rate": round(needs_review_count / len(per_item), 4)},
+        "items": per_item,
         "cost": estimate_cost(mode, len(per_item)),
         "per_item": per_item,
     }
@@ -276,6 +287,9 @@ def main() -> int:
           f"(prompt {report['versions']['extraction']['prompt_version']}, "
           f"taxonomy {report['versions']['extraction']['taxonomy_version']})")
     print(f"images evaluated : {len(per_item)}")
+    if not is_mock:
+        print(f"pacing           : {sleep_s:g}s inter-call sleep, provider retry "
+              f"(429/5xx/transport, max {os.getenv('GEMINI_MAX_ATTEMPTS', '5')} attempts)")
     print(f"mean accuracy    : {accuracy:.1%}   (contract: >= 80% in REAL mode)")
     print(f"images >= 0.8    : {report['images_at_or_above_0_8']}/{len(per_item)}")
     print(f"style micro P/R/F1     : {report['style_micro']['precision']:.3f} / "
