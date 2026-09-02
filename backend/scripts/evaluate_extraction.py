@@ -185,7 +185,7 @@ def main() -> int:
 
     mode = resolve_mode(force_real)
     is_mock = mode == "MOCK"
-    data = json.loads(BENCHMARK.read_text())
+    data = json.loads(BENCHMARK.read_text(encoding="utf-8"))
     items = data["items"][:sample] if sample else data["items"]
 
     extractor = FeatureExtractor()
@@ -315,7 +315,7 @@ def main() -> int:
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             slim = {k: v for k, v in report.items() if k != "per_item"}
-            path.write_text(json.dumps(slim, indent=2, ensure_ascii=False) + "\n")
+            path.write_text(json.dumps(slim, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
             print(f"report written   : {path}")
         except OSError:
             pass

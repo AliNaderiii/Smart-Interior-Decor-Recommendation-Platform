@@ -24,6 +24,13 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ### Fixed
 
+- **UTF-8 evidence artefact on Windows.** `evaluate_extraction.py` wrote
+  `docs/reports/extraction_report.json` with the platform default encoding
+  (cp1252 on Windows), which makes the committed benchmark evidence fail to
+  parse under UTF-8 (Linux/CI). Reads/writes now pin `encoding="utf-8"`;
+  the committed PASS report (82.2%, gemini-3.5-flash-lite, prompt p5) was
+  re-encoded without touching any value.
+
 - **Gemini resilience + pacing for the offline real benchmark.** The first
   real 50-image run attempts (free-tier Gemini key over a VPN tunnel) died
   to a mix of `429 Too Many Requests` (per-minute quota) and transport

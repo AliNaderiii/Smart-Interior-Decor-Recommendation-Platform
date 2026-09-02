@@ -12,7 +12,7 @@
     },
     "embedding": {
       "backend": "hash",
-      "model": "feature-hash-512 (DETERMINISTIC FALLBACK — NOT a semantic model)",
+      "model": "feature-hash-512 (DETERMINISTIC FALLBACK â€” NOT a semantic model)",
       "dim": 512
     },
     "recommender_config_version": "2026-08-26.1"
@@ -970,6 +970,6 @@
   "cost": {
     "estimated_cost_usd": 0.0043,
     "basis": "ESTIMATE: 50 images x (258 image + 120 prompt) input tokens @ $0.1/1M + 120 output tokens @ $0.4/1M",
-    "source": "https://ai.google.dev/gemini-api/docs/pricing (default model is now gemini-3.5-flash; prices shown are the flash-lite tier and are UNVERIFIED for 3.5-flash — re-verify with a real run before budgeting)"
+    "source": "https://ai.google.dev/gemini-api/docs/pricing (default model is now gemini-3.5-flash; prices shown are the flash-lite tier and are UNVERIFIED for 3.5-flash â€” re-verify with a real run before budgeting)"
   }
 }
