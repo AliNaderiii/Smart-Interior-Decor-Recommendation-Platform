@@ -22,6 +22,14 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Added
+
+- **Vercel demo rewrite (`frontend/vercel.json`).** The frontend calls the
+  API on the relative path `/api/v1`; for the free demo deploy (Vercel +
+  Render) a rewrite proxies `/api/:path*` to the Render backend, so no
+  CORS/env wiring is needed in the static build. Replace
+  `__RENDER_BACKEND_URL__` with the Render service hostname.
+
 ### Fixed
 
 - **UTF-8 evidence artefact on Windows.** `evaluate_extraction.py` wrote
