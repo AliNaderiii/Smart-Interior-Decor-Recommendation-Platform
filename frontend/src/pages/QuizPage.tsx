@@ -32,7 +32,7 @@ const DIMENSION_HELP = DATASET_STEPS.find((item) => item.id === "room_dimensions
 const BUDGET_RANGES = (DATASET_STEPS.find((item) => item.id === "budget")?.ranges ?? []) as BudgetRange[];
 
 export default function QuizPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const quiz = useQuizStore();
   const user = useAuthStore((s) => s.user);
   const navigate = useNavigate();
@@ -94,7 +94,7 @@ export default function QuizPage() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="h1 text-[var(--color-ink)]">طراحی نشیمن شما</h1>
+      <h1 className="h1 text-[var(--color-ink)]">{t.quiz.title}</h1>
       <p className="mt-1 text-sm text-[var(--color-muted)]">
         {t.quiz.stepOf(step + 1, t.quiz.stepTitles.length)} — {t.quiz.stepTitles[step]}
       </p>
@@ -157,7 +157,7 @@ export default function QuizPage() {
                   >
                     <OptimizedImage
                       src={s.image}
-                      alt={`${s.label} style living room`}
+                      alt={locale === "fa" ? `نشیمن با سبک ${s.fa}` : `${s.label} style living room`}
                       width={500}
                       height={400}
                       sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
@@ -168,8 +168,11 @@ export default function QuizPage() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
                     <div className="absolute inset-x-0 bottom-0 flex items-end justify-between p-4">
                       <div>
-                        <span className="block text-base font-semibold text-white">{s.icon} {s.fa}</span>
-                        <span className="block text-xs text-white/70">{s.label}</span>
+                        {/* One label per locale. Showing fa and en together
+                            leaked the other language into both modes. */}
+                        <span className="block text-base font-semibold text-white">
+                          {s.icon} {locale === "fa" ? s.fa : s.label}
+                        </span>
                       </div>
                     </div>
                     <AnimatePresence>

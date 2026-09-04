@@ -22,7 +22,7 @@ import {
 
 
 export default function HomePage() {
-  const { t, num } = useLocale();
+  const { t, num, locale } = useLocale();
   const user = useAuthStore((s) => s.user);
 
   const cta = user
@@ -117,16 +117,15 @@ export default function HomePage() {
           concrete example rather than an adjective. */}
       <TiltOnScroll className="border-t border-[var(--color-line)] py-16 lg:py-24">
         <h2 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">
-          هر پیشنهاد، دلیل دارد
+          {t.home.explainTitle}
         </h2>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-[var(--color-muted)]">
-          به‌جای فهرست بی‌توضیح، هر محصول با امتیاز تفکیک‌شده می‌آید تا بدانید چرا
-          انتخاب شده و کجا با سلیقه‌تان فاصله دارد.
+          {t.home.explainBody}
         </p>
 
         <CardTilt3D className="mt-8 max-w-md">
         <Card className="overflow-hidden p-5">
-          <p className="font-semibold text-[var(--color-ink)]">مبل مدرن — چرم عسلی</p>
+          <p className="font-semibold text-[var(--color-ink)]">{t.home.sampleProduct}</p>
           <p className="mt-1 text-sm text-[var(--color-muted)]">
             {num("42,900,000")} {t.common.toman}
           </p>
@@ -145,7 +144,7 @@ export default function HomePage() {
                 <span
                   className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--color-line)]"
                   role="img"
-                  aria-label={`${row.label}: ${num(row.value)} درصد`}
+                  aria-label={`${row.label}: ${num(row.value)}${t.common.percent}`}
                 >
                   {/* RTL: the track is a flex row so the fill starts at the
                       right edge, matching reading direction. A bare width on a
@@ -158,7 +157,7 @@ export default function HomePage() {
                   </span>
                 </span>
                 <span className="w-9 shrink-0 text-xs tabular-nums text-[var(--color-ink)]">
-                  {num(row.value)}٪
+                  {num(row.value)}{t.common.percent}
                 </span>
               </div>
             ))}
@@ -181,7 +180,7 @@ export default function HomePage() {
             <Card className="overflow-hidden">
               <OptimizedImage
                 src={s.image}
-                alt={`نشیمن با سبک ${s.fa}`}
+                alt={locale === "fa" ? `نشیمن با سبک ${s.fa}` : `${s.label} style living room`}
                 width={320}
                 height={200}
                 sizes="(max-width: 640px) 50vw, 200px"
@@ -189,7 +188,7 @@ export default function HomePage() {
               />
 
               <p className="px-3 py-2.5 text-sm font-medium text-[var(--color-ink)]">
-                {s.fa}
+                {locale === "fa" ? s.fa : s.label}
               </p>
             </Card>
             </CardTilt3D>

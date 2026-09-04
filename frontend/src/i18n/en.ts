@@ -44,6 +44,7 @@ export const en: Dict = {
     retry: "Try again",
     optional: "optional",
     toman: "Toman",
+    percent: "%",
   },
 
   home: {
@@ -143,6 +144,17 @@ export const en: Dict = {
     emptyHint:
       "Pick products you like on the recommendations page to create your first moodboard.",
     emptyCta: "Go to recommendations",
+    subtitle: "Arrange the products you liked into a board you can share or shop.",
+    defaultName: "My Living Room",
+    created: "Moodboard created.",
+    createFailed: "Could not create the moodboard.",
+    deleted: "Moodboard deleted.",
+    deleteFailed: "Could not delete the moodboard.",
+    creating: "Creating…",
+    createCta: "Create moodboard",
+    loadFailed: "Could not load your moodboards.",
+    deleting: "Deleting…",
+    confirmDelete: "Confirm delete",
   },
 
   floorplan: {
@@ -165,6 +177,17 @@ export const en: Dict = {
     emptyTitle: "Your shopping list is empty",
     emptyHint: "Add products from a moodboard to list them here.",
     total: "Total",
+    copied: "Shopping list copied to clipboard.",
+    clipboardBlocked: "Clipboard blocked by your browser.",
+    copyList: "Copy shopping list",
+    loadFailed: "Could not load your shopping list.",
+    nothingAdded: "Nothing added yet",
+    createBoardFirst: "Create a moodboard first",
+    goToMoodboards: "Go to moodboards",
+    browseRecommendations: "Browse recommendations",
+    hintFromBoard: "Open a moodboard and choose “Add all to shopping list” to collect everything you want to buy.",
+    hintNoBoard: "Your shopping list is built from a moodboard. Pick products you like and save them to a board.",
+    linkVerified: "Link verified",
   },
 
   auth: {

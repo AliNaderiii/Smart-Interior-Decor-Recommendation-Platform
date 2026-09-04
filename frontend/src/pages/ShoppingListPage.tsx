@@ -10,6 +10,7 @@ import { EmptyState, ErrorState } from "@/components/states";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { useToast } from "@/components/Toast";
 import { useCommands } from "@/components/CommandPalette";
+import { useT } from "@/i18n";
 
 /** Persisted so quantities survive a reload — a stepper that forgets is worse
  *  than no stepper. Keyed per board. */
@@ -81,6 +82,7 @@ function QuantityStepper({
 /* --------------------------------------------------------------------- page */
 
 export default function ShoppingListPage() {
+  const t = useT();
   const toast = useToast();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [qty, setQty] = useState<Record<string, number>>({});
@@ -146,15 +148,15 @@ export default function ShoppingListPage() {
       .join("\n");
     try {
       await navigator.clipboard.writeText(`${text}\n\nTotal: ${formatToman(total)}`);
-      toast.success("Shopping list copied to clipboard.");
+      toast.success(t.shoppingList.copied);
     } catch {
-      toast.error("Clipboard blocked by your browser.");
+      toast.error(t.shoppingList.clipboardBlocked);
     }
   }
 
   useCommands(
     [
-      { id: "shop.copy", label: "Copy shopping list", group: "Actions", keywords: "clipboard export", run: copyAll },
+      { id: "shop.copy", label: t.shoppingList.copyList, group: "Actions", keywords: "clipboard export", run: copyAll },
     ],
     [rows, qty, total],
   );
@@ -180,27 +182,27 @@ export default function ShoppingListPage() {
   }
 
   if (isError) {
-    return <ErrorState message="Could not load your shopping list." onRetry={() => refetch()} />;
+    return <ErrorState message={t.shoppingList.loadFailed} onRetry={() => refetch()} />;
   }
 
   if (rows.length === 0) {
     return (
       <div>
-        <h1 className="h1 text-[var(--color-ink)]">Shopping list</h1>
+        <h1 className="h1 text-[var(--color-ink)]">{t.shoppingList.title}</h1>
         <div className="mt-8">
           <EmptyState
-            title={boards?.length ? "Nothing added yet" : "Create a moodboard first"}
+            title={boards?.length ? t.shoppingList.nothingAdded : t.shoppingList.createBoardFirst}
             hint={
               boards?.length
-                ? "Open a moodboard and choose “Add all to shopping list” to collect everything you want to buy."
-                : "Your shopping list is built from a moodboard. Pick products you like and save them to a board."
+                ? t.shoppingList.hintFromBoard
+                : t.shoppingList.hintNoBoard
             }
             action={
               <Link
                 to={boards?.length ? "/moodboards" : "/recommendations"}
                 className="inline-block rounded-xl bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--color-canvas)] hover:opacity-90"
               >
-                {boards?.length ? "Go to moodboards" : "Browse recommendations"}
+                {boards?.length ? t.shoppingList.goToMoodboards : t.shoppingList.browseRecommendations}
               </Link>
             }
           />
@@ -213,7 +215,7 @@ export default function ShoppingListPage() {
     <div className="pb-28">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="h1 text-[var(--color-ink)]">Shopping list</h1>
+          <h1 className="h1 text-[var(--color-ink)]">{t.shoppingList.title}</h1>
           <p className="mt-1 text-sm text-[var(--color-muted)]">
             {itemCount} item{itemCount === 1 ? "" : "s"} from “{board?.title}”
           </p>
@@ -283,7 +285,7 @@ export default function ShoppingListPage() {
                             : "bg-[var(--color-line)] text-[var(--color-muted)]"
                       }`}
                     >
-                      {p.seller_link_ok ? "Link verified" : p.seller_link_ok === false ? "Link broken" : "Not checked"}
+                      {p.seller_link_ok ? t.shoppingList.linkVerified : p.seller_link_ok === false ? "Link broken" : "Not checked"}
                     </span>
                     {/* X-01: stored seller links are sanitised at render, and
                         a rejected link renders as nothing rather than as a

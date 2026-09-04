@@ -8,13 +8,15 @@ import { Button, Card, Input, Skeleton } from "@/components/ui";
 import { EmptyState, ErrorState } from "@/components/states";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { useToast } from "@/components/Toast";
+import { useT } from "@/i18n";
 
 export default function MoodboardsPage() {
+  const t = useT();
   const qc = useQueryClient();
   const navigate = useNavigate();
   const toast = useToast();
   const { picked, clear } = useMoodboardStore();
-  const [title, setTitle] = useState("My Living Room");
+  const [title, setTitle] = useState(t.moodboards.defaultName);
   // Two-step delete: the second click within the same row confirms. Cheaper
   // than a modal and reversible right up to the moment you press again.
   const [confirmId, setConfirmId] = useState<string | null>(null);
@@ -42,10 +44,10 @@ export default function MoodboardsPage() {
     onSuccess: (board) => {
       clear();
       qc.invalidateQueries({ queryKey: ["moodboards"] });
-      toast.success("Moodboard created.");
+      toast.success(t.moodboards.created);
       navigate(`/moodboard/${board.id}`);
     },
-    onError: () => toast.error("Could not create the moodboard."),
+    onError: () => toast.error(t.moodboards.createFailed),
   });
 
   const deleteBoard = useMutation({
@@ -53,20 +55,20 @@ export default function MoodboardsPage() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["moodboards"] });
       setConfirmId(null);
-      toast.success("Moodboard deleted.");
+      toast.success(t.moodboards.deleted);
     },
     onError: () => {
       setConfirmId(null);
-      toast.error("Could not delete the moodboard.");
+      toast.error(t.moodboards.deleteFailed);
     },
   });
 
   return (
     <div>
       <div>
-        <h1 className="h1 text-[var(--color-ink)]">Moodboards</h1>
+        <h1 className="h1 text-[var(--color-ink)]">{t.moodboards.title}</h1>
         <p className="mt-1 text-sm text-[var(--color-muted)]">
-          Arrange the products you liked into a board you can share or shop.
+          {t.moodboards.subtitle}
         </p>
       </div>
 
@@ -98,7 +100,7 @@ export default function MoodboardsPage() {
               Clear
             </Button>
             <Button variant="accent" onClick={() => createBoard.mutate()} disabled={createBoard.isPending || !title.trim()}>
-              {createBoard.isPending ? "Creating…" : "Create moodboard"}
+              {createBoard.isPending ? t.moodboards.creating : t.moodboards.createCta}
             </Button>
           </div>
         </Card>
@@ -116,13 +118,13 @@ export default function MoodboardsPage() {
         </div>
       ) : isError ? (
         <div className="mt-8">
-          <ErrorState message="Could not load your moodboards." onRetry={() => refetch()} />
+          <ErrorState message={t.moodboards.loadFailed} onRetry={() => refetch()} />
         </div>
       ) : !boards || boards.length === 0 ? (
         <div className="mt-8">
           <EmptyState
-            title="No moodboards yet"
-            hint="Pick products on the recommendations page, then create your first board."
+            title={t.moodboards.emptyTitle}
+            hint={t.moodboards.emptyHint}
             action={
               <Link
                 to="/recommendations"
@@ -156,7 +158,7 @@ export default function MoodboardsPage() {
                       onClick={() => deleteBoard.mutate(b.id)}
                       disabled={deleteBoard.isPending}
                     >
-                      {deleteBoard.isPending ? "Deleting…" : "Confirm delete"}
+                      {deleteBoard.isPending ? t.moodboards.deleting : t.moodboards.confirmDelete}
                     </Button>
                     <Button variant="ghost" onClick={() => setConfirmId(null)}>
                       Cancel
