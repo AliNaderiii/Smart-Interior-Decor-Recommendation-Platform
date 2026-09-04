@@ -68,38 +68,82 @@ export default function CinematicSequence({
   const decoded = useRef<boolean[]>(new Array(FRAMES.length).fill(false));
   const currentSrc = useRef<string>("");
   const lastCaption = useRef(-1);
+  const lastShown = useRef(0);
   const eased = useRef(0);
   const [, force] = useState(0);
 
-  // Warm every frame in the background, in order, so early scrolling has
-  // something to show and later scrolling is already resident.
+  // Warm frames in PARALLEL, coarse-to-fine.
+  //
+  // The first implementation walked 0..35 sequentially and awaited each one.
+  // On a slow connection the user out-scrolls the loader: the <img> pins to
+  // the last decoded frame (observed on production — the sequence froze on
+  // frame21 while the scroll was already at frame35) and the walkthrough
+  // looks broken.
+  //
+  // Instead: fetch a sparse spread across the whole range first, so *some*
+  // frame is available at every scroll position within the first moments,
+  // then fill in the gaps. Requests are issued concurrently and never
+  // awaited in series.
   useEffect(() => {
     let cancelled = false;
+
+    const warm = (i: number) =>
+      new Promise<void>((resolve) => {
+        if (decoded.current[i]) return resolve();
+        const img = new Image();
+        img.src = FRAMES[i];
+        const done = () => {
+          decoded.current[i] = true;
+          resolve();
+        };
+        img.decode?.().then(done, done) ?? (img.onload = done);
+        img.onerror = done;
+      });
+
     (async () => {
-      for (let i = 0; i < FRAMES.length; i++) {
+      // Pass 1: every 2nd frame (~9 images, ~560 KB) so the whole journey is
+      // scrubbable within the first moments even on a slow link. The set was
+      // reduced from 36 to 18 frames for the same reason: measured on a
+      // throttled connection, 36 frames could not warm before a normal user
+      // had scrolled the section, so the shot visibly froze.
+      const coarse = [];
+      for (let i = 0; i < FRAMES.length; i += 2) coarse.push(i);
+      if (!coarse.includes(FRAMES.length - 1)) coarse.push(FRAMES.length - 1);
+      await Promise.all(coarse.map(warm));
+      if (cancelled) return;
+      force((n) => n + 1);
+
+      // Pass 2: everything else, in small concurrent batches so we neither
+      // stall on one image nor open 36 sockets at once.
+      const rest = [];
+      for (let i = 0; i < FRAMES.length; i++) if (!coarse.includes(i)) rest.push(i);
+      const BATCH = 8;
+      for (let i = 0; i < rest.length; i += BATCH) {
         if (cancelled) return;
-        await new Promise<void>((resolve) => {
-          const img = new Image();
-          img.src = FRAMES[i];
-          const done = () => {
-            decoded.current[i] = true;
-            resolve();
-          };
-          img.decode?.().then(done, done) ?? (img.onload = done);
-        });
-        if (i === 0) force((n) => n + 1);
+        await Promise.all(rest.slice(i, i + BATCH).map(warm));
       }
     })();
+
     return () => {
       cancelled = true;
     };
   }, []);
 
-  /** Nearest frame at or before `i` that has finished decoding. */
+  /** Closest decoded frame to `i`.
+   *
+   *  Ties break *backwards*: when the frame either side is equidistant we take
+   *  the earlier one. Preferring the later frame made the displayed index jump
+   *  around non-monotonically while the set warmed (observed: 13 -> 19 -> 13),
+   *  which looks like stuttering rather than a camera move. */
   const resolveFrame = useMemo(
     () => (i: number) => {
-      for (let j = i; j >= 0; j--) if (decoded.current[j]) return j;
-      for (let j = i + 1; j < FRAMES.length; j++) if (decoded.current[j]) return j;
+      if (decoded.current[i]) return i;
+      for (let d = 1; d < FRAMES.length; d++) {
+        const lo = i - d;
+        if (lo >= 0 && decoded.current[lo]) return lo;
+        const hi = i + d;
+        if (hi < FRAMES.length && decoded.current[hi]) return hi;
+      }
       return 0;
     },
     [],
@@ -121,7 +165,14 @@ export default function CinematicSequence({
 
       const el = imgRef.current;
       if (el) {
-        const src = FRAMES[resolveFrame(idx)];
+        let pick = resolveFrame(idx);
+        // While warming, never step backwards during a forward scroll: a
+        // temporary gap in the decoded set must not rewind the shot.
+        if (idx >= lastShown.current && pick < lastShown.current) {
+          pick = lastShown.current;
+        }
+        lastShown.current = pick;
+        const src = FRAMES[pick];
         if (src !== currentSrc.current) {
           currentSrc.current = src;
           el.src = src;
