@@ -56,10 +56,16 @@ const CAPTION_COUNT = 6;
 /** Ken Burns push applied within a single frame's scroll step. */
 const PUSH = 0.035;
 
-/** Source frames are 16:9; the canvas backing store matches so `drawImage`
- *  never has to resample on a mismatched aspect. */
-const BASE_W = 1280;
-const BASE_H = 720;
+/** Source frame dimensions (16:9). */
+const SRC_W = 1920;
+const SRC_H = 1080;
+
+/** Cap on the canvas backing store. Measured problem: a fixed 1280×720 store
+ *  on a DPR-2 laptop supplied 0.54 of the device pixels the element covered,
+ *  so the browser upscaled and the result looked soft. The store is now sized
+ *  from the element's real box × DPR, clamped here so a 4K monitor does not
+ *  ask for a 3840-wide blit every frame. */
+const MAX_BACKING_W = 2048;
 
 type Surface = ImageBitmap | HTMLImageElement;
 
@@ -118,11 +124,12 @@ export default function CinematicSequence({
       if (cancelled) return;
       setFirstReady(true);
 
-      // Then a coarse spread so the whole journey is scrubbable early,
-      // then fill the gaps. Concurrency is bounded so we neither stall on a
-      // single request nor open 18 sockets at once.
+      // Load the eight true keyframes first (indices 0,4,8,…): they are the
+      // originals, they carry the story beats, and having them means every
+      // scroll position resolves to a real photograph within moments. The
+      // derived in-betweens fill in afterwards and only refine the motion.
       const coarse: number[] = [];
-      for (let i = 2; i < FRAMES.length; i += 4) coarse.push(i);
+      for (let i = 4; i < FRAMES.length; i += 4) coarse.push(i);
       const rest: number[] = [];
       for (let i = 1; i < FRAMES.length; i++) {
         if (!coarse.includes(i)) rest.push(i);
@@ -151,14 +158,28 @@ export default function CinematicSequence({
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // A modest backing store keeps `drawImage` cheap; the element is stretched
-    // by CSS. At these dimensions the source is still denser than the CSS
-    // pixels it covers on a phone, so it stays sharp.
-    canvas.width = BASE_W;
-    canvas.height = BASE_H;
     const ctx = canvas.getContext("2d", { alpha: false });
     if (!ctx) return;
     ctx.imageSmoothingQuality = "high";
+
+    // Size the backing store to the device pixels actually covered.
+    let cw = SRC_W;
+    let ch = SRC_H;
+    const sizeCanvas = () => {
+      const rect = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const want = Math.min(Math.round(rect.width * dpr), MAX_BACKING_W);
+      cw = Math.max(640, want);
+      ch = Math.round((cw * SRC_H) / SRC_W);
+      if (canvas.width !== cw || canvas.height !== ch) {
+        canvas.width = cw;
+        canvas.height = ch;
+        ctx.imageSmoothingQuality = "high";
+        lastDrawn.current = { idx: -1, scale: -1 }; // force a repaint
+      }
+    };
+    sizeCanvas();
+    window.addEventListener("resize", sizeCanvas, { passive: true });
 
     let raf = 0;
 
@@ -194,12 +215,14 @@ export default function CinematicSequence({
       lastDrawn.current = { idx: pick, scale: scaleQ };
 
       const surface = surfaces.current[pick]!;
-      // Ken Burns: draw a centre-biased crop scaled up to fill the canvas.
-      const sw = BASE_W / scaleQ;
-      const sh = BASE_H / scaleQ;
-      const sx = (BASE_W - sw) / 2;
-      const sy = (BASE_H - sh) * 0.55;
-      ctx.drawImage(surface, sx, sy, sw, sh, 0, 0, BASE_W, BASE_H);
+      // Ken Burns: crop from the SOURCE (full 1920×1080) and blit to the
+      // backing store. Cropping in source space means the push-in never
+      // magnifies already-downscaled pixels.
+      const sw = SRC_W / scaleQ;
+      const sh = SRC_H / scaleQ;
+      const sx = (SRC_W - sw) / 2;
+      const sy = (SRC_H - sh) * 0.55;
+      ctx.drawImage(surface, sx, sy, sw, sh, 0, 0, cw, ch);
 
       const caption = Math.min(CAPTION_COUNT - 1, Math.floor(p * CAPTION_COUNT));
       if (caption !== lastCaption.current) {
@@ -209,7 +232,10 @@ export default function CinematicSequence({
     };
 
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", sizeCanvas);
+    };
   }, [progress, reduced, onFrame, firstReady]);
 
   /* ---------------------------------------------------------------- render */
