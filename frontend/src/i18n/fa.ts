@@ -133,6 +133,12 @@ export const fa = {
     added: "افزوده شد ✓",
     aiNotice: "استخراج‌شده با هوش مصنوعی از صفحه فروشنده — پیش از خرید تأیید کنید.",
     proLocked: "با نسخه Pro همه گزینه‌ها را ببینید",
+    verifiedPrice: "قیمت تأییدشده",
+    estimatedPrice: "قیمت تخمینی",
+    whyMatched: (title: string, pct: number) =>
+      `چرا ${title} پیشنهاد شد: ${pct} درصد تطابق کلی`,
+    moreLike: (title: string) => `بیشتر شبیه ${title}`,
+    fewerLike: (title: string) => `کمتر شبیه ${title}`,
   },
 
   moodboards: {
@@ -176,6 +182,22 @@ export const fa = {
     noAccount: "حساب ندارید؟",
     hasAccount: "قبلاً ثبت‌نام کرده‌اید؟",
     passwordHint: "حداقل ۸ کاراکتر",
+    welcomeBack: "خوش آمدید",
+    loginSubtitle: "برای ادامه‌ی طراحی نشیمن‌تان وارد شوید.",
+    registerSubtitle: "برای شروع، یک حساب رایگان بسازید.",
+    createOne: "یک حساب بسازید",
+    signInHere: "وارد شوید",
+    signingIn: "در حال ورود…",
+    creating: "در حال ساخت حساب…",
+    loginFailed: "ورود ناموفق بود.",
+    registerFailed: "ثبت‌نام ناموفق بود.",
+    invalidEmail: "ایمیل معتبر وارد کنید",
+    minChars: "حداقل ۸ کاراکتر",
+    enterName: "نام خود را وارد کنید",
+    registerHeading: "حساب خود را بسازید",
+    iAmA: "من یک…",
+    homeowner: "صاحب‌خانه",
+    designer: "طراح داخلی",
   },
 
   cinematic: {

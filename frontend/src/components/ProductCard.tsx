@@ -3,7 +3,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import * as HoverCard from "@radix-ui/react-hover-card";
 import { Link } from "react-router-dom";
 import type { RecommendedProduct } from "@/lib/types";
-import { formatToman } from "@/lib/constants";
+import { useLocale, useT } from "@/i18n";
 import { safeUrl } from "@/lib/safeUrl";
 import { MotionCard } from "@/components/ui";
 import { OptimizedImage } from "@/components/OptimizedImage";
@@ -29,6 +29,7 @@ interface Props {
  *  in the a11y tree. Aesop's rule — secondary detail hides behind interaction
  *  rather than cluttering the card face. */
 function MatchBreakdown({ product }: { product: RecommendedProduct }) {
+  const { t, money } = useLocale();
   // Controlled rather than hover-only. Radix opens the card on pointer hover,
   // but a touch user has no hover — without an explicit tap handler the
   // explainability panel (the whole point of the feature) is unreachable on
@@ -36,11 +37,11 @@ function MatchBreakdown({ product }: { product: RecommendedProduct }) {
   const [open, setOpen] = useState(false);
   const exp = product.explanation;
   const rows = [
-    { label: "Style", value: exp.style_match, detail: product.styles.join(" / ") || "—" },
-    { label: "Colour", value: exp.color_match, detail: null },
-    { label: "Budget", value: exp.budget_fit, detail: formatToman(product.price_toman) },
+    { label: t.recommendations.scoreStyle, value: exp.style_match, detail: product.styles.join(" / ") || "—" },
+    { label: t.recommendations.scoreColor, value: exp.color_match, detail: null },
+    { label: t.recommendations.scoreBudget, value: exp.budget_fit, detail: money(product.price_toman) },
     {
-      label: "Material",
+      label: t.recommendations.scoreMaterial,
       value: exp.material_match,
       detail: exp.matched_materials.length ? exp.matched_materials.join(", ") : product.materials.join(", ") || "—",
     },
@@ -54,7 +55,7 @@ function MatchBreakdown({ product }: { product: RecommendedProduct }) {
           className="w-full rounded-lg text-start text-xs font-semibold text-[var(--color-muted)] underline decoration-dotted underline-offset-2 hover:text-[var(--color-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
-          aria-label={`Why we matched ${product.title}: ${Math.round(product.final_score * 100)} percent overall`}
+          aria-label={t.recommendations.whyMatched(product.title, Math.round(product.final_score * 100))}
         >
           {Math.round(product.final_score * 100)}% match — why?
         </button>
@@ -89,7 +90,7 @@ function MatchBreakdown({ product }: { product: RecommendedProduct }) {
           </div>
           {product.colors.length > 0 && (
             <div className="mt-3 flex items-center gap-1.5 border-t border-[var(--color-line)] pt-3">
-              <span className="text-[11px] text-[var(--color-faint)]">Palette</span>
+              <span className="text-[11px] text-[var(--color-faint)]">{t.recommendations.palette}</span>
               {product.colors.slice(0, 5).map((c) => (
                 <span
                   key={c}
@@ -117,6 +118,7 @@ function FeedbackButtons({
   value?: number;
   onFeedback?: (p: RecommendedProduct, signal: 1 | -1) => void;
 }) {
+  const t = useT();
   if (!onFeedback) return null;
   const base =
     "grid h-8 w-8 place-items-center rounded-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]";
@@ -124,7 +126,7 @@ function FeedbackButtons({
     <div className="flex items-center gap-1">
       <button
         type="button"
-        aria-label={`More like ${product.title}`}
+        aria-label={t.recommendations.moreLike(product.title)}
         aria-pressed={value === 1}
         onClick={() => onFeedback(product, 1)}
         className={`${base} ${
@@ -146,7 +148,7 @@ function FeedbackButtons({
       </button>
       <button
         type="button"
-        aria-label={`Fewer like ${product.title}`}
+        aria-label={t.recommendations.fewerLike(product.title)}
         aria-pressed={value === -1}
         onClick={() => onFeedback(product, -1)}
         className={`${base} ${
@@ -174,20 +176,21 @@ function FeedbackButtons({
  *  Never present an AI-extracted price as fact. Colour is paired with a text
  *  label so the signal survives colour-blindness and greyscale. */
 function PriceBadge({ verified }: { verified?: boolean }) {
+  const t = useT();
   if (verified === undefined) return null;
   return verified ? (
     <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-ok)]/10 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-ok)]">
       <svg width="9" height="9" viewBox="0 0 12 12" fill="none" aria-hidden="true">
         <path d="M2.5 6.2l2.2 2.2 4.8-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
-      Verified price
+      {t.recommendations.verifiedPrice}
     </span>
   ) : (
     <span
       className="rounded-full bg-[var(--color-warn)]/10 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-warn)]"
-      title="Extracted by AI from the retailer page — confirm before buying."
+      title={t.recommendations.aiNotice}
     >
-      Estimated price
+      {t.recommendations.estimatedPrice}
     </span>
   );
 }
@@ -195,6 +198,10 @@ function PriceBadge({ verified }: { verified?: boolean }) {
 /* -------------------------------------------------------------------- card */
 
 function ProductCardInner({ product, rank, onAdd, added, feedback, onFeedback }: Props) {
+  const { t, locale, money } = useLocale();
+  // The catalogue ships both; showing the English title inside a Persian page
+  // was the "everything turns English when you click through" complaint.
+  const title = (locale === "fa" && product.title_fa) || product.title;
   const [hovered, setHovered] = useState(false);
   const reduce = useReducedMotion();
 
@@ -219,7 +226,7 @@ function ProductCardInner({ product, rank, onAdd, added, feedback, onFeedback }:
             <p className="text-sm font-semibold text-[var(--color-ink)]">
               {rank + 1} more match{rank === 0 ? "" : "es"} in this room
             </p>
-            <p className="mt-0.5 text-xs text-[var(--color-muted)]">Unlock the full set with Pro</p>
+            <p className="mt-0.5 text-xs text-[var(--color-muted)]">{t.recommendations.proLocked}</p>
             <Link
               to="/upgrade"
               className="mt-3 inline-block rounded-xl bg-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-[var(--color-canvas)] hover:opacity-90"
@@ -250,7 +257,7 @@ function ProductCardInner({ product, rank, onAdd, added, feedback, onFeedback }:
       >
         <OptimizedImage
           src={product.image_url}
-          alt={product.title}
+          alt={title}
           width={400}
           height={260}
           priority={rank === 0}
@@ -288,10 +295,10 @@ function ProductCardInner({ product, rank, onAdd, added, feedback, onFeedback }:
 
       <div className="flex flex-1 flex-col gap-2 p-4">
         <h3 className="line-clamp-2 text-sm font-semibold leading-snug text-[var(--color-ink)]">
-          {product.title}
+          {title}
         </h3>
         <p className="text-base font-semibold tabular-nums text-[var(--color-ink)]">
-          {formatToman(product.price_toman)}
+          {money(product.price_toman)}
         </p>
 
         {/* Colour swatches as chips, never a text list (Wayfair/Baymard). */}
@@ -324,7 +331,7 @@ function ProductCardInner({ product, rank, onAdd, added, feedback, onFeedback }:
                   : "bg-[var(--color-accent)] text-[var(--color-canvas)] hover:opacity-90"
               }`}
             >
-              {added ? "Added ✓" : "Add to moodboard"}
+              {added ? t.recommendations.added : t.recommendations.addToMoodboard}
             </motion.button>
           )}
           <FeedbackButtons product={product} value={feedback} onFeedback={onFeedback} />

@@ -129,6 +129,12 @@ export const en: Dict = {
     added: "Added ✓",
     aiNotice: "Extracted by AI from the retailer page — confirm before buying.",
     proLocked: "Unlock the full set with Pro",
+    verifiedPrice: "Verified price",
+    estimatedPrice: "Estimated price",
+    whyMatched: (title: string, pct: number) =>
+      `Why we matched ${title}: ${pct} percent overall`,
+    moreLike: (title: string) => `More like ${title}`,
+    fewerLike: (title: string) => `Fewer like ${title}`,
   },
 
   moodboards: {
@@ -172,6 +178,22 @@ export const en: Dict = {
     noAccount: "No account?",
     hasAccount: "Already registered?",
     passwordHint: "At least 8 characters",
+    welcomeBack: "Welcome back",
+    loginSubtitle: "Sign in to continue designing your living room.",
+    registerSubtitle: "Create a free account to get started.",
+    createOne: "Create one",
+    signInHere: "Sign in",
+    signingIn: "Signing in…",
+    creating: "Creating…",
+    loginFailed: "Login failed.",
+    registerFailed: "Registration failed.",
+    invalidEmail: "Enter a valid email",
+    minChars: "At least 8 characters",
+    enterName: "Enter your name",
+    registerHeading: "Create your account",
+    iAmA: "I am a…",
+    homeowner: "Homeowner",
+    designer: "Interior Designer",
   },
 
   cinematic: {

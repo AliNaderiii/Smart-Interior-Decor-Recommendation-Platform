@@ -7,10 +7,11 @@ import { ApiError, post } from "@/lib/api";
 import type { AuthPayload } from "@/lib/types";
 import { useAuthStore } from "@/stores/authStore";
 import { Button, Card, Input } from "@/components/ui";
+import { useT } from "@/i18n";
 
 const schema = z.object({
-  email: z.string().email("Enter a valid email"),
-  password: z.string().min(8, "At least 8 characters"),
+  email: z.string().email("invalidEmail"),
+  password: z.string().min(8, "minChars"),
 });
 type Form = z.infer<typeof schema>;
 
@@ -20,6 +21,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation() as { state?: { from?: string } };
   const [error, setError] = useState("");
+  const t = useT();
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(values: Form) {
@@ -39,7 +41,7 @@ export default function LoginPage() {
       // axios-shaped `.response` this fetch-based client never produced, so
       // users always saw the generic "Login failed" instead of
       // "Invalid credentials").
-      setError(e instanceof ApiError ? e.message : "Login failed");
+      setError(e instanceof ApiError ? e.message : t.auth.loginFailed);
     } finally {
       setBusy(false);
     }
@@ -48,26 +50,26 @@ export default function LoginPage() {
   return (
     <div className="mx-auto max-w-md pt-10">
       <Card className="p-8">
-        <h1 className="h1 text-[var(--color-ink)]">Welcome back</h1>
-        <p className="mt-1 text-sm text-[var(--color-muted)]">Sign in to continue designing your living room.</p>
+        <h1 className="h1 text-[var(--color-ink)]">{t.auth.welcomeBack}</h1>
+        <p className="mt-1 text-sm text-[var(--color-muted)]">{t.auth.loginSubtitle}</p>
         <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4" noValidate>
           <div>
-            <label htmlFor="email" className="mb-1 block text-sm font-medium">Email</label>
+            <label htmlFor="email" className="mb-1 block text-sm font-medium">{t.auth.email}</label>
             <Input id="email" type="email" autoComplete="email" {...register("email")} />
-            {formState.errors.email && <p className="mt-1 text-xs text-red-700">{formState.errors.email.message}</p>}
+            {formState.errors.email && <p className="mt-1 text-xs text-red-700">{t.auth[formState.errors.email.message as "invalidEmail"] ?? formState.errors.email.message}</p>}
           </div>
           <div>
-            <label htmlFor="password" className="mb-1 block text-sm font-medium">Password</label>
+            <label htmlFor="password" className="mb-1 block text-sm font-medium">{t.auth.password}</label>
             <Input id="password" type="password" autoComplete="current-password" {...register("password")} />
-            {formState.errors.password && <p className="mt-1 text-xs text-red-700">{formState.errors.password.message}</p>}
+            {formState.errors.password && <p className="mt-1 text-xs text-red-700">{t.auth[formState.errors.password.message as "minChars"] ?? formState.errors.password.message}</p>}
           </div>
           {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>}
           <Button type="submit" className="w-full" disabled={busy}>
-            {busy ? "Signing in…" : "Sign in"}
+            {busy ? t.auth.signingIn : t.auth.loginCta}
           </Button>
         </form>
         <p className="mt-4 text-center text-sm text-[var(--color-muted)]">
-          No account? <Link to="/register" className="font-semibold text-[var(--color-ink)] underline underline-offset-2">Create one</Link>
+          {t.auth.noAccount} <Link to="/register" className="font-semibold text-[var(--color-ink)] underline underline-offset-2">{t.auth.createOne}</Link>
         </p>
         {/* Stage 03 (T-02): the demo credentials used to be published to every
             visitor, including in production, where `admin@smartdecor.dev /
