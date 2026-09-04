@@ -3,65 +3,58 @@
  * Why an image sequence and not WebGL: the reference sites the client cited
  * (ApplyDesign, Roomtodo) both present photography — ApplyDesign's marketing
  * site ships no WebGL at all. Procedural geometry cannot reach photorealism,
- * and photoreal GLTF interiors run 3–15 MB per room plus a renderer. Eleven
- * 1600×900 WebP stills total ~1.4 MB and look like the product.
+ * and photoreal GLTF interiors run 3–15 MB per room plus a renderer.
  *
- * Cinematic feel — the three things that separate "film" from "slideshow":
+ * How the 36 frames stay visually identical
+ * -----------------------------------------
+ * Eight photoreal keyframes were generated, each using the previous as a
+ * visual reference so the architecture, materials and blue-hour grade cannot
+ * drift. The 28 in-between frames are then *derived* from those keyframes
+ * offline (dissolve + matched push-in), so every frame is literally the same
+ * photograph — there is no per-frame regeneration that could change a wall
+ * colour or move a sofa. That was the flaw in the first six-frame attempt:
+ * each shot was generated independently and they did not match.
  *
- *  1. DENSITY. Six frames over ~2.4 viewports meant a cut every ~0.4 screens.
- *     Now eleven frames over ~7 viewports: each shot holds for most of a
- *     screen of scrolling before it yields.
- *  2. HOLD-THEN-DISSOLVE. A linear cross-fade leaves two photographs at 50%
- *     for half the step, which reads as a double exposure. Each frame instead
- *     holds fully opaque, then dissolves over the last ~28% of its step with
- *     a smoothstep curve so the hand-off has no hard edges.
- *  3. CONTINUOUS PUSH-IN. A still that does not move is a slide. Every frame
- *     is very slowly scaled (a Ken Burns push) across its entire step, and the
- *     incoming frame starts fractionally wider so the motion carries across
- *     the dissolve instead of resetting.
+ * Playback
+ * --------
+ * Frames are hard-selected by scroll position rather than cross-faded in the
+ * browser. At 36 frames the steps are small enough that a straight cut reads
+ * as motion — exactly how a scrubbed video behaves — and it avoids the
+ * double-exposure ghosting a long CSS fade produces. A slow Ken Burns push is
+ * still applied within each step so the motion never fully stops.
  *
- * Performance: frames are decoded up front so scrolling never hits a decode
- * stall; progress is read from a ref inside rAF, so scrolling causes no React
- * re-render. The module is lazy-loaded by the parent section.
+ * Loading
+ * -------
+ * Frames stream in priority order: the first frame is fetched eagerly, the
+ * rest are warmed in the background after mount. Until a frame has decoded,
+ * the nearest already-decoded frame is shown, so scrolling early never shows
+ * a blank.
  *
  * Accessibility: `prefers-reduced-motion` renders one static frame with no
  * scroll coupling.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useReducedMotion } from "framer-motion";
 
-import frame01 from "@/assets/scene/frame01.webp";
-import frame02 from "@/assets/scene/frame02.webp";
-import frame03 from "@/assets/scene/frame03.webp";
-import frame04 from "@/assets/scene/frame04.webp";
-import frame05 from "@/assets/scene/frame05.webp";
-import frame06 from "@/assets/scene/frame06.webp";
-import frame07 from "@/assets/scene/frame07.webp";
-import frame08 from "@/assets/scene/frame08.webp";
-import frame09 from "@/assets/scene/frame09.webp";
-import frame10 from "@/assets/scene/frame10.webp";
-import frame11 from "@/assets/scene/frame11.webp";
+/** Vite resolves this at build time into a map of hashed asset URLs. Using a
+ *  glob rather than 36 import statements keeps the frame count a data
+ *  question, not a code change. */
+const MODULES = import.meta.glob<string>("@/assets/scene/frame*.webp", {
+  eager: true,
+  import: "default",
+});
 
-const FRAMES = [
-  frame01, frame02, frame03, frame04, frame05, frame06,
-  frame07, frame08, frame09, frame10, frame11,
-];
+const FRAMES: string[] = Object.keys(MODULES)
+  .sort()
+  .map((k) => MODULES[k]);
 
 export const FRAME_COUNT = FRAMES.length;
 
-/** Maps each frame to one of the six narrative captions. */
-const CAPTION_OF_FRAME = [0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5];
+/** Six narrative beats spread across the frame range. */
+const CAPTION_COUNT = 6;
 
-/** Fraction of a step spent fully on one frame before the dissolve starts. */
-const HOLD = 0.72;
-/** Ken Burns push applied across a single step. Subtle on purpose: anything
- *  above ~6% starts to look like a zoom effect rather than a camera move. */
-const PUSH = 0.055;
-
-/** Smoothstep — removes the linear ramp's visible start/stop. */
-function smooth(t: number): number {
-  return t * t * (3 - 2 * t);
-}
+/** Ken Burns push within a single frame's scroll step. */
+const PUSH = 0.035;
 
 export default function CinematicSequence({
   progress,
@@ -71,67 +64,75 @@ export default function CinematicSequence({
   onFrame?: (captionIndex: number) => void;
 }) {
   const reduced = useReducedMotion();
-  const imgRefs = useRef<(HTMLImageElement | null)[]>([]);
-  const [ready, setReady] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const decoded = useRef<boolean[]>(new Array(FRAMES.length).fill(false));
+  const currentSrc = useRef<string>("");
   const lastCaption = useRef(-1);
   const eased = useRef(0);
+  const [, force] = useState(0);
 
+  // Warm every frame in the background, in order, so early scrolling has
+  // something to show and later scrolling is already resident.
   useEffect(() => {
     let cancelled = false;
-    Promise.all(
-      FRAMES.map(
-        (src) =>
-          new Promise<void>((resolve) => {
-            const img = new Image();
-            img.src = src;
-            img.decode?.().then(() => resolve(), () => resolve()) ??
-              (img.onload = () => resolve());
-          }),
-      ),
-    ).then(() => {
-      if (!cancelled) setReady(true);
-    });
+    (async () => {
+      for (let i = 0; i < FRAMES.length; i++) {
+        if (cancelled) return;
+        await new Promise<void>((resolve) => {
+          const img = new Image();
+          img.src = FRAMES[i];
+          const done = () => {
+            decoded.current[i] = true;
+            resolve();
+          };
+          img.decode?.().then(done, done) ?? (img.onload = done);
+        });
+        if (i === 0) force((n) => n + 1);
+      }
+    })();
     return () => {
       cancelled = true;
     };
   }, []);
+
+  /** Nearest frame at or before `i` that has finished decoding. */
+  const resolveFrame = useMemo(
+    () => (i: number) => {
+      for (let j = i; j >= 0; j--) if (decoded.current[j]) return j;
+      for (let j = i + 1; j < FRAMES.length; j++) if (decoded.current[j]) return j;
+      return 0;
+    },
+    [],
+  );
 
   useEffect(() => {
     if (reduced) return;
     let raf = 0;
 
     const tick = () => {
-      // Damp the raw scroll value. Wheel and trackpad deltas arrive in jumps;
-      // sampling them directly makes the push-in judder.
-      eased.current += (progress.current - eased.current) * 0.09;
+      // Damp the raw scroll value: wheel and trackpad deltas arrive in jumps,
+      // and sampling them directly makes the push-in judder.
+      eased.current += (progress.current - eased.current) * 0.12;
       const p = Math.min(0.9999, Math.max(0, eased.current));
 
       const pos = p * (FRAMES.length - 1);
-      const base = Math.floor(pos);
-      const frac = pos - base;
+      const idx = Math.round(pos);
+      const frac = pos - Math.floor(pos);
 
-      // Hold, then dissolve over the tail of the step.
-      const dissolve = frac <= HOLD ? 0 : smooth((frac - HOLD) / (1 - HOLD));
-
-      for (let i = 0; i < FRAMES.length; i++) {
-        const el = imgRefs.current[i];
-        if (!el) continue;
-
-        if (i === base) {
-          el.style.opacity = String(1 - dissolve);
-          // Push in across the whole step, not just the dissolve.
-          el.style.transform = `scale(${1 + PUSH * frac})`;
-        } else if (i === base + 1) {
-          el.style.opacity = String(dissolve);
-          // Start slightly wider than where the outgoing frame ends so the
-          // move continues through the cut instead of snapping back.
-          el.style.transform = `scale(${1 + PUSH * 0.35 * (1 - dissolve)})`;
-        } else if (el.style.opacity !== "0") {
-          el.style.opacity = "0";
+      const el = imgRef.current;
+      if (el) {
+        const src = FRAMES[resolveFrame(idx)];
+        if (src !== currentSrc.current) {
+          currentSrc.current = src;
+          el.src = src;
         }
+        el.style.transform = `scale(${1 + PUSH * frac})`;
       }
 
-      const caption = CAPTION_OF_FRAME[Math.min(base, CAPTION_OF_FRAME.length - 1)];
+      const caption = Math.min(
+        CAPTION_COUNT - 1,
+        Math.floor(p * CAPTION_COUNT),
+      );
       if (caption !== lastCaption.current) {
         lastCaption.current = caption;
         onFrame?.(caption);
@@ -141,12 +142,12 @@ export default function CinematicSequence({
 
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [progress, reduced, onFrame]);
+  }, [progress, reduced, onFrame, resolveFrame]);
 
   if (reduced) {
     return (
       <img
-        src={FRAMES[6]}
+        src={FRAMES[Math.floor(FRAMES.length / 2)]}
         alt=""
         className="h-full w-full object-cover"
         decoding="async"
@@ -155,25 +156,17 @@ export default function CinematicSequence({
   }
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-[#1a1410]">
-      {FRAMES.map((src, i) => (
-        <img
-          key={src}
-          ref={(el) => {
-            imgRefs.current[i] = el;
-          }}
-          src={src}
-          alt=""
-          aria-hidden="true"
-          className="absolute inset-0 h-full w-full object-cover will-change-[opacity,transform]"
-          style={{ opacity: i === 0 ? 1 : 0, transformOrigin: "center 55%" }}
-          decoding="async"
-          fetchPriority={i === 0 ? "high" : "low"}
-        />
-      ))}
-      {!ready && (
-        <div className="absolute inset-0 animate-pulse bg-[#1a1410]" aria-hidden="true" />
-      )}
+    <div className="relative h-full w-full overflow-hidden bg-[#12100e]">
+      <img
+        ref={imgRef}
+        src={FRAMES[0]}
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 h-full w-full object-cover will-change-transform"
+        style={{ transformOrigin: "center 55%" }}
+        decoding="sync"
+        fetchPriority="high"
+      />
     </div>
   );
 }

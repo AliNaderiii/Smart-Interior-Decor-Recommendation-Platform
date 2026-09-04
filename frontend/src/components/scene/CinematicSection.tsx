@@ -51,6 +51,10 @@ function PosterFallback({ caption }: { caption: string }) {
   );
 }
 
+/** Scroll length of the pinned section, in viewport heights. Tuned against the
+ *  frame count: each shot should hold for roughly one screen of scrolling. */
+const SECTION_VH = 900;
+
 export function CinematicSection({ children }: { children?: ReactNode }) {
   const t = useT();
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -108,10 +112,15 @@ export function CinematicSection({ children }: { children?: ReactNode }) {
   return (
     <section
       ref={sectionRef}
-      // ~7 viewports of scroll for 11 frames: each shot holds for most of a
-      // screen before it dissolves. At 340vh (the first attempt) a cut landed
-      // every ~0.4 screens and the result read as a slideshow, not a shot.
-      className="relative -mx-4 h-[700vh] sm:-mx-6 lg:-mx-8"
+      // Full-bleed with negative margins that mirror the page gutters. An
+      // earlier attempt used `left-1/2 w-screen -translate-x-1/2`, which is
+      // the usual trick but assumes an LTR centred container — under RTL it
+      // shifted the entire page sideways.
+      //
+      // `isolate` gives the pinned child its own stacking context so the next
+      // section paints above it during the hand-off instead of underneath.
+      className="relative isolate -mx-4 sm:-mx-6 lg:-mx-8"
+      style={{ height: `${SECTION_VH}vh` }}
       aria-label={t.cinematic.title}
     >
       <div className="sticky top-0 h-screen w-full overflow-hidden">

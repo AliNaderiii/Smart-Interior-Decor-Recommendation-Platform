@@ -34,8 +34,9 @@ export default function HomePage() {
     : "/register";
 
   return (
-    <ScrollStage>
+    <>
       <ScrollProgress />
+      <ScrollStage>
       {/* Hero — Aesop's rule: let it breathe. One idea, enormous margins. */}
       <section className="grid items-center gap-12 py-16 lg:grid-cols-2 lg:py-24">
         <div>
@@ -87,9 +88,14 @@ export default function HomePage() {
         />
         </ParallaxZ>
       </section>
+      </ScrollStage>
 
+      {/* Outside ScrollStage on purpose: that wrapper sets `perspective`, which
+          creates a containing block and silently disables `position: sticky`
+          for everything inside it. */}
       <CinematicSection />
 
+      <ScrollStage>
       <TiltOnScroll className="border-t border-[var(--color-line)] py-16 lg:py-24">
         <h2 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">
           {t.home.howItWorks}
@@ -206,5 +212,6 @@ export default function HomePage() {
         </div>
       </section>
     </ScrollStage>
+    </>
   );
 }
