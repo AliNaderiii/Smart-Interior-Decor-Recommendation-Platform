@@ -10,6 +10,7 @@
  */
 import { useId, useMemo } from "react";
 import { formatToman } from "@/lib/constants";
+import { t } from "@/i18n/fa";
 
 interface Props {
   min: number;
@@ -68,7 +69,7 @@ export function BudgetHistogram({
   return (
     <div>
       <div className="mb-2 flex items-baseline justify-between">
-        <span className="text-sm font-medium text-[var(--color-ink)]">Total budget</span>
+        <span className="text-sm font-medium text-[var(--color-ink)]">{t.quiz.totalBudget}</span>
         <span className="text-sm font-semibold tabular-nums text-[var(--color-ink)]">
           {formatToman(valueMin)} — {formatToman(valueMax)}
         </span>
@@ -104,7 +105,7 @@ export function BudgetHistogram({
           max={max}
           step={step}
           value={valueMin}
-          aria-label="Minimum budget"
+          aria-label={t.quiz.min}
           onChange={(e) => onChange(Math.min(Number(e.target.value), valueMax - step), valueMax)}
           className="range-thumb absolute inset-x-0 top-0 h-6 w-full appearance-none bg-transparent"
         />
@@ -115,7 +116,7 @@ export function BudgetHistogram({
           max={max}
           step={step}
           value={valueMax}
-          aria-label="Maximum budget"
+          aria-label={t.quiz.max}
           onChange={(e) => onChange(valueMin, Math.max(Number(e.target.value), valueMin + step))}
           className="range-thumb absolute inset-x-0 top-0 h-6 w-full appearance-none bg-transparent"
         />
@@ -124,7 +125,7 @@ export function BudgetHistogram({
       <div className="mt-4 grid grid-cols-2 gap-3">
         <div>
           <label htmlFor={`${id}-lo`} className="mb-1 block text-xs text-[var(--color-muted)]">
-            Minimum (toman)
+            {t.quiz.min}
           </label>
           <input
             id={`${id}-lo`}
@@ -139,7 +140,7 @@ export function BudgetHistogram({
         </div>
         <div>
           <label htmlFor={`${id}-hi`} className="mb-1 block text-xs text-[var(--color-muted)]">
-            Maximum (toman)
+            {t.quiz.max}
           </label>
           <input
             id={`${id}-hi`}

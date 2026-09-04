@@ -6,6 +6,7 @@ import { useQuizStore } from "@/stores/quizStore";
 import { Button, Card, Input } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { useCommands } from "@/components/CommandPalette";
+import { t } from "@/i18n/fa";
 
 /** 2D floorplan preview (MVP): SVG room at 1px = 1cm (scaled to fit),
  *  draggable product rectangles, fit warnings when furniture exceeds room. */
@@ -198,7 +199,7 @@ export default function FloorplanPage() {
       a.href = url;
       a.download = `floorplan-${width}x${length}cm.png`;
       a.click();
-      toast.success("Floorplan exported as PNG.");
+      toast.success("نقشه چیدمان به‌صورت تصویر ذخیره شد.");
     } catch {
       toast.error("Could not export the floorplan.");
     } finally {
@@ -218,14 +219,13 @@ export default function FloorplanPage() {
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="h1 text-[var(--color-ink)]">Floorplan</h1>
+          <h1 className="h1 text-[var(--color-ink)]">{t.floorplan.title}</h1>
           <p className="mt-1 text-sm text-[var(--color-muted)]">
-            Real dimensions, 1 unit = 1 cm. Drag furniture to arrange the room —
-            walkways under {MIN_CLEARANCE_CM} cm are flagged.
+            {t.floorplan.subtitle}
           </p>
         </div>
         <Button variant="accent" onClick={() => void exportPng()} disabled={exporting}>
-          {exporting ? "Exporting…" : "Export PNG"}
+          {exporting ? "در حال ذخیره…" : t.floorplan.exportPng}
         </Button>
       </div>
 
@@ -395,15 +395,15 @@ export default function FloorplanPage() {
 
         <div className="space-y-4">
           <Card className="p-4">
-            <h2 className="text-sm font-semibold text-[var(--color-ink)]">Room dimensions</h2>
+            <h2 className="text-sm font-semibold text-[var(--color-ink)]">{t.floorplan.roomDimensions}</h2>
             <div className="mt-3 space-y-3">
               <div>
-                <label htmlFor="fp-w" className="mb-1 block text-xs text-[var(--color-muted)]">Width (cm)</label>
+                <label htmlFor="fp-w" className="mb-1 block text-xs text-[var(--color-muted)]">{t.floorplan.width}</label>
                 <Input id="fp-w" type="number" min={100} max={3000} value={width}
                        onChange={(e) => setWidth(Math.max(100, Number(e.target.value)))} />
               </div>
               <div>
-                <label htmlFor="fp-l" className="mb-1 block text-xs text-[var(--color-muted)]">Length (cm)</label>
+                <label htmlFor="fp-l" className="mb-1 block text-xs text-[var(--color-muted)]">{t.floorplan.length}</label>
                 <Input id="fp-l" type="number" min={100} max={3000} value={length}
                        onChange={(e) => setLength(Math.max(100, Number(e.target.value)))} />
               </div>
@@ -411,9 +411,9 @@ export default function FloorplanPage() {
           </Card>
 
           <Card className="p-4">
-            <h2 className="text-sm font-semibold text-[var(--color-ink)]">Add from your moodboard</h2>
+            <h2 className="text-sm font-semibold text-[var(--color-ink)]">{t.floorplan.addFromMoodboard}</h2>
             {available.length === 0 ? (
-              <p className="mt-2 text-xs text-[var(--color-muted)]">Create a moodboard first — its products appear here with real dimensions.</p>
+              <p className="mt-2 text-xs text-[var(--color-muted)]">{t.floorplan.addFromMoodboardHint}</p>
             ) : (
               <ul className="mt-2 space-y-1.5">
                 {available.map((p) => (

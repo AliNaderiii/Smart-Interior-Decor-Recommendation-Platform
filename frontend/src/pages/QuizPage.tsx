@@ -24,6 +24,8 @@ type ColorPalette = { id: string; label_fa: string; colors: string[]; mood: stri
 type BudgetRange = { id: string; label_fa: string; min: number; max: number; color: string };
 type DatasetStep = { id: string; title_fa: string; help_text_fa?: string; options?: unknown[]; ranges?: unknown[] };
 const DATASET_STEPS = questionnaire.steps as unknown as DatasetStep[];
+import { t } from "@/i18n/fa";
+
 const STEP_TITLES = DATASET_STEPS.map((item) => item.title_fa);
 const COLOR_PALETTES = (DATASET_STEPS.find((item) => item.id === "color_palette")?.options ?? []) as ColorPalette[];
 const DIMENSION_HELP = DATASET_STEPS.find((item) => item.id === "room_dimensions")?.help_text_fa;
@@ -93,13 +95,13 @@ export default function QuizPage() {
     <div className="mx-auto max-w-3xl">
       <h1 className="h1 text-[var(--color-ink)]">طراحی نشیمن شما</h1>
       <p className="mt-1 text-sm text-[var(--color-muted)]" dir="rtl">
-        مرحله {new Intl.NumberFormat("fa-IR").format(step + 1)} از ۵ — {STEP_TITLES[step]}
+        {t.quiz.stepOf(step + 1, STEP_TITLES.length)} — {STEP_TITLES[step]}
       </p>
 
       {/* Stepper */}
       {/* Progress: the current segment shimmers so "where am I" is legible at
           a glance without reading the step counter. */}
-      <ol className="mt-6 flex gap-1.5" aria-label={`Quiz progress: step ${step + 1} of ${STEP_TITLES.length}`}>
+      <ol className="mt-6 flex gap-1.5" aria-label={t.quiz.progressLabel(step + 1, STEP_TITLES.length)}>
         {STEP_TITLES.map((title, i) => (
           <li
             key={title}
@@ -230,7 +232,7 @@ export default function QuizPage() {
               })}
             </div>
             <div className="mt-4 flex items-center gap-3">
-              <label htmlFor="custom-color" className="text-sm font-medium">Custom:</label>
+              <label htmlFor="custom-color" className="text-sm font-medium">{t.quiz.custom}:</label>
               <input
                 id="custom-color"
                 type="color"
@@ -249,7 +251,7 @@ export default function QuizPage() {
         {step === 2 && (
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="width" className="mb-1 block text-sm font-medium">Room width (cm)</label>
+              <label htmlFor="width" className="mb-1 block text-sm font-medium">{t.quiz.roomWidth}</label>
               <Input
                 id="width" type="number" min={100} max={3000}
                 value={quiz.room_width_cm}
@@ -257,7 +259,7 @@ export default function QuizPage() {
               />
             </div>
             <div>
-              <label htmlFor="length" className="mb-1 block text-sm font-medium">Room length (cm)</label>
+              <label htmlFor="length" className="mb-1 block text-sm font-medium">{t.quiz.roomLength}</label>
               <Input
                 id="length" type="number" min={100} max={3000}
                 value={quiz.room_length_cm}
@@ -293,7 +295,7 @@ export default function QuizPage() {
 
         {step === 4 && (
           <div>
-            <p className="mb-5 text-sm text-[var(--color-muted)]">Which materials do you love? (optional)</p>
+            <p className="mb-5 text-sm text-[var(--color-muted)]">{t.quiz.materialsQuestion} <span className="text-[var(--color-faint)]">({t.common.optional})</span></p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
               {MATERIALS.map((m) => {
                 const active = quiz.materials.includes(m.id);
@@ -324,15 +326,15 @@ export default function QuizPage() {
 
       <div className="mt-6 flex justify-between">
         <Button variant="secondary" onClick={() => quiz.setStep(Math.max(0, step - 1))} disabled={step === 0}>
-          ← Back
+          {t.common.back}
         </Button>
         {step < 4 ? (
           <Button variant="accent" onClick={() => quiz.setStep(step + 1)} disabled={!canNext}>
-            Next →
+            {t.common.next}
           </Button>
         ) : (
           <Button variant="accent" onClick={submit} disabled={busy}>
-            {busy ? "Finding matches…" : "Get my recommendations"}
+            {busy ? "در حال یافتن گزینه‌ها…" : t.quiz.submit}
           </Button>
         )}
       </div>

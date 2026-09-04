@@ -4,24 +4,25 @@ import { post, tokenStore } from "@/lib/api";
 import clsx from "clsx";
 import { useThemeStore } from "@/stores/themeStore";
 import { useCommandPalette } from "@/components/CommandPalette";
+import { t } from "@/i18n/fa";
 
 const navByRole: Record<string, { to: string; label: string }[]> = {
   homeowner: [
-    { to: "/quiz", label: "Style Quiz" },
-    { to: "/recommendations", label: "Recommendations" },
-    { to: "/moodboards", label: "Moodboards" },
-    { to: "/floorplan", label: "Floorplan" },
-    { to: "/shopping-list", label: "Shopping List" },
+    { to: "/quiz", label: t.nav.quiz },
+    { to: "/recommendations", label: t.nav.recommendations },
+    { to: "/moodboards", label: t.nav.moodboards },
+    { to: "/floorplan", label: t.nav.floorplan },
+    { to: "/shopping-list", label: t.nav.shoppingList },
   ],
   designer: [
-    { to: "/designer/dashboard", label: "Projects" },
-    { to: "/quiz", label: "New Quiz" },
-    { to: "/recommendations", label: "Recommendations" },
+    { to: "/designer/dashboard", label: t.nav.designerDashboard },
+    { to: "/quiz", label: t.nav.quiz },
+    { to: "/recommendations", label: t.nav.recommendations },
   ],
   admin: [
-    { to: "/admin/products", label: "Products" },
-    { to: "/admin/users", label: "Users" },
-    { to: "/admin/subscriptions", label: "Subscriptions" },
+    { to: "/admin/products", label: t.nav.adminProducts },
+    { to: "/admin/users", label: t.nav.adminUsers },
+    { to: "/admin/subscriptions", label: "اشتراک‌ها" },
   ],
 };
 
@@ -35,14 +36,14 @@ function PaletteButton() {
     <button
       type="button"
       onClick={() => setOpen(true)}
-      aria-label="Open command palette"
+      aria-label={t.nav.openSearch}
       className="hidden items-center gap-2 rounded-lg border border-[var(--color-line)] px-2.5 py-1.5 text-xs text-[var(--color-muted)] transition-colors hover:border-[var(--color-faint)] hover:text-[var(--color-ink)] sm:flex"
     >
       <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
         <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />
         <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       </svg>
-      <span>Search</span>
+      <span>{t.nav.search}</span>
       <kbd className="rounded border border-[var(--color-line)] px-1 py-0.5 font-sans text-[10px]">
         {isMac ? "\u2318" : "Ctrl"}K
       </kbd>
@@ -58,9 +59,9 @@ function ThemeToggle() {
     <button
       type="button"
       onClick={toggle}
-      aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}
+      aria-label={dark ? t.nav.lightMode : t.nav.darkMode}
       aria-pressed={dark}
-      title={dark ? "Light mode" : "Dark mode"}
+      title={dark ? t.nav.lightMode : t.nav.darkMode}
       className="grid h-9 w-9 place-items-center rounded-lg text-[var(--color-muted)] transition-colors hover:bg-[var(--color-line)] hover:text-[var(--color-ink)]"
     >
       {dark ? (
@@ -113,7 +114,7 @@ export default function Layout() {
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
           <Link to="/" className="flex items-center gap-2 font-semibold tracking-[-0.02em] text-[var(--color-ink)]">
             <span aria-hidden className="grid h-7 w-7 place-items-center rounded-lg bg-[var(--color-accent)] text-sm text-[var(--color-canvas)]">SD</span>
-            Smart Decor
+            {t.brand}
           </Link>
           <nav className="hidden gap-1 md:flex" aria-label="Main">
             {links.map((l) => (
@@ -141,23 +142,23 @@ export default function Layout() {
                 {user.subscription_active && (
                   <span className="rounded-full bg-[var(--color-accent)]/8 px-2.5 py-0.5 text-xs font-semibold text-[var(--color-accent)]">PRO</span>
                 )}
-                <span className="hidden text-sm text-[var(--color-muted)] lg:inline">{user.email}</span>
+                <span dir="ltr" className="hidden text-sm text-[var(--color-muted)] lg:inline">{user.email}</span>
                 <button
                   onClick={handleLogout}
                   className="rounded-lg px-3 py-1.5 text-sm font-medium text-[var(--color-muted)] hover:bg-[var(--color-line)] hover:text-[var(--color-ink)]"
                 >
-                  Log out
+                  {t.nav.logout}
                 </button>
               </>
             ) : (
               <Link to="/login" className="rounded-xl bg-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-[var(--color-canvas)] hover:opacity-90">
-                Sign in
+                {t.nav.login}
               </Link>
             )}
           </div>
         </div>
         {links.length > 0 && (
-          <nav className="flex gap-1 overflow-x-auto border-t border-[var(--color-line)] px-3 py-1.5 md:hidden" aria-label="Mobile">
+          <nav className="flex gap-1 overflow-x-auto border-t border-[var(--color-line)] px-3 py-1.5 md:hidden" aria-label="ناوبری موبایل">
             {links.map((l) => (
               <NavLink
                 key={l.to}

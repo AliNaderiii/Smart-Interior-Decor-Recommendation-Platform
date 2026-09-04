@@ -16,6 +16,9 @@ import { useToast } from "@/components/Toast";
 import { useCommands } from "@/components/CommandPalette";
 import { spring, staggerContainer, staggerItem } from "@/lib/motion";
 
+import { t } from "@/i18n/fa";
+import { ScrollStage, CardTilt3D } from "@/components/Scroll3D";
+
 type LayoutMode = "grid" | "masonry";
 
 function useRecommendations(quizId: string | null) {
@@ -285,9 +288,32 @@ export default function RecommendationsPage() {
   if (isError) {
     return (
       <ErrorState
-        message="Could not load recommendations."
+        message={t.recommendations.errorTitle}
         onRetry={() => refetch()}
         errorId={(error as { status?: number })?.status ? `HTTP ${(error as { status?: number }).status}` : undefined}
+      />
+    );
+  }
+
+  // B-1: these were one branch, so arriving here without a quiz (e.g. clicking
+  // "Recommendations" in the nav before finishing the quiz) claimed the budget
+  // had failed — blaming the user's inputs for a step they never took. The
+  // backend is fine: POST /quiz -> POST /recommend?quiz_id=... returns 35
+  // products across 7 categories. Distinguish "no input yet" from "input
+  // produced nothing".
+  if (!quizId) {
+    return (
+      <EmptyState
+        title={t.recommendations.noQuizTitle}
+        hint={t.recommendations.noQuizHint}
+        action={
+          <Link
+            to="/quiz"
+            className="inline-block rounded-xl bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--color-canvas)] hover:opacity-90"
+          >
+            {t.recommendations.noQuizCta}
+          </Link>
+        }
       />
     );
   }
@@ -295,14 +321,14 @@ export default function RecommendationsPage() {
   if (!data || categories.length === 0) {
     return (
       <EmptyState
-        title="No matches in this budget"
-        hint="Nothing cleared your filters. Widening the budget range usually brings back the most options."
+        title={t.recommendations.emptyTitle}
+        hint={t.recommendations.emptyHint}
         action={
           <Link
             to="/quiz"
             className="inline-block rounded-xl bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--color-canvas)] hover:opacity-90"
           >
-            Adjust your quiz
+            {t.recommendations.emptyCta}
           </Link>
         }
       />
@@ -318,12 +344,13 @@ export default function RecommendationsPage() {
         "columns-1 gap-4 sm:columns-2 lg:columns-4 [&>*]:mb-4 [&>*]:break-inside-avoid";
 
   return (
+    <ScrollStage>
     <div>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="h1 text-[var(--color-ink)]">Your recommendations</h1>
+          <h1 className="h1 text-[var(--color-ink)]">{t.recommendations.title}</h1>
           <p className="mt-1 text-sm text-[var(--color-muted)]">
-            Ranked by style, colour, budget and material fit. Use 👍/👎 to tune the next set.
+            {t.recommendations.subtitle}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -380,6 +407,7 @@ export default function RecommendationsPage() {
           >
             {items.map((product, i) => (
               <motion.div key={product.id} variants={reduce ? undefined : staggerItem}>
+                <CardTilt3D>
                 <ProductCard
                   product={product}
                   rank={i}
@@ -388,11 +416,13 @@ export default function RecommendationsPage() {
                   feedback={feedbackMap?.[product.id]}
                   onFeedback={product.locked ? undefined : handleFeedback}
                 />
+                </CardTilt3D>
               </motion.div>
             ))}
           </motion.div>
         </section>
       ))}
     </div>
+    </ScrollStage>
   );
 }
