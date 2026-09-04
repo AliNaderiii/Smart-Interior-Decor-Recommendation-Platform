@@ -3,7 +3,12 @@ import { useAuthStore } from "@/stores/authStore";
 import { STYLES } from "@/lib/constants";
 import { Card } from "@/components/ui";
 import { OptimizedImage } from "@/components/OptimizedImage";
-import heroImage from "@/assets/hero.png";
+// WebP, pre-sized to the largest rendered width (1440px = 960 CSS px at 1.5x
+// DPR). The source PNG was 2.7 MB and pushed mobile LCP to 17.5 s — the single
+// audit dragging Lighthouse performance to 72. Vite fingerprints local assets,
+// so OptimizedImage's `deriveSources` URL derivation cannot apply; importing
+// the already-optimised file is the correct route.
+import heroImage from "@/assets/hero.webp";
 import { t, toFa } from "@/i18n/fa";
 import {
   ScrollStage,
