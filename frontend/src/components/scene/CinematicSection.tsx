@@ -108,9 +108,10 @@ export function CinematicSection({ children }: { children?: ReactNode }) {
   return (
     <section
       ref={sectionRef}
-      // 340vh gives the camera path room to breathe: ~2.4 viewports of scroll
-      // for eight waypoints reads as a slow dolly rather than a jump cut.
-      className="relative -mx-4 h-[340vh] sm:-mx-6 lg:-mx-8"
+      // ~7 viewports of scroll for 11 frames: each shot holds for most of a
+      // screen before it dissolves. At 340vh (the first attempt) a cut landed
+      // every ~0.4 screens and the result read as a slideshow, not a shot.
+      className="relative -mx-4 h-[700vh] sm:-mx-6 lg:-mx-8"
       aria-label={t.cinematic.title}
     >
       <div className="sticky top-0 h-screen w-full overflow-hidden">
