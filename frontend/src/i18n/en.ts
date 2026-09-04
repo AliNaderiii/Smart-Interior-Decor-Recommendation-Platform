@@ -40,7 +40,7 @@ export const en: Dict = {
     delete: "Delete",
     edit: "Edit",
     close: "Close",
-    loading: "Loading…",
+    loading: "Preparing the walkthrough…",
     retry: "Try again",
     optional: "optional",
     toman: "Toman",
@@ -223,12 +223,18 @@ export const en: Dict = {
 
   cinematic: {
     title: "Step inside the room",
-    body:
-      "As you scroll, the camera moves from outside the building into the living room, gliding past the sofa, rug, artwork and lamp. Everything is modelled at real dimensions — the same measurements you see in the recommendations.",
+    captions: [
+      "We start outside — a modern home at dusk.",
+      "Approaching the entrance, warm light behind the glass.",
+      "Stepping inside: open plan, high ceiling, timber stair.",
+      "The living room — sofa, hand-knotted rug, walnut table.",
+      "Gliding past the sofa; texture, brass, tea on the table.",
+      "And finally, the gallery wall and bookshelf.",
+    ],
     scrollHint: "Scroll to move the camera",
     loading: "Preparing the 3D scene…",
     staticNotice:
-      "The 3D view is disabled on this device to keep the site fast.",
+      "Shown as a still image because your device requests reduced motion.",
   },
 
   errors: {

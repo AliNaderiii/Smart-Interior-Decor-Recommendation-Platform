@@ -30,26 +30,7 @@ import { useReducedMotion } from "framer-motion";
 import { useT } from "@/i18n";
 import heroImage from "@/assets/hero.webp";
 
-const CinematicScene = lazy(() => import("./CinematicScene"));
-
-/** Cheap capability probe. Creates and immediately discards a context. */
-function canRunWebGL(): boolean {
-  if (typeof document === "undefined") return false;
-  try {
-    const c = document.createElement("canvas");
-    const gl =
-      c.getContext("webgl2") ??
-      (c.getContext("webgl") as WebGLRenderingContext | null);
-    if (!gl) return false;
-    const cores = navigator.hardwareConcurrency ?? 4;
-    const mem = (navigator as Navigator & { deviceMemory?: number }).deviceMemory ?? 4;
-    // Two cores and 2 GB is a 2016-era budget phone; it can create a context
-    // but cannot hold 30 fps with shadows and a dozen meshes.
-    return cores >= 4 && mem >= 3;
-  } catch {
-    return false;
-  }
-}
+const CinematicSequence = lazy(() => import("./CinematicSequence"));
 
 /** Static stand-in used whenever the scene is refused. Same framing and copy,
  *  so the section never looks broken — it looks like a photograph. */
@@ -76,13 +57,13 @@ export function CinematicSection({ children }: { children?: ReactNode }) {
   const progress = useRef(0);
   const reduced = useReducedMotion();
 
-  const [enabled] = useState(canRunWebGL);
   const [near, setNear] = useState(false);
+  const [frame, setFrame] = useState(0);
 
-  // Only mount the heavy chunk when the section is within one viewport.
+  // Only fetch the frame set when the section is within one viewport.
   useEffect(() => {
     const el = sectionRef.current;
-    if (!el || !enabled || reduced) return;
+    if (!el || reduced) return;
     const io = new IntersectionObserver(
       (entries) => {
         if (entries.some((e) => e.isIntersecting)) {
@@ -94,7 +75,7 @@ export function CinematicSection({ children }: { children?: ReactNode }) {
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [enabled, reduced]);
+  }, [reduced]);
 
   // Scroll → progress. Written to a ref (not state) so scrolling never
   // triggers a React re-render; the Canvas reads it inside useFrame.
@@ -122,7 +103,7 @@ export function CinematicSection({ children }: { children?: ReactNode }) {
     };
   }, []);
 
-  const showScene = enabled && !reduced;
+  const showScene = !reduced;
 
   return (
     <section
@@ -136,7 +117,7 @@ export function CinematicSection({ children }: { children?: ReactNode }) {
         {showScene ? (
           <Suspense fallback={<PosterFallback caption={t.cinematic.loading} />}>
             {near ? (
-              <CinematicScene progress={progress} />
+              <CinematicSequence progress={progress} onFrame={setFrame} />
             ) : (
               <PosterFallback caption={t.cinematic.loading} />
             )}
@@ -147,16 +128,16 @@ export function CinematicSection({ children }: { children?: ReactNode }) {
 
         {/* Copy overlay. pointer-events-none so it never blocks scrolling. */}
         <div className="pointer-events-none absolute inset-0 flex flex-col justify-between p-6 sm:p-10">
-          <div className="max-w-lg rounded-2xl bg-[var(--color-canvas)]/78 p-5 backdrop-blur-sm">
+          <div className="max-w-lg rounded-2xl bg-[var(--color-canvas)]/88 p-5 shadow-lg backdrop-blur-md">
             <h2 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">
               {t.cinematic.title}
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-[var(--color-muted)]">
-              {t.cinematic.body}
+              {t.cinematic.captions[Math.min(frame, t.cinematic.captions.length - 1)]}
             </p>
           </div>
 
-          <p className="self-center rounded-full bg-[var(--color-canvas)]/78 px-4 py-1.5 text-xs font-medium text-[var(--color-muted)] backdrop-blur-sm">
+          <p className="self-center rounded-full bg-[var(--color-canvas)]/88 px-4 py-1.5 shadow-md text-xs font-medium text-[var(--color-muted)] backdrop-blur-sm">
             {t.cinematic.scrollHint}
           </p>
         </div>
