@@ -85,6 +85,8 @@ export function BeforeAfter({
         <img
           src={afterSrc}
           alt={afterLabel}
+          width={1200}
+          height={750}
           className="absolute inset-0 h-full w-full object-cover"
           loading="lazy"
           decoding="async"
@@ -96,6 +98,8 @@ export function BeforeAfter({
           <img
             src={beforeSrc}
             alt={beforeLabel}
+            width={1200}
+            height={750}
             className="absolute inset-0 h-full w-full object-cover"
             loading="lazy"
             decoding="async"

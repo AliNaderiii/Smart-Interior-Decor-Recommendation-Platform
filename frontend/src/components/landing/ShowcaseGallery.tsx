@@ -86,6 +86,8 @@ export function ShowcaseGallery() {
                   <img
                     src={shot.src}
                     alt={copy.title}
+                    width={1100}
+                    height={688}
                     className="aspect-[16/10] w-full object-cover"
                     loading="lazy"
                     decoding="async"
