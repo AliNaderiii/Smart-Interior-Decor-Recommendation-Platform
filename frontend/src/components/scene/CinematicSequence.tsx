@@ -129,21 +129,20 @@ export default function CinematicSequence({
     };
   }, []);
 
-  /** Closest decoded frame to `i`.
+  /** Best decoded frame to display for scroll index `i`.
    *
-   *  Ties break *backwards*: when the frame either side is equidistant we take
-   *  the earlier one. Preferring the later frame made the displayed index jump
-   *  around non-monotonically while the set warmed (observed: 13 -> 19 -> 13),
-   *  which looks like stuttering rather than a camera move. */
+   *  Searches BACKWARDS only. Showing a frame from further along the journey
+   *  than the user has actually scrolled is worse than showing an earlier one:
+   *  it reveals the interior before they have "entered", and then appears to
+   *  rewind once the correct frame decodes. Measured on a throttled
+   *  connection, the bidirectional version opened on frame 17 of 18 and then
+   *  jumped back to 9.
+   *
+   *  Frame 0 is fetched eagerly, so the backwards search almost always
+   *  terminates on something real. */
   const resolveFrame = useMemo(
     () => (i: number) => {
-      if (decoded.current[i]) return i;
-      for (let d = 1; d < FRAMES.length; d++) {
-        const lo = i - d;
-        if (lo >= 0 && decoded.current[lo]) return lo;
-        const hi = i + d;
-        if (hi < FRAMES.length && decoded.current[hi]) return hi;
-      }
+      for (let j = i; j >= 0; j--) if (decoded.current[j]) return j;
       return 0;
     },
     [],
@@ -165,12 +164,11 @@ export default function CinematicSequence({
 
       const el = imgRef.current;
       if (el) {
-        let pick = resolveFrame(idx);
-        // While warming, never step backwards during a forward scroll: a
-        // temporary gap in the decoded set must not rewind the shot.
-        if (idx >= lastShown.current && pick < lastShown.current) {
-          pick = lastShown.current;
-        }
+        // Clamp to the scroll position: never show a frame the user has not
+        // reached. Combined with the backwards-only search this makes the
+        // sequence monotonic while warming — it may lag, but it never jumps
+        // ahead and never rewinds.
+        const pick = Math.min(resolveFrame(idx), idx);
         lastShown.current = pick;
         const src = FRAMES[pick];
         if (src !== currentSrc.current) {
