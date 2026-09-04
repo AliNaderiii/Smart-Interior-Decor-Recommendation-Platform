@@ -237,6 +237,93 @@ export const en: Dict = {
       "Shown as a still image because your device requests reduced motion.",
   },
 
+  gallery: {
+    title: "What you actually get",
+    subtitle:
+      "These are real platform outputs: a room furnished from catalogue products, with Toman prices and verified seller links.",
+    before: "Before",
+    after: "After",
+    sliderLabel: "Compare before and after",
+    baTitle: "From an empty room to a finished layout",
+    baBody:
+      "Drag the handle. The right side is the same room furnished by our engine — every piece is a real product with its own match score.",
+    baHint: "Drag the handle in the middle to compare",
+    stylesTitle: "Six styles, different outcomes",
+    stylesBody:
+      "For each style the engine picks a different combination of furniture, colour and material.",
+    styleCards: [
+      {
+        title: "Modern",
+        body: "Clean lines, neutral palette, glossy materials. Suits compact urban spaces.",
+      },
+      {
+        title: "Scandinavian",
+        body: "Light wood, soft textures, plenty of daylight. Calm and visually open.",
+      },
+      {
+        title: "Bohemian",
+        body: "Layered rugs and textiles, warm colours, handmade pieces and plants.",
+      },
+      {
+        title: "Classic",
+        body: "Velvet, hand-knotted carpet, walnut and brass. For formal living rooms.",
+      },
+    ],
+  },
+
+  proof: {
+    title: "What people say",
+    subtitle: "Three different roles, three different uses.",
+    items: [
+      {
+        quote:
+          "Before buying a sofa I compared three combinations and saw which one worked with our existing carpet. I did not waste the money.",
+        role: "Homeowner, Tehran",
+      },
+      {
+        quote:
+          "I can prepare several directions for a client in minutes instead of spending two days building moodboards.",
+        role: "Interior designer",
+      },
+      {
+        quote:
+          "The score breakdown is the important part — I can explain to a client exactly why a piece was recommended.",
+        role: "Styling consultant",
+      },
+    ],
+  },
+
+  faq: {
+    title: "Frequently asked questions",
+    subtitle: "Everything worth knowing before you start.",
+    items: [
+      {
+        q: "Are the prices and seller links real?",
+        a: "Yes. Every product carries a Toman price and a seller link, and link health is checked automatically — dead links are quarantined out of the results.",
+      },
+      {
+        q: "How is the match score calculated?",
+        a: "Four components: style fit, colour harmony, budget fit and material fit. Each is shown separately so you can see where a product diverges from your taste.",
+      },
+      {
+        q: "Do I need to upload a photo of my room?",
+        a: "No. The two-minute style quiz is enough: style, colour palette, room dimensions, budget and preferred materials.",
+      },
+      {
+        q: "Do I need design experience?",
+        a: "No. Just pick the rooms you are drawn to — your style is inferred from what you choose.",
+      },
+      {
+        q: "Why do you ask for room dimensions?",
+        a: "The floorplan is built at real scale and walkways under 76 cm are flagged, so furniture that will not physically fit is never recommended.",
+      },
+      {
+        q: "Is my data stored?",
+        a: "Only your quiz answers and moodboards. Card details are never stored, and full account deletion is available at any time.",
+      },
+    ],
+  },
+
   errors: {
     generic: "Something went wrong. Please try again.",
     network: "The server could not be reached.",

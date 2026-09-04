@@ -10,7 +10,8 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 // the already-optimised file is the correct route.
 import heroImage from "@/assets/hero.webp";
 import { useLocale } from "@/i18n";
-import { CinematicSection } from "@/components/scene/CinematicSection";
+import { ShowcaseGallery } from "@/components/landing/ShowcaseGallery";
+import { FaqAndProof } from "@/components/landing/FaqAndProof";
 import {
   ScrollStage,
   TiltOnScroll,
@@ -88,14 +89,9 @@ export default function HomePage() {
         />
         </ParallaxZ>
       </section>
-      </ScrollStage>
 
-      {/* Outside ScrollStage on purpose: that wrapper sets `perspective`, which
-          creates a containing block and silently disables `position: sticky`
-          for everything inside it. */}
-      <CinematicSection />
+      <ShowcaseGallery />
 
-      <ScrollStage>
       <TiltOnScroll className="border-t border-[var(--color-line)] py-16 lg:py-24">
         <h2 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">
           {t.home.howItWorks}
@@ -171,6 +167,8 @@ export default function HomePage() {
         </Card>
         </CardTilt3D>
       </TiltOnScroll>
+
+      <FaqAndProof />
 
       <section className="border-t border-[var(--color-line)] py-16 lg:py-24">
         <h2 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">
