@@ -7,6 +7,7 @@ import { safeUrl } from "@/lib/safeUrl";
 import { Badge, Card, Skeleton } from "@/components/ui";
 import { ErrorState } from "@/components/states";
 import { OptimizedImage } from "@/components/OptimizedImage";
+import { useT } from "@/i18n";
 
 interface ShareData {
   client_name: string;
@@ -16,6 +17,7 @@ interface ShareData {
 
 /** Public read-only recommendation view (no auth). */
 export default function SharePage() {
+  const t = useT();
   const { token } = useParams<{ token: string }>();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["share", token],
@@ -55,7 +57,7 @@ export default function SharePage() {
   return (
     <div>
       <Card className="p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-muted)]">Shared room plan</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-muted)]">{t.shoppingList.sharedPlan}</p>
         <h1 className="mt-2 h1 text-[var(--color-ink)]">
           {data.client_name ? `${data.client_name}'s living room` : "Living room plan"}
         </h1>

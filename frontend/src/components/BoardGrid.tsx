@@ -3,6 +3,7 @@
 import { GridLayout, noCompactor, type Layout } from "react-grid-layout";
 import type { RecommendedProduct } from "@/lib/types";
 import { OptimizedImage } from "@/components/OptimizedImage";
+import { useT } from "@/i18n";
 
 interface LayoutItem {
   i: string;
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export default function BoardGrid({ layout, products, onLayoutChange, width = 1080 }: Props) {
+  const t = useT();
   return (
     <GridLayout
       className="layout"
@@ -53,7 +55,7 @@ export default function BoardGrid({ layout, products, onLayoutChange, width = 10
                 <div className="truncate px-2 py-1.5 text-[11px] font-medium text-[var(--color-ink)]">{p.title}</div>
               </div>
             ) : (
-              <div className="grid h-full place-items-center text-xs text-[var(--color-faint)]">Unavailable</div>
+              <div className="grid h-full place-items-center text-xs text-[var(--color-faint)]">{t.shoppingList.unavailable}</div>
             )}
           </div>
         );

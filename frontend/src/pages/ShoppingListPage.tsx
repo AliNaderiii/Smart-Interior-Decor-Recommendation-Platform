@@ -323,7 +323,7 @@ export default function ShoppingListPage() {
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--color-line)] bg-[var(--color-canvas)]/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
           <div>
-            <p className="text-xs uppercase tracking-wider text-[var(--color-faint)]">Total</p>
+            <p className="text-xs uppercase tracking-wider text-[var(--color-faint)]">{t.shoppingList.total}</p>
             <p className="text-xl font-semibold tabular-nums text-[var(--color-ink)]">{formatToman(total)}</p>
           </div>
           <p className="text-xs text-[var(--color-muted)]">

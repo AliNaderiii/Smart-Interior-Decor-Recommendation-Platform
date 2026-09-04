@@ -188,6 +188,8 @@ export const en: Dict = {
     hintFromBoard: "Open a moodboard and choose “Add all to shopping list” to collect everything you want to buy.",
     hintNoBoard: "Your shopping list is built from a moodboard. Pick products you like and save them to a board.",
     linkVerified: "Link verified",
+    unavailable: "Unavailable",
+    sharedPlan: "Shared room plan",
   },
 
   auth: {

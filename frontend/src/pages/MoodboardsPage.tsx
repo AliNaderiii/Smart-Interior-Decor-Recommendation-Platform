@@ -130,7 +130,7 @@ export default function MoodboardsPage() {
                 to="/recommendations"
                 className="inline-block rounded-xl bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--color-canvas)] hover:opacity-90"
               >
-                Browse recommendations
+                {t.moodboards.emptyCta}
               </Link>
             }
           />
