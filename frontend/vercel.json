@@ -1,5 +1,12 @@
 {
   "rewrites": [
-    { "source": "/api/:path*", "destination": "https://smartdecor-backend.onrender.com/api/:path*" }
+    {
+      "source": "/api/:path*",
+      "destination": "https://smartdecor-backend.onrender.com/api/:path*"
+    },
+    {
+      "source": "/((?!assets/|favicon|robots|sitemap).*)",
+      "destination": "/index.html"
+    }
   ]
 }
