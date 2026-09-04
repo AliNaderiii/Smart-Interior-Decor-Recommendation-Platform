@@ -174,6 +174,16 @@ export const en: Dict = {
     passwordHint: "At least 8 characters",
   },
 
+  cinematic: {
+    title: "Step inside the room",
+    body:
+      "As you scroll, the camera moves from outside the building into the living room, gliding past the sofa, rug, artwork and lamp. Everything is modelled at real dimensions — the same measurements you see in the recommendations.",
+    scrollHint: "Scroll to move the camera",
+    loading: "Preparing the 3D scene…",
+    staticNotice:
+      "The 3D view is disabled on this device to keep the site fast.",
+  },
+
   errors: {
     generic: "Something went wrong. Please try again.",
     network: "The server could not be reached.",

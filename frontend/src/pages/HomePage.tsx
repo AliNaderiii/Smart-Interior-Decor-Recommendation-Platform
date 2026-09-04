@@ -10,6 +10,7 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 // the already-optimised file is the correct route.
 import heroImage from "@/assets/hero.webp";
 import { useLocale } from "@/i18n";
+import { CinematicSection } from "@/components/scene/CinematicSection";
 import {
   ScrollStage,
   TiltOnScroll,
@@ -86,6 +87,8 @@ export default function HomePage() {
         />
         </ParallaxZ>
       </section>
+
+      <CinematicSection />
 
       <TiltOnScroll className="border-t border-[var(--color-line)] py-16 lg:py-24">
         <h2 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">
