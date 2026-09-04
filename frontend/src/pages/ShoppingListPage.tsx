@@ -301,7 +301,7 @@ export default function ShoppingListPage() {
                   </div>
                 </div>
                 <QuantityStepper value={n} onChange={(v) => setQuantity(p.id, v)} label={p.title} />
-                <div className="w-32 text-right">
+                <div className="w-32 text-end">
                   <p className="font-semibold tabular-nums text-[var(--color-ink)]">
                     {formatToman(p.price_toman * n)}
                   </p>

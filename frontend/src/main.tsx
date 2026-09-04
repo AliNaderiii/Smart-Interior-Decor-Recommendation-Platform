@@ -8,9 +8,13 @@ import "@/lib/earlyRecommend";
 // V2: only the subsets we actually render — see src/fonts.css.
 import "./fonts.css";
 import { useThemeStore, applyMode } from "@/stores/themeStore";
+import { applyLocale, readStoredLocale } from "@/i18n";
 
 // Apply the persisted theme before first paint to avoid a light-mode flash.
 applyMode(useThemeStore.getState().mode);
+// Same reasoning for direction: setting lang/dir after mount makes the whole
+// layout visibly jump from RTL to LTR on first paint.
+applyLocale(readStoredLocale());
 import "./index.css";
 import App from "./App";
 

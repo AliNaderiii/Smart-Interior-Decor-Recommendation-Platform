@@ -60,7 +60,7 @@ export default function AdminSubscriptionsPage() {
       <Card className="mt-6 overflow-x-auto">
         <table className="w-full min-w-[560px] text-sm">
           <thead>
-            <tr className="border-b border-[var(--color-line)] text-left text-xs uppercase tracking-wide text-[var(--color-muted)]">
+            <tr className="border-b border-[var(--color-line)] text-start text-xs uppercase tracking-wide text-[var(--color-muted)]">
               <th className="px-4 py-3">User</th>
               <th className="px-4 py-3">Plan</th>
               <th className="px-4 py-3">Status</th>

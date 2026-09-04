@@ -17,7 +17,7 @@ function PlanGrid({ title, plans, busy, active, onPayment }: {
   title: string; plans: Plan[]; busy: boolean; active: boolean; onPayment: () => void;
 }) {
   return (
-    <section className="mt-10" dir="rtl">
+    <section className="mt-10">
       <h2 className="text-2xl font-semibold text-[var(--color-ink)]">{title}</h2>
       <div className="mt-5 grid gap-5 lg:grid-cols-3">
         {plans.map((plan) => (
@@ -79,7 +79,7 @@ export default function UpgradePage() {
 
   return (
     <div className="mx-auto max-w-6xl pb-12 pt-6">
-      <div className="text-center" dir="rtl">
+      <div className="text-center">
         <h1 className="text-3xl font-semibold text-[var(--color-ink)]">پلن مناسب خودت را انتخاب کن</h1>
         <p className="mt-2 text-sm text-[var(--color-muted)]">پرداخت امن زرین‌پال؛ اطلاعات کارت هرگز در این سامانه ذخیره نمی‌شود.</p>
         {sub?.is_active && <p className="mt-4 text-sm text-[var(--color-ok)]">اشتراک فعال تا {sub.expires_at ? new Date(sub.expires_at).toLocaleDateString("fa-IR") : "—"}</p>}

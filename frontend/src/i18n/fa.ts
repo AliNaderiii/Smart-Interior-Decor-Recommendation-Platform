@@ -1,10 +1,13 @@
-/** Persian UI strings.
+/** Persian UI strings — the reference catalogue.
  *
- * Why a module and not a full i18n runtime: the product ships Persian-only for
- * the Iranian market (prices in Toman, Digikala seller links). A runtime like
- * i18next would add ~40 KB and a provider tree for a single locale. When a
- * second locale is actually required, swap this object for the loader — every
- * call site already goes through `t`, so nothing else changes.
+ * Persian is the source of truth: its shape is exported as `Dict`, and `en.ts`
+ * is typed against it, so a missing or misspelled English key fails the build
+ * instead of leaking Persian into an English page.
+ *
+ * Why a hand-rolled catalogue rather than i18next: two static locales need a
+ * lookup table, not a 40 KB runtime with plural rules and lazy namespaces.
+ * Every call site goes through `useT()`, so swapping in a real runtime later
+ * touches this folder only.
  */
 export const fa = {
   brand: "اسمارت دکور",
@@ -25,6 +28,9 @@ export const fa = {
     designerDashboard: "داشبورد طراح",
     adminProducts: "مدیریت محصولات",
     adminUsers: "مدیریت کاربران",
+    adminSubscriptions: "اشتراک‌ها",
+    language: "زبان",
+    skipToContent: "پرش به محتوا",
   },
 
   common: {
@@ -68,6 +74,10 @@ export const fa = {
     stylesTitle: "شش سبک، یک آزمون",
     stylesSubtitle:
       "اتاق‌هایی را انتخاب کنید که به دلتان می‌نشیند — مدل سلیقه شما را از تصویر می‌فهمد، نه از صفت‌ها.",
+    explainTitle: "هر پیشنهاد، دلیل دارد",
+    explainBody:
+      "به‌جای فهرست بی‌توضیح، هر محصول با امتیاز تفکیک‌شده می‌آید تا بدانید چرا انتخاب شده و کجا با سلیقه‌تان فاصله دارد.",
+    sampleProduct: "مبل مدرن — چرم عسلی",
   },
 
   quiz: {
@@ -90,8 +100,11 @@ export const fa = {
     max: "حداکثر (تومان)",
     materialsQuestion: "چه متریالی دوست داری؟",
     colorHint: "پالت رنگی نزدیک به حس دلخواهت را انتخاب کن.",
+    stylesHint:
+      "اتاق‌هایی را انتخاب کن که به دلت می‌نشیند. سبکت را از انتخاب‌هایت می‌فهمیم — لازم نیست اسمش را بدانی.",
     custom: "دلخواه",
     submit: "پیشنهادها را نشانم بده",
+    submitting: "در حال یافتن گزینه‌ها…",
     progressLabel: (current: number, total: number) =>
       `پیشرفت آزمون: مرحله ${toFa(current)} از ${toFa(total)}`,
   },
@@ -115,6 +128,11 @@ export const fa = {
     scoreColor: "هماهنگی رنگ",
     scoreBudget: "تناسب بودجه",
     scoreMaterial: "تناسب متریال",
+    palette: "پالت",
+    addToMoodboard: "افزودن به مودبورد",
+    added: "افزوده شد ✓",
+    aiNotice: "استخراج‌شده با هوش مصنوعی از صفحه فروشنده — پیش از خرید تأیید کنید.",
+    proLocked: "با نسخه Pro همه گزینه‌ها را ببینید",
   },
 
   moodboards: {
@@ -130,14 +148,14 @@ export const fa = {
     subtitle:
       "ابعاد واقعی، هر واحد ۱ سانتی‌متر. مبلمان را بکشید و بچینید — مسیرهای عبور کمتر از ۷۶ سانتی‌متر علامت می‌خورند.",
     exportPng: "خروجی تصویر",
+    exporting: "در حال ذخیره…",
+    exported: "نقشه چیدمان به‌صورت تصویر ذخیره شد.",
     roomDimensions: "ابعاد اتاق",
     width: "عرض (سانتی‌متر)",
     length: "طول (سانتی‌متر)",
     addFromMoodboard: "افزودن از مودبورد",
     addFromMoodboardHint:
       "ابتدا یک مودبورد بسازید — محصولاتش با ابعاد واقعی اینجا ظاهر می‌شوند.",
-    footprint: (w: string, l: string, used: string, total: string, pct: string) =>
-      `${w}×${l} سانتی‌متر · اشغال ${used} از ${total} متر مربع (${pct}٪)`,
   },
 
   shoppingList: {
@@ -168,7 +186,10 @@ export const fa = {
     /** Render Free sleeps after inactivity; the first request pays the wake-up. */
     coldStart: "سرور در حال بیدار شدن است… (تا ۳۰ ثانیه)",
   },
-} as const;
+};
+
+/** The catalogue shape every locale must satisfy. */
+export type Dict = typeof fa;
 
 /** Latin digits -> Persian digits. */
 export function toFa(input: number | string): string {

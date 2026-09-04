@@ -4,33 +4,41 @@ import { post, tokenStore } from "@/lib/api";
 import clsx from "clsx";
 import { useThemeStore } from "@/stores/themeStore";
 import { useCommandPalette } from "@/components/CommandPalette";
-import { t } from "@/i18n/fa";
+import { useT } from "@/i18n";
+import { LanguageToggle } from "@/components/LanguageToggle";
 
-const navByRole: Record<string, { to: string; label: string }[]> = {
-  homeowner: [
-    { to: "/quiz", label: t.nav.quiz },
-    { to: "/recommendations", label: t.nav.recommendations },
-    { to: "/moodboards", label: t.nav.moodboards },
-    { to: "/floorplan", label: t.nav.floorplan },
-    { to: "/shopping-list", label: t.nav.shoppingList },
-  ],
-  designer: [
-    { to: "/designer/dashboard", label: t.nav.designerDashboard },
-    { to: "/quiz", label: t.nav.quiz },
-    { to: "/recommendations", label: t.nav.recommendations },
-  ],
-  admin: [
-    { to: "/admin/products", label: t.nav.adminProducts },
-    { to: "/admin/users", label: t.nav.adminUsers },
-    { to: "/admin/subscriptions", label: "اشتراک‌ها" },
-  ],
-};
+type NavLinkDef = { to: string; label: string };
+
+/** Built per render: a module-level constant would capture the catalogue at
+ *  import time and keep showing the boot locale after the user switches. */
+function navByRole(t: ReturnType<typeof useT>): Record<string, NavLinkDef[]> {
+  return {
+    homeowner: [
+      { to: "/quiz", label: t.nav.quiz },
+      { to: "/recommendations", label: t.nav.recommendations },
+      { to: "/moodboards", label: t.nav.moodboards },
+      { to: "/floorplan", label: t.nav.floorplan },
+      { to: "/shopping-list", label: t.nav.shoppingList },
+    ],
+    designer: [
+      { to: "/designer/dashboard", label: t.nav.designerDashboard },
+      { to: "/quiz", label: t.nav.quiz },
+      { to: "/recommendations", label: t.nav.recommendations },
+    ],
+    admin: [
+      { to: "/admin/products", label: t.nav.adminProducts },
+      { to: "/admin/users", label: t.nav.adminUsers },
+      { to: "/admin/subscriptions", label: t.nav.adminSubscriptions },
+    ],
+  };
+}
 
 /** Cmd+K is invisible to touch users and to anyone who does not already know
  *  the convention, so the palette also needs a visible affordance (RESEARCH_V2
  *  §6). This button is that affordance. */
 function PaletteButton() {
   const { setOpen } = useCommandPalette();
+  const t = useT();
   const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
   return (
     <button
@@ -52,6 +60,7 @@ function PaletteButton() {
 }
 
 function ThemeToggle() {
+  const t = useT();
   const mode = useThemeStore((s) => s.mode);
   const toggle = useThemeStore((s) => s.toggle);
   const dark = mode === "dark";
@@ -82,6 +91,7 @@ function ThemeToggle() {
 export default function Layout() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
+  const t = useT();
 
   async function handleLogout() {
     try {
@@ -99,7 +109,7 @@ export default function Layout() {
     navigate("/login");
   }
 
-  const links = user ? (navByRole[user.role] ?? []) : [];
+  const links = user ? (navByRole(t)[user.role] ?? []) : [];
 
   return (
     <div className="min-h-screen bg-[var(--color-canvas)]">
@@ -108,7 +118,7 @@ export default function Layout() {
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-[var(--color-accent)] focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-[var(--color-canvas)]"
       >
-        Skip to content
+        {t.nav.skipToContent}
       </a>
       <header className="sticky top-0 z-40 border-b border-[var(--color-line)] bg-[var(--color-canvas)]/85 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
@@ -136,6 +146,7 @@ export default function Layout() {
           </nav>
           <div className="flex items-center gap-2">
             <PaletteButton />
+            <LanguageToggle />
             <ThemeToggle />
             {user ? (
               <>

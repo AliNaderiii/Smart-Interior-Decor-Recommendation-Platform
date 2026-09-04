@@ -16,7 +16,7 @@ import { useToast } from "@/components/Toast";
 import { useCommands } from "@/components/CommandPalette";
 import { spring, staggerContainer, staggerItem } from "@/lib/motion";
 
-import { t } from "@/i18n/fa";
+import { useT } from "@/i18n";
 import { ScrollStage, CardTilt3D } from "@/components/Scroll3D";
 
 type LayoutMode = "grid" | "masonry";
@@ -124,6 +124,7 @@ function CategoryTabs({
 /* --------------------------------------------------------------------- page */
 
 export default function RecommendationsPage() {
+  const t = useT();
   const [params] = useSearchParams();
   const quizId = params.get("quiz");
   const { data, isLoading, isError, error, refetch, isFetching } = useRecommendations(quizId);

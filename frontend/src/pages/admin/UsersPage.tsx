@@ -70,7 +70,7 @@ export default function AdminUsersPage() {
       <Card className="mt-6 overflow-x-auto">
         <table className="w-full min-w-[720px] text-sm">
           <thead>
-            <tr className="border-b border-[var(--color-line)] text-left text-xs uppercase tracking-wide text-[var(--color-muted)]">
+            <tr className="border-b border-[var(--color-line)] text-start text-xs uppercase tracking-wide text-[var(--color-muted)]">
               <th className="px-4 py-3">Email</th>
               <th className="px-4 py-3">Name</th>
               <th className="px-4 py-3">Role</th>

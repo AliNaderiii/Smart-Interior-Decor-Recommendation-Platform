@@ -9,7 +9,7 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 // so OptimizedImage's `deriveSources` URL derivation cannot apply; importing
 // the already-optimised file is the correct route.
 import heroImage from "@/assets/hero.webp";
-import { t, toFa } from "@/i18n/fa";
+import { useLocale } from "@/i18n";
 import {
   ScrollStage,
   TiltOnScroll,
@@ -21,6 +21,7 @@ import {
 
 
 export default function HomePage() {
+  const { t, num } = useLocale();
   const user = useAuthStore((s) => s.user);
 
   const cta = user
@@ -95,7 +96,7 @@ export default function HomePage() {
           {t.home.steps.map((s, i) => (
             <ScrollReveal key={s.title} delay={i * 0.12}>
               <span className="text-xs font-semibold tabular-nums tracking-widest text-[var(--color-faint)]">
-                {toFa(String(i + 1).padStart(2, "0"))}
+                {num(String(i + 1).padStart(2, "0"))}
               </span>
 
               <h3 className="mt-3 font-semibold text-[var(--color-ink)]">{s.title}</h3>
@@ -124,7 +125,7 @@ export default function HomePage() {
         <Card className="overflow-hidden p-5">
           <p className="font-semibold text-[var(--color-ink)]">مبل مدرن — چرم عسلی</p>
           <p className="mt-1 text-sm text-[var(--color-muted)]">
-            {toFa("42,900,000")} {t.common.toman}
+            {num("42,900,000")} {t.common.toman}
           </p>
 
           <div className="mt-4 space-y-2.5">
@@ -141,7 +142,7 @@ export default function HomePage() {
                 <span
                   className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--color-line)]"
                   role="img"
-                  aria-label={`${row.label}: ${toFa(row.value)} درصد`}
+                  aria-label={`${row.label}: ${num(row.value)} درصد`}
                 >
                   {/* RTL: the track is a flex row so the fill starts at the
                       right edge, matching reading direction. A bare width on a
@@ -154,7 +155,7 @@ export default function HomePage() {
                   </span>
                 </span>
                 <span className="w-9 shrink-0 text-xs tabular-nums text-[var(--color-ink)]">
-                  {toFa(row.value)}٪
+                  {num(row.value)}٪
                 </span>
               </div>
             ))}

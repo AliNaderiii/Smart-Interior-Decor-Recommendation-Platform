@@ -24,14 +24,15 @@ type ColorPalette = { id: string; label_fa: string; colors: string[]; mood: stri
 type BudgetRange = { id: string; label_fa: string; min: number; max: number; color: string };
 type DatasetStep = { id: string; title_fa: string; help_text_fa?: string; options?: unknown[]; ranges?: unknown[] };
 const DATASET_STEPS = questionnaire.steps as unknown as DatasetStep[];
-import { t } from "@/i18n/fa";
+import { useLocale } from "@/i18n";
 
-const STEP_TITLES = DATASET_STEPS.map((item) => item.title_fa);
+
 const COLOR_PALETTES = (DATASET_STEPS.find((item) => item.id === "color_palette")?.options ?? []) as ColorPalette[];
 const DIMENSION_HELP = DATASET_STEPS.find((item) => item.id === "room_dimensions")?.help_text_fa;
 const BUDGET_RANGES = (DATASET_STEPS.find((item) => item.id === "budget")?.ranges ?? []) as BudgetRange[];
 
 export default function QuizPage() {
+  const { t } = useLocale();
   const quiz = useQuizStore();
   const user = useAuthStore((s) => s.user);
   const navigate = useNavigate();
@@ -94,15 +95,15 @@ export default function QuizPage() {
   return (
     <div className="mx-auto max-w-3xl">
       <h1 className="h1 text-[var(--color-ink)]">طراحی نشیمن شما</h1>
-      <p className="mt-1 text-sm text-[var(--color-muted)]" dir="rtl">
-        {t.quiz.stepOf(step + 1, STEP_TITLES.length)} — {STEP_TITLES[step]}
+      <p className="mt-1 text-sm text-[var(--color-muted)]">
+        {t.quiz.stepOf(step + 1, t.quiz.stepTitles.length)} — {t.quiz.stepTitles[step]}
       </p>
 
       {/* Stepper */}
       {/* Progress: the current segment shimmers so "where am I" is legible at
           a glance without reading the step counter. */}
-      <ol className="mt-6 flex gap-1.5" aria-label={t.quiz.progressLabel(step + 1, STEP_TITLES.length)}>
-        {STEP_TITLES.map((title, i) => (
+      <ol className="mt-6 flex gap-1.5" aria-label={t.quiz.progressLabel(step + 1, t.quiz.stepTitles.length)}>
+        {t.quiz.stepTitles.map((title: string, i: number) => (
           <li
             key={title}
             aria-current={i === step ? "step" : undefined}
@@ -148,7 +149,7 @@ export default function QuizPage() {
                     whileTap={reduce ? undefined : { scale: 0.98 }}
                     transition={spring}
                     className={clsx(
-                      "group relative aspect-[5/4] overflow-hidden rounded-2xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-2",
+                      "group relative aspect-[5/4] overflow-hidden rounded-2xl text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] focus-visible:ring-offset-2",
                       active
                         ? "ring-2 ring-[var(--color-accent)] ring-offset-2"
                         : "ring-1 ring-[var(--color-line)]",
@@ -204,8 +205,8 @@ export default function QuizPage() {
 
         {step === 1 && (
           <div>
-            <p className="mb-5 text-sm text-[var(--color-muted)]" dir="rtl">پالت رنگی نزدیک به حس دلخواهت را انتخاب کن.</p>
-            <div className="grid gap-3 sm:grid-cols-2" dir="rtl">
+            <p className="mb-5 text-sm text-[var(--color-muted)]">{t.quiz.colorHint}</p>
+            <div className="grid gap-3 sm:grid-cols-2">
               {COLOR_PALETTES.map((palette) => {
                 const active = palette.colors.every((hex) => quiz.color_palette.includes(hex));
                 return (
@@ -218,12 +219,12 @@ export default function QuizPage() {
                     })}
                     aria-pressed={active}
                     className={clsx(
-                      "rounded-2xl border p-4 text-right transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]",
+                      "rounded-2xl border p-4 text-start transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]",
                       active ? "border-[var(--color-accent)] bg-[var(--color-accent)]/5" : "border-[var(--color-line)]",
                     )}
                   >
                     <span className="font-semibold">{palette.label_fa}</span>
-                    <span className="mr-2 text-xs text-[var(--color-muted)]">{palette.mood}</span>
+                    <span className="ms-2 text-xs text-[var(--color-muted)]">{palette.mood}</span>
                     <span className="mt-3 flex gap-2">
                       {palette.colors.map((hex) => <span key={hex} className="h-12 w-12 rounded-full ring-1 ring-inset ring-black/10" style={{ backgroundColor: hex }} />)}
                     </span>
@@ -281,7 +282,7 @@ export default function QuizPage() {
               valueMax={quiz.budget_max_toman}
               onChange={(lo, hi) => quiz.setBudget(lo, hi)}
             />
-            <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4" dir="rtl">
+            <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {BUDGET_RANGES.map((range) => (
                 <button key={range.id} type="button" onClick={() => quiz.setBudget(range.min, range.max)}
                         className="rounded-xl border border-[var(--color-line)] p-2 text-xs hover:border-[var(--color-accent)]">

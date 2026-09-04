@@ -51,7 +51,7 @@ function MatchBreakdown({ product }: { product: RecommendedProduct }) {
       <HoverCard.Trigger asChild>
         <button
           type="button"
-          className="w-full rounded-lg text-left text-xs font-semibold text-[var(--color-muted)] underline decoration-dotted underline-offset-2 hover:text-[var(--color-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
+          className="w-full rounded-lg text-start text-xs font-semibold text-[var(--color-muted)] underline decoration-dotted underline-offset-2 hover:text-[var(--color-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-label={`Why we matched ${product.title}: ${Math.round(product.final_score * 100)} percent overall`}

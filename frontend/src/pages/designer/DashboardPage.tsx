@@ -299,10 +299,10 @@ export default function DesignerDashboardPage() {
                     {p.client_name || "No client"}
                   </span>
                 </span>
-                <span className="hidden w-20 text-right text-xs text-[var(--color-faint)] tabular-nums md:block">
+                <span className="hidden w-20 text-end text-xs text-[var(--color-faint)] tabular-nums md:block">
                   {p.quiz_count} quiz{p.quiz_count === 1 ? "" : "zes"}
                 </span>
-                <span className="w-24 text-right text-xs text-[var(--color-faint)] tabular-nums">
+                <span className="w-24 text-end text-xs text-[var(--color-faint)] tabular-nums">
                   {new Date(p.created_at).toLocaleDateString("fa-IR")}
                 </span>
                 <span

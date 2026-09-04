@@ -6,7 +6,7 @@ import { useQuizStore } from "@/stores/quizStore";
 import { Button, Card, Input } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { useCommands } from "@/components/CommandPalette";
-import { t } from "@/i18n/fa";
+import { useT } from "@/i18n";
 
 /** 2D floorplan preview (MVP): SVG room at 1px = 1cm (scaled to fit),
  *  draggable product rectangles, fit warnings when furniture exceeds room. */
@@ -39,6 +39,7 @@ const WALL_CM = 12;
 const GUTTER = 46;
 
 export default function FloorplanPage() {
+  const t = useT();
   const quiz = useQuizStore();
   const [width, setWidth] = useState(quiz.room_width_cm);
   const [length, setLength] = useState(quiz.room_length_cm);

@@ -33,6 +33,7 @@ const QuizPage = lazy(() => import("@/pages/QuizPage"));
 // of LCP headroom (1205 vs 3000 budget) vs ~58KB gz moved forward; the
 // matrix run after this commit is the before/after evidence for both cells.
 import RecommendationsPage from "@/pages/RecommendationsPage";
+import { LocaleProvider } from "@/i18n";
 const MoodboardsPage = lazy(() => import("@/pages/MoodboardsPage"));
 const MoodboardEditorPage = lazy(() => import("@/pages/MoodboardEditorPage"));
 const FloorplanPage = lazy(() => import("@/pages/FloorplanPage"));
@@ -93,7 +94,8 @@ function AnimatedRoutes() {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <LocaleProvider>
+      <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         {/* Palette needs a Router (it navigates); Toast wraps everything so any
             page can report success/failure. */}
@@ -103,6 +105,7 @@ export default function App() {
           </ToastProvider>
         </CommandPaletteProvider>
       </BrowserRouter>
-    </QueryClientProvider>
+      </QueryClientProvider>
+    </LocaleProvider>
   );
 }

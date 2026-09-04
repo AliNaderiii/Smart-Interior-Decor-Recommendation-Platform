@@ -53,7 +53,7 @@ export function JsonDiff({ rows }: { rows: DiffRow[] }) {
 
   return (
     <div className="overflow-hidden rounded-xl border border-[var(--color-line)]">
-      <table className="w-full text-left text-xs">
+      <table className="w-full text-start text-xs">
         <caption className="sr-only">Changes compared with the AI extraction</caption>
         <thead>
           <tr className="bg-[var(--color-line)]/60 text-[10px] uppercase tracking-wider text-[var(--color-muted)]">

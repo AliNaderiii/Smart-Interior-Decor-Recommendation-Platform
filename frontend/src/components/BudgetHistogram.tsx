@@ -10,7 +10,7 @@
  */
 import { useId, useMemo } from "react";
 import { formatToman } from "@/lib/constants";
-import { t } from "@/i18n/fa";
+import { useT } from "@/i18n";
 
 interface Props {
   min: number;
@@ -34,6 +34,7 @@ export function BudgetHistogram({
   bins = 28,
   onChange,
 }: Props) {
+  const t = useT();
   const id = useId();
 
   const histogram = useMemo(() => {

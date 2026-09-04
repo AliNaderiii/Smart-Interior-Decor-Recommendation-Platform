@@ -459,7 +459,7 @@ export default function AdminProductsPage() {
         </div>
       ) : (
         <Card className="mt-6 overflow-x-auto p-0">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-start text-xs">
             <thead className="border-b border-[var(--color-line)] bg-[var(--color-canvas)] text-[11px] font-semibold uppercase tracking-wider text-[var(--color-muted)]">
               <tr>
                 <th className="w-8 px-4 py-3">
