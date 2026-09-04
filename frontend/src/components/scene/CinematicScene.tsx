@@ -35,10 +35,10 @@ import {
 /** Waypoints of the fly-through, in metres.
  *  z decreases as we move deeper into the room; the window sits at z = 4. */
 const CAMERA_PATH: THREE.Vector3[] = [
-  new THREE.Vector3(1.6, 3.0, 13.0), // outside, above street level
-  new THREE.Vector3(0.9, 2.1, 8.4), // approaching the facade
-  new THREE.Vector3(0.35, 1.62, 5.0), // lining up with the opening
-  new THREE.Vector3(0.05, 1.5, 3.4), // crossing the glazing plane
+  new THREE.Vector3(1.4, 2.7, 10.5), // outside, above street level
+  new THREE.Vector3(0.7, 1.9, 6.2), // approaching the facade
+  new THREE.Vector3(0.2, 1.58, 4.1), // lining up with the opening
+  new THREE.Vector3(0.0, 1.5, 2.6), // crossing the glazing plane
   new THREE.Vector3(-0.5, 1.4, 1.6), // inside — the room opens up
   new THREE.Vector3(-1.7, 1.15, 0.1), // gliding past the sofa arm
   new THREE.Vector3(-1.25, 0.95, -1.5), // low over the rug and table
@@ -144,29 +144,29 @@ function Room({ shadows }: { shadows: boolean }) {
       {/* front wall with a window opening the camera flies through: four
           panels leaving a gap, cheaper and cleaner than CSG subtraction */}
       <group position={[0, 0, D / 2]}>
-        <mesh material={wall} position={[-2.15, H / 2, 0]}>
-          <planeGeometry args={[2.2, H]} />
+        <mesh material={wall} position={[-2.55, H / 2, 0]}>
+          <planeGeometry args={[1.4, H]} />
         </mesh>
-        <mesh material={wall} position={[2.15, H / 2, 0]}>
-          <planeGeometry args={[2.2, H]} />
+        <mesh material={wall} position={[2.55, H / 2, 0]}>
+          <planeGeometry args={[1.4, H]} />
         </mesh>
-        <mesh material={wall} position={[0, 2.72, 0]}>
-          <planeGeometry args={[2.1, 0.56]} />
+        <mesh material={wall} position={[0, 2.82, 0]}>
+          <planeGeometry args={[3.7, 0.36]} />
         </mesh>
-        <mesh material={wall} position={[0, 0.2, 0]}>
-          <planeGeometry args={[2.1, 0.4]} />
+        <mesh material={wall} position={[0, 0.12, 0]}>
+          <planeGeometry args={[3.7, 0.24]} />
         </mesh>
         {/* Glazing, split either side of the flight line: a centred mullion
             would sit directly in front of the lens for the whole approach. */}
-        <mesh material={glass} position={[-0.78, 1.52, 0.01]}>
-          <planeGeometry args={[0.54, 2.24]} />
+        <mesh material={glass} position={[-1.45, 1.5, 0.01]}>
+          <planeGeometry args={[0.75, 2.5]} />
         </mesh>
-        <mesh material={glass} position={[0.78, 1.52, 0.01]}>
-          <planeGeometry args={[0.54, 2.24]} />
+        <mesh material={glass} position={[1.45, 1.5, 0.01]}>
+          <planeGeometry args={[0.75, 2.5]} />
         </mesh>
-        {[-0.5, 0.5].map((x) => (
-          <mesh key={x} position={[x, 1.52, 0.02]}>
-            <boxGeometry args={[0.05, 2.24, 0.05]} />
+        {[-1.82, 1.82].map((x) => (
+          <mesh key={x} position={[x, 1.5, 0.02]}>
+            <boxGeometry args={[0.06, 2.5, 0.06]} />
             <meshStandardMaterial color={PALETTE.wood} roughness={0.6} />
           </mesh>
         ))}
