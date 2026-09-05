@@ -125,6 +125,8 @@ export const en: Dict = {
     emptyCta: "Adjust your quiz",
     errorTitle: "Could not load recommendations",
     errorHint: "The server could not be reached. Please try again.",
+    breakdownTitle: "Match breakdown",
+    matchWhy: (pct: number) => `${pct}% match — why?`,
     scoreStyle: "Style fit",
     scoreColor: "Colour harmony",
     scoreBudget: "Budget fit",

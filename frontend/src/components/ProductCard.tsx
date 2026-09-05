@@ -36,11 +36,15 @@ function MatchBreakdown({ product }: { product: RecommendedProduct }) {
   // mobile. Clicking toggles it; hover still works on pointer devices.
   const [open, setOpen] = useState(false);
   const exp = product.explanation;
+  // `key` is the stable, locale-independent identity of each signal. It feeds
+  // `data-signal` below so the e2e suite can assert on the breakdown without
+  // depending on the wording of either catalogue (see journey-homeowner.spec).
   const rows = [
-    { label: t.recommendations.scoreStyle, value: exp.style_match, detail: product.styles.join(" / ") || "—" },
-    { label: t.recommendations.scoreColor, value: exp.color_match, detail: null },
-    { label: t.recommendations.scoreBudget, value: exp.budget_fit, detail: money(product.price_toman) },
+    { key: "style", label: t.recommendations.scoreStyle, value: exp.style_match, detail: product.styles.join(" / ") || "—" },
+    { key: "color", label: t.recommendations.scoreColor, value: exp.color_match, detail: null },
+    { key: "budget", label: t.recommendations.scoreBudget, value: exp.budget_fit, detail: money(product.price_toman) },
     {
+      key: "material",
       label: t.recommendations.scoreMaterial,
       value: exp.material_match,
       detail: exp.matched_materials.length ? exp.matched_materials.join(", ") : product.materials.join(", ") || "—",
@@ -56,8 +60,9 @@ function MatchBreakdown({ product }: { product: RecommendedProduct }) {
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-label={t.recommendations.whyMatched(product.title, Math.round(product.final_score * 100))}
+          data-testid="match-chip"
         >
-          {Math.round(product.final_score * 100)}% match — why?
+          {t.recommendations.matchWhy(Math.round(product.final_score * 100))}
         </button>
       </HoverCard.Trigger>
       <HoverCard.Portal>
@@ -66,13 +71,14 @@ function MatchBreakdown({ product }: { product: RecommendedProduct }) {
           align="start"
           sideOffset={8}
           className="z-50 w-72 rounded-2xl bg-[var(--color-surface)] p-4 shadow-[var(--shadow-float)]"
+          data-testid="match-breakdown"
         >
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-[var(--color-faint)]">
-            Match breakdown
+            {t.recommendations.breakdownTitle}
           </p>
           <div className="space-y-2.5">
             {rows.map((r) => (
-              <div key={r.label}>
+              <div key={r.key} data-testid="match-signal" data-signal={r.key}>
                 <div className="flex items-baseline justify-between text-xs">
                   <span className="font-medium text-[var(--color-ink)]">{r.label}</span>
                   <span className="tabular-nums text-[var(--color-muted)]">{r.value}%</span>

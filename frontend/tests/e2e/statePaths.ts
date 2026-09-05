@@ -30,3 +30,11 @@ export type Role = "homeowner" | "designer" | "admin";
 export function statePath(role: Role): string {
   return path.join(STATE_DIR, `${role}.json`);
 }
+
+/**
+ * storageState for the ANONYMOUS projects (`chromium`, `chromium-sweep`).
+ * It carries no session — only the pinned UI locale (see `locale.ts`), so
+ * the login form those projects drive renders in the language their
+ * selectors were written in. Written by globalSetup.
+ */
+export const ANONYMOUS_STATE_PATH = path.join(STATE_DIR, "anonymous.json");
