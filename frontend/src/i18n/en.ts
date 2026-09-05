@@ -208,6 +208,7 @@ export const en: Dict = {
     hasAccount: "Already registered?",
     passwordHint: "At least 8 characters",
     welcomeBack: "Welcome back",
+    gatedHint: "This section needs an account. You will be returned to it after signing in.",
     loginSubtitle: "Sign in to continue designing your living room.",
     registerSubtitle: "Create a free account to get started.",
     createOne: "Create one",
@@ -437,6 +438,10 @@ export const en: Dict = {
     ],
     rights: (year: string) => `© ${year} Smart Decor. All rights reserved.`,
     builtWith: "React 19 · FastAPI · PostgreSQL + pgvector",
+  },
+
+  admin: {
+    totalProducts: (n: number) => `${n} products`,
   },
 
   errors: {

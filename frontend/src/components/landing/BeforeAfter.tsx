@@ -129,11 +129,17 @@ export function BeforeAfter({
           </span>
         </div>
 
-        {/* Corner labels. `dir=auto` keeps them readable in both locales. */}
-        <span className="pointer-events-none absolute bottom-3 start-3 rounded-full bg-black/65 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
+        {/* Corner labels pinned with PHYSICAL sides, deliberately.
+         *
+         *  `clip-path: inset(0 X% 0 0)` always clips from the physical left,
+         *  so the "before" image always occupies the left of the frame — that
+         *  does not flip under RTL. Using the logical `start-3`/`end-3` here
+         *  moved the labels to the opposite side in Persian while the images
+         *  stayed put, so each label named the wrong picture. */}
+        <span className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-black/65 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
           {beforeLabel}
         </span>
-        <span className="pointer-events-none absolute bottom-3 end-3 rounded-full bg-black/65 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
+        <span className="pointer-events-none absolute bottom-3 right-3 rounded-full bg-black/65 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
           {afterLabel}
         </span>
       </div>

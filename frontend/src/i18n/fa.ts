@@ -212,6 +212,7 @@ export const fa = {
     hasAccount: "قبلاً ثبت‌نام کرده‌اید؟",
     passwordHint: "حداقل ۸ کاراکتر",
     welcomeBack: "خوش آمدید",
+    gatedHint: "این بخش نیاز به حساب کاربری دارد. بعد از ورود، به همان صفحه برمی‌گردید.",
     loginSubtitle: "برای ادامه‌ی طراحی نشیمن‌تان وارد شوید.",
     registerSubtitle: "برای شروع، یک حساب رایگان بسازید.",
     createOne: "یک حساب بسازید",
@@ -441,6 +442,10 @@ export const fa = {
     ],
     rights: (year: string) => `© ${year} اسمارت دکور. تمامی حقوق محفوظ است.`,
     builtWith: "React 19 · FastAPI · PostgreSQL + pgvector",
+  },
+
+  admin: {
+    totalProducts: (n: number) => `${n} محصول`,
   },
 
   errors: {

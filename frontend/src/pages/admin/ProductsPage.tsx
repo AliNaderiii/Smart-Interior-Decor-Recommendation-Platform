@@ -10,6 +10,7 @@ import { useToast } from "@/components/Toast";
 import { useCommands } from "@/components/CommandPalette";
 import { JsonDiff, diffObjects } from "@/components/JsonDiff";
 import { useDialog } from "@/hooks/useDialog";
+import { useT } from "@/i18n";
 
 interface ProductList {
   items: AdminProduct[];
@@ -150,6 +151,7 @@ function EditProductModal({
 }
 
 export default function AdminProductsPage() {
+  const t = useT();
   const qc = useQueryClient();
   const toast = useToast();
   const [page, setPage] = useState(1);
@@ -661,10 +663,10 @@ export default function AdminProductsPage() {
       )}
 
       <div className="mt-4 flex items-center justify-between text-sm text-[var(--color-muted)]">
-        <span>{data?.total ?? 0} products</span>
+        <span>{t.admin.totalProducts(data?.total ?? 0)}</span>
         <div className="flex gap-2">
           <Button variant="secondary" className="py-1.5 text-xs" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-            ← Prev
+            {t.common.back}
           </Button>
           <Button
             variant="secondary"
@@ -672,7 +674,7 @@ export default function AdminProductsPage() {
             disabled={!data || page * data.page_size >= data.total}
             onClick={() => setPage(page + 1)}
           >
-            Next →
+            {t.common.next}
           </Button>
         </div>
       </div>

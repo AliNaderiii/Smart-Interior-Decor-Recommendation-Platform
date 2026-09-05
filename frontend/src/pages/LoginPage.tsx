@@ -52,6 +52,15 @@ export default function LoginPage() {
       <Card className="p-8">
         <h1 className="h1 text-[var(--color-ink)]">{t.auth.welcomeBack}</h1>
         <p className="mt-1 text-sm text-[var(--color-muted)]">{t.auth.loginSubtitle}</p>
+
+        {/* A visitor who clicked "Moodboards" in the footer landed here with
+            no explanation, so the nav looked like a dead button. Name the
+            destination and confirm they will be returned to it. */}
+        {location.state?.from && (
+          <p className="mt-3 rounded-xl border border-[var(--color-accent)]/30 bg-[var(--color-accent)]/8 px-3 py-2 text-sm text-[var(--color-ink)]">
+            {t.auth.gatedHint}
+          </p>
+        )}
         <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4" noValidate>
           <div>
             <label htmlFor="email" className="mb-1 block text-sm font-medium">{t.auth.email}</label>
