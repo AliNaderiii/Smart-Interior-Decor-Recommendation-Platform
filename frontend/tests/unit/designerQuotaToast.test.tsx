@@ -12,7 +12,7 @@
  * "Could not create the project." — the designer was told nothing about why
  * they were blocked or what to do. Same defect class as the LoginPage one.
  */
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -31,6 +31,7 @@ vi.mock("@/lib/api", async (importOriginal) => {
 import { ApiError } from "@/lib/api";
 import { ToastProvider } from "@/components/Toast";
 import DesignerDashboardPage from "@/pages/designer/DashboardPage";
+import { renderWithProviders } from "./renderWithProviders";
 
 /** Verbatim backend message (designer_quota.py QUOTA_MESSAGE, formatted). */
 const QUOTA_MESSAGE =
@@ -41,7 +42,9 @@ function renderDashboard() {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
-  return render(
+  // renderWithProviders wraps everything in <LocaleProvider locale=en>: the
+  // page (and Toast) are i18n-aware, and the selectors below are English.
+  return renderWithProviders(
     <QueryClientProvider client={client}>
       <MemoryRouter>
         <ToastProvider>
