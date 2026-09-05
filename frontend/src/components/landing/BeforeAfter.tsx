@@ -85,6 +85,7 @@ export function BeforeAfter({
         <img
           src={afterSrc}
           alt={afterLabel}
+          draggable={false}
           width={1200}
           height={750}
           className="absolute inset-0 h-full w-full object-cover"
@@ -98,6 +99,7 @@ export function BeforeAfter({
           <img
             src={beforeSrc}
             alt={beforeLabel}
+            draggable={false}
             width={1200}
             height={750}
             className="absolute inset-0 h-full w-full object-cover"
@@ -108,10 +110,13 @@ export function BeforeAfter({
 
         {/* Divider + grab handle */}
         <div
-          className="pointer-events-none absolute inset-y-0 w-0.5 bg-white/90 shadow-[0_0_12px_rgba(0,0,0,0.35)]"
-          style={{ left: `${pos}%` }}
+          className="absolute inset-y-0 w-0.5 cursor-ew-resize bg-white/90 shadow-[0_0_12px_rgba(0,0,0,0.35)]"
+          style={{ left: `${pos}%`, touchAction: "none" }}
         >
-          <span className="absolute top-1/2 grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-white shadow-lg">
+          {/* The knob is deliberately larger than it looks (44px hit area,
+              the WCAG target minimum) and carries its own capture, so the
+              gesture starts wherever the user actually grabs. */}
+          <span className="absolute top-1/2 grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize place-items-center rounded-full bg-white shadow-lg">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path
                 d="M9 6L4 12l5 6M15 6l5 6-5 6"

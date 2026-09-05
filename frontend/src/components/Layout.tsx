@@ -6,6 +6,7 @@ import { useThemeStore } from "@/stores/themeStore";
 import { useCommandPalette } from "@/components/CommandPalette";
 import { useT } from "@/i18n";
 import { LanguageToggle } from "@/components/LanguageToggle";
+import { Logo } from "@/components/Logo";
 
 type NavLinkDef = { to: string; label: string };
 
@@ -123,7 +124,7 @@ export default function Layout() {
       <header className="sticky top-0 z-40 border-b border-[var(--color-line)] bg-[var(--color-canvas)]/85 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
           <Link to="/" className="flex items-center gap-2 font-semibold tracking-[-0.02em] text-[var(--color-ink)]">
-            <span aria-hidden className="grid h-7 w-7 place-items-center rounded-lg bg-[var(--color-accent)] text-sm text-[var(--color-canvas)]">SD</span>
+            <Logo size={28} className="text-[var(--color-accent)]" />
             {t.brand}
           </Link>
           <nav className="hidden gap-1 md:flex" aria-label="Main">

@@ -1,9 +1,13 @@
-/** FAQ and social proof — two sections the landing page was missing.
+/** Frequently asked questions.
  *
  * The competitor's FAQ answers exactly the objections that stop a purchase
  * ("do I need design experience?", "what should I upload?"). Ours answers the
  * objections specific to *our* proposition: are the prices real, are the
  * seller links real, is my data safe.
+ *
+ * The testimonials that used to live here were removed: the product has no
+ * users yet, so the quotes were invented — see ProofStats for what replaced
+ * them.
  *
  * Implementation note: native <details>/<summary> rather than a JS accordion.
  * It is keyboard- and screen-reader-correct for free, works before hydration,
@@ -13,47 +17,11 @@
 import { useT } from "@/i18n";
 import { ScrollReveal } from "@/components/Scroll3D";
 
-function Stars() {
-  return (
-    <span className="text-sm text-[var(--color-accent)]" aria-hidden="true">
-      ★★★★★
-    </span>
-  );
-}
-
-export function FaqAndProof() {
+export function Faq() {
   const t = useT();
 
   return (
-    <>
-      {/* ------------------------------------------------------ testimonials */}
-      <section className="border-t border-[var(--color-line)] py-16 lg:py-24">
-        <ScrollReveal>
-          <h2 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">
-            {t.proof.title}
-          </h2>
-          <p className="mt-2 text-sm text-[var(--color-muted)]">{t.proof.subtitle}</p>
-        </ScrollReveal>
-
-        <div className="mt-8 grid gap-5 sm:grid-cols-3">
-          {t.proof.items.map((item, i) => (
-            <ScrollReveal key={item.quote} delay={i * 0.08}>
-              <figure className="h-full rounded-2xl border border-[var(--color-line)] p-5">
-                <Stars />
-                <blockquote className="mt-3 text-sm leading-relaxed text-[var(--color-ink)]">
-                  “{item.quote}”
-                </blockquote>
-                <figcaption className="mt-3 text-xs text-[var(--color-muted)]">
-                  — {item.role}
-                </figcaption>
-              </figure>
-            </ScrollReveal>
-          ))}
-        </div>
-      </section>
-
-      {/* --------------------------------------------------------------- faq */}
-      <section className="border-t border-[var(--color-line)] py-16 lg:py-24">
+    <section className="border-t border-[var(--color-line)] py-16 lg:py-24">
         <ScrollReveal>
           <h2 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">
             {t.faq.title}
@@ -82,6 +50,5 @@ export function FaqAndProof() {
           ))}
         </div>
       </section>
-    </>
   );
 }

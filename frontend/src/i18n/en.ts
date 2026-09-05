@@ -59,15 +59,19 @@ export const en: Dict = {
     steps: [
       {
         title: "Tell us your space",
-        body: "Real dimensions, your budget, and the styles you are drawn to. Two minutes, no account walls.",
+        body: "Five short steps: the styles you are drawn to, a colour palette, the real width and length of your room, a budget range and preferred materials. You never have to name a style — it is inferred from the rooms you pick.",
+      },
+      {
+        title: "The engine goes to work",
+        body: "First, anything outside your budget or too large for the room is filtered out. Then a semantic search runs over the style vector, and finally each product is scored with weights of 30% style, 30% colour, 20% budget, 15% material and 10% pattern.",
       },
       {
         title: "See why, not just what",
-        body: "Every product carries its score breakdown — style fit, colour harmony, budget and how it fits your room.",
+        body: "Every product shows its score breakdown: how well it fits your style, how its colour harmonises, whether it fits the budget. So you know why it was recommended and where it diverges from your taste.",
       },
       {
         title: "Arrange, check, buy",
-        body: "Drop picks onto a moodboard, verify walkways on the floorplan, then shop from validated retailer links.",
+        body: "Drop your picks onto a moodboard, verify on the real-dimension floorplan that no walkway drops below 76 cm, then take the shopping list with Toman prices and direct seller links.",
       },
     ],
     stylesTitle: "Six styles, one quiz",
@@ -271,27 +275,6 @@ export const en: Dict = {
     ],
   },
 
-  proof: {
-    title: "What people say",
-    subtitle: "Three different roles, three different uses.",
-    items: [
-      {
-        quote:
-          "Before buying a sofa I compared three combinations and saw which one worked with our existing carpet. I did not waste the money.",
-        role: "Homeowner, Tehran",
-      },
-      {
-        quote:
-          "I can prepare several directions for a client in minutes instead of spending two days building moodboards.",
-        role: "Interior designer",
-      },
-      {
-        quote:
-          "The score breakdown is the important part — I can explain to a client exactly why a piece was recommended.",
-        role: "Styling consultant",
-      },
-    ],
-  },
 
   faq: {
     title: "Frequently asked questions",
@@ -322,6 +305,138 @@ export const en: Dict = {
         a: "Only your quiz answers and moodboards. Card details are never stored, and full account deletion is available at any time.",
       },
     ],
+  },
+
+  stats: {
+    title: "Why you can trust the output",
+    subtitle:
+      "These are not claims. Each figure is the output of a command that was actually run, and the evidence sits in the repository.",
+    items: [
+      {
+        value: 82.2,
+        unit: "%",
+        label: "AI attribute-extraction accuracy",
+        note: "On a 50-image real benchmark, zero failures",
+      },
+      {
+        value: 685,
+        unit: "",
+        label: "Automated tests",
+        note: "Including 52 dedicated recommender tests",
+      },
+      {
+        value: 93,
+        unit: "",
+        label: "Lighthouse mobile score",
+        note: "Accessibility 96 · SEO 100",
+      },
+      {
+        value: 1,
+        unit: "s>",
+        label: "Recommendation response time",
+        note: "Median under one second on the live demo",
+      },
+    ],
+    footnote:
+      "Evidence: docs/reports/extraction_report.json in the repository, and Lighthouse runs against this very URL.",
+  },
+
+  pricing: {
+    title: "Simple plans for every space",
+    subtitle: "Choose the plan that fits your project. Cancel anytime.",
+    cycleLabel: "Billing cycle",
+    monthly: "Monthly",
+    annual: "Annual",
+    saveBadge: "Up to 2 months free",
+    popular: "Most popular",
+    perMonth: "month",
+    free: "Free",
+    billedYearly: (total: string) => `billed yearly at ${total} Toman`,
+    note:
+      "Prices are in Toman and include tax. Payment goes through a secure gateway and your card details are never stored.",
+    plans: [
+      {
+        name: "Basic",
+        for: "For a single home project",
+        price: 0,
+        monthly: 0,
+        annualPerMonth: 0,
+        featured: false,
+        cta: "Start free",
+        features: [
+          "One style quiz",
+          "Recommendations across 7 categories",
+          "One moodboard",
+          "Real-dimension floorplan",
+        ],
+      },
+      {
+        name: "Pro",
+        for: "For a full home redesign",
+        price: 1,
+        monthly: 390000,
+        annualPerMonth: 325000,
+        featured: true,
+        cta: "Choose Pro",
+        features: [
+          "Unlimited quizzes",
+          "Unlimited moodboards",
+          "Shopping list with verified seller links",
+          "Floorplan image export",
+          "Priority support",
+        ],
+      },
+      {
+        name: "Designer",
+        for: "For interior designers and teams",
+        price: 2,
+        monthly: 1290000,
+        annualPerMonth: 1075000,
+        featured: false,
+        cta: "Choose Designer",
+        features: [
+          "Everything in Pro",
+          "Designer portal with project management",
+          "Run the quiz on a client's behalf",
+          "Share results via a private link",
+          "Unlimited projects",
+        ],
+      },
+    ],
+  },
+
+  footer: {
+    blurb:
+      "Smart furniture and decor recommendations based on your style, colour palette, budget and the real dimensions of your room — with Toman prices and direct seller links.",
+    columns: [
+      {
+        title: "Product",
+        links: [
+          { label: "Style quiz", to: "/quiz" },
+          { label: "Recommendations", to: "/recommendations" },
+          { label: "Moodboards", to: "/moodboards" },
+          { label: "Floorplan", to: "/floorplan" },
+        ],
+      },
+      {
+        title: "For you",
+        links: [
+          { label: "Homeowners", to: "/register" },
+          { label: "Interior designers", to: "/register" },
+          { label: "Shopping list", to: "/shopping-list" },
+          { label: "Plans", to: "/upgrade" },
+        ],
+      },
+      {
+        title: "Account",
+        links: [
+          { label: "Sign in", to: "/login" },
+          { label: "Sign up", to: "/register" },
+        ],
+      },
+    ],
+    rights: (year: string) => `© ${year} Smart Decor. All rights reserved.`,
+    builtWith: "React 19 · FastAPI · PostgreSQL + pgvector",
   },
 
   errors: {

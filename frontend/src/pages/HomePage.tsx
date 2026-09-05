@@ -11,7 +11,10 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 import heroImage from "@/assets/hero.webp";
 import { useLocale } from "@/i18n";
 import { ShowcaseGallery } from "@/components/landing/ShowcaseGallery";
-import { FaqAndProof } from "@/components/landing/FaqAndProof";
+import { Faq } from "@/components/landing/Faq";
+import { ProofStats } from "@/components/landing/ProofStats";
+import { PricingPlans } from "@/components/landing/PricingPlans";
+import { SiteFooter } from "@/components/landing/SiteFooter";
 import {
   ScrollStage,
   TiltOnScroll,
@@ -168,8 +171,6 @@ export default function HomePage() {
         </CardTilt3D>
       </TiltOnScroll>
 
-      <FaqAndProof />
-
       <section className="border-t border-[var(--color-line)] py-16 lg:py-24">
         <h2 className="text-2xl font-semibold tracking-tight text-[var(--color-ink)]">
           {t.home.stylesTitle}
@@ -209,7 +210,19 @@ export default function HomePage() {
           </Link>
         </div>
       </section>
+
+      {/* Order matters: proof comes straight after the styles + CTA block so
+          a reader who has just seen "start free" immediately gets a reason to
+          trust it. Pricing follows, then the FAQ absorbs the objections that
+          pricing raises. */}
+      <ProofStats />
+
+      <PricingPlans />
+
+      <Faq />
     </ScrollStage>
+
+    <SiteFooter />
     </>
   );
 }
