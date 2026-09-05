@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import html
 import secrets
-from datetime import timedelta
+from datetime import timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
@@ -219,11 +219,12 @@ def set_project_status(
     project = db.get(Project, project_id)
     if project is None or project.designer_id != user.id:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found")
+    previous = project.status
     project.status = body.status
     db.commit()
     audit.record(
-        db, actions.ACTION_SHARE_CREATE, user_id=user.id,
-        detail=f"project={project.id} status={body.status}", request=request,
+        db, actions.ACTION_PROJECT_STATUS, user_id=user.id,
+        detail=f"project={project.id} status={previous}->{body.status}", request=request,
     )
     return ok(_project_out(project, len(project.quizzes)))
 
@@ -293,6 +294,27 @@ def share_project(
     return ok({"token": link.token, "share_url": share_url, "expires_at": link.expires_at.isoformat()})
 
 
+def _load_live_share_link(db: Session, token: str) -> ShareLink:
+    """Resolve a share token or raise 404 (unknown) / 410 (expired).
+
+    Shared by every unauthenticated ``/share/{token}/...`` endpoint so the
+    expiry rule cannot drift between them — ``/approvals`` originally omitted
+    the check that ``/approve`` and the public view enforced.
+    """
+    if len(token) > 128:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Share link not found")
+    link = db.scalar(select(ShareLink).where(ShareLink.token == token))
+    if link is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Share link not found")
+    if link.expires_at is not None:
+        exp = link.expires_at
+        if exp.tzinfo is None:
+            exp = exp.replace(tzinfo=timezone.utc)
+        if exp < utcnow():
+            raise HTTPException(status.HTTP_410_GONE, "Share link expired")
+    return link
+
+
 @router.get("/share/{token}")
 def public_share_view(
     token: str,
@@ -308,19 +330,7 @@ def public_share_view(
         f"share:{audit.client_ip(request)}",
         limit=settings.SHARE_RATE_LIMIT_PER_MINUTE,
     )
-    if len(token) > 128:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Share link not found")
-    link = db.scalar(select(ShareLink).where(ShareLink.token == token))
-    if link is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Share link not found")
-    if link.expires_at is not None:
-        exp = link.expires_at
-        if exp.tzinfo is None:
-            from datetime import timezone
-
-            exp = exp.replace(tzinfo=timezone.utc)
-        if exp < utcnow():
-            raise HTTPException(status.HTTP_410_GONE, "Share link expired")
+    link = _load_live_share_link(db, token)
     quiz = db.get(StyleQuiz, link.quiz_id)
     if quiz is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Quiz deleted")
@@ -367,20 +377,7 @@ def client_approve(
         f"approve:{audit.client_ip(request)}",
         limit=settings.SHARE_RATE_LIMIT_PER_MINUTE,
     )
-    if len(token) > 128:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Share link not found")
-
-    link = db.scalar(select(ShareLink).where(ShareLink.token == token))
-    if link is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Share link not found")
-    if link.expires_at is not None:
-        exp = link.expires_at
-        if exp.tzinfo is None:
-            from datetime import timezone
-
-            exp = exp.replace(tzinfo=timezone.utc)
-        if exp < utcnow():
-            raise HTTPException(status.HTTP_410_GONE, "Share link expired")
+    link = _load_live_share_link(db, token)
 
     if db.get(Product, body.product_id) is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found")
@@ -415,11 +412,7 @@ def list_client_approvals(token: str, request: Request, db: Session = Depends(ge
         f"approve:{audit.client_ip(request)}",
         limit=settings.SHARE_RATE_LIMIT_PER_MINUTE,
     )
-    if len(token) > 128:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Share link not found")
-    link = db.scalar(select(ShareLink).where(ShareLink.token == token))
-    if link is None:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, "Share link not found")
+    link = _load_live_share_link(db, token)
     rows = db.scalars(
         select(ClientApproval).where(ClientApproval.share_link_id == link.id)
     ).all()
