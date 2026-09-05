@@ -92,7 +92,7 @@ feature / agent branch  ──PR──►  v2-strict-mode  ──PR──►  ma
    arena/<session-id>
 ```
 
-Rules (from `agent-master-prompts/00-README.md`, enforced by this stage):
+Rules (from `docs/internal/agent-master-prompts/00-README.md`, enforced by this stage):
 
 1. Agents branch from the baseline commit; they never merge, rebase, reset,
    force-push or cherry-pick another agent's branch.

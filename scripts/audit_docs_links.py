@@ -103,7 +103,7 @@ INTENTIONALLY_UNTRACKED = {
 # written to report, so they are excluded from THAT check by default. Markdown
 # link resolution is still enforced on them. Use --include-reports to override.
 AUDIT_REPORT_FILES = {
-    "integration-request.md",
+    "docs/internal/integration-request.md",
     "docs/RELEASE_BASELINE.md",
     "docs/RELEASE_CHECKLIST.md",
     "docs/REPRODUCIBILITY.md",
@@ -120,7 +120,9 @@ SKIP_DEFAULT = {
     "MASTER_PROMPT_V3_DATASETS_INTEGRATION.md",
     "PHASE0_AUDIT_GUIDE.md",
 }
-SKIP_DIR_DEFAULT = {"agent-master-prompts"}
+# Moved from the repository root to docs/internal/ on 2026-09-05 so a
+# visitor's first screen is the product, not the tooling that built it.
+SKIP_DIR_DEFAULT = {"docs/internal/agent-master-prompts"}
 
 
 def tracked_markdown(include_prompts: bool) -> list[Path]:
@@ -131,7 +133,9 @@ def tracked_markdown(include_prompts: bool) -> list[Path]:
     for rel in out:
         p = Path(rel)
         if not include_prompts:
-            if p.name in SKIP_DEFAULT or (p.parts and p.parts[0] in SKIP_DIR_DEFAULT):
+            if p.name in SKIP_DEFAULT or any(
+                p.as_posix().startswith(d + "/") for d in SKIP_DIR_DEFAULT
+            ):
                 continue
         files.append(p)
     return sorted(files)

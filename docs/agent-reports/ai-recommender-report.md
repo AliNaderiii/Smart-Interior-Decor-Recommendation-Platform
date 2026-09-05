@@ -2,7 +2,7 @@
 
 Date: 2026-08-21 (UTC) · Branch: `arena/01a02613-smart-interior-decor-recommend`
 Base commit: `a07f0145fed320949f41ee67a020ad3e98f3aff0` (= remote `v2-strict-mode`)
-Governing prompts: `agent-master-prompts/00-README.md`, `04-ai-recommender-data.md`
+Governing prompts: `docs/internal/agent-master-prompts/00-README.md`, `04-ai-recommender-data.md`
 Supervisor: ML/AI Lead (virtual team; every change and evidence file reviewed before commit).
 
 > **Branch-name note (same pattern as prior stages):** Master Prompt 04

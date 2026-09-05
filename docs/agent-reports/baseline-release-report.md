@@ -9,7 +9,7 @@
 | **PR target** | `v2-strict-mode` — opened, **not merged** |
 | **Date** | 2026-08-21 (UTC) |
 | **Environment** | Linux 6.1.158+ x86_64, 2 vCPU / 3.8 GiB · Node v22.22.3 · npm 10.9.8 · Python 3.11.2 · pip 26.2.1 · git 2.39.5 · **no Docker, no PostgreSQL, no Redis, no Chrome** |
-| **Governing prompts** | `agent-master-prompts/00-README.md`, `agent-master-prompts/01-baseline-release-governance.md` |
+| **Governing prompts** | `docs/internal/agent-master-prompts/00-README.md`, `docs/internal/agent-master-prompts/01-baseline-release-governance.md` |
 | **Evidence** | [`baseline-release-evidence/`](baseline-release-evidence/) (24 files) |
 
 ---
@@ -63,7 +63,7 @@ formally handed over (out of scope).
 ### 3.2 Deliberately NOT changed
 
 No file under `backend/`, `frontend/`, `datasets/`, `ci/`, `docker-compose*.yml`,
-`Caddyfile`, `lighthouse-budget.json` or `agent-master-prompts/` was modified.
+`Caddyfile`, `lighthouse-budget.json` or `docs/internal/agent-master-prompts/` was modified.
 No pre-existing document owned by another agent (`docs/DEPLOYMENT.md`,
 `docs/ARCHITECTURE.md`, `docs/API.md`, `docs/AUDIT_V2.md`, `docs/SECURITY_AUDIT_V2.md`,
 `docs/DATASETS_AUDIT.md`, `docs/reports/**`, `ci/README.md`) was edited — every

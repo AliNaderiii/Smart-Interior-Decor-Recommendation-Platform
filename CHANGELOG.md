@@ -22,7 +22,75 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Fixed — CI green again after the bilingual/RTL work (2026-09-05)
+
+`main` had been red for 22 consecutive commits, starting at `459fbf4`
+("Persian UI, RTL"). Root cause was one change with three symptoms: the UI
+became bilingual with Persian as the default, and the test suites were still
+written against the English catalogue.
+
+- **Frontend unit tests (4 failures).** `LoginPage` calls `useT()` and was
+  rendered without `<LocaleProvider>`. Added
+  `tests/unit/renderWithProviders.tsx` (LocaleProvider + `locale=en` pinned
+  before mount) and migrated every component spec to it, so the next
+  `useT()` added to a component cannot break CI the same way.
+- **Playwright E2E (globalSetup could not find the login form).** Added
+  `tests/e2e/locale.ts`: seeds `localStorage["smartdecor.locale"]` through an
+  init script on every context globalSetup logs in with, and writes a
+  session-less `anonymous.json` storageState for the two anonymous projects.
+  `E2E_LOCALE=fa` runs the suite against the Persian UI.
+- **`journey-homeowner` › match breakdown.** The i18n pass renamed the signal
+  labels ("Style" → "Style fit"). The breakdown now carries locale-independent
+  hooks (`data-testid="match-breakdown"`, `data-signal="style|color|budget|material"`)
+  and the spec asserts on those. Two strings that were still hardcoded English
+  inside the Persian UI (`Match breakdown`, `NN% match — why?`) moved to the
+  catalogues as `recommendations.breakdownTitle` / `recommendations.matchWhy`.
+- **Dead-key sweep hung for 12 minutes.** `el.getAttribute("href")` was read
+  *after* the click; when the click navigated to a page with fewer controls,
+  `nth(i)` matched nothing and the auto-wait ran until the test timeout. The
+  attribute is now read before the click and `actionTimeout: 30s` is set as a
+  global safety net. `E2E_SWEEP_ROUTES` narrows the sweep for local bisecting.
+- **Sweep › "command palette opens with Cmd+K" was a hydration race.** The
+  test pressed Cmd+K right after `domcontentloaded`, but the shortcut listener
+  is attached in `CommandPaletteProvider`'s effect ~25 ms later, so the key
+  press was lost on a fast machine (3/3 local failures). The spec now waits for
+  a React-rendered element (the header's palette button) before pressing.
+- **Backend lint.** Unsorted import in `app/models/project.py` (I001) — the one
+  line that was failing the backend job and skipping six dependent jobs.
+
 ### Added
+
+- **`backend/tests/test_designer_workflow.py` (30 tests).** Migration 0005
+  shipped `PATCH /projects/{id}/status`, `POST /share/{token}/approve` (an
+  **unauthenticated write**) and `GET /share/{token}/approvals` with no tests.
+  Covers ownership (IDOR → 404, homeowner → 403, anonymous → 401), status
+  validation, audit trail, upsert idempotency, comment sanitisation and
+  length, unknown/oversized token, expiry (410) on all three token endpoints,
+  per-IP rate limiting and cross-link isolation.
+- **`frontend/tests/unit/sharePage.test.tsx` (6 tests).** The client-side
+  approval loop: POST payload, `aria-pressed` reflection, saved verdicts on
+  reload, note round-trip, 404/410 error state with no controls, and the
+  `javascript:` seller-link guard (X-01). Verified to fail when the sanitiser
+  or the payload is broken.
+
+### Fixed — designer workflow (found while writing the tests above)
+
+- `GET /share/{token}/approvals` did not check link expiry, so an expired link
+  still disclosed the client's verdicts to anyone holding the URL. All three
+  token endpoints now resolve the link through one helper
+  (`_load_live_share_link`: 404 unknown, 410 expired).
+- `PATCH /projects/{id}/status` was audited as `share_create`. It now records
+  its own `project_status` action with the `old->new` transition.
+
+### Changed
+
+- Build-process artefacts (`agent-master-prompts/`, `*MASTER_PROMPT*.md`,
+  `PHASE0_AUDIT_GUIDE.md`, `integration-request.md`) moved from the repository
+  root to `docs/internal/` (`git mv`, history preserved; see
+  `docs/internal/README.md`). `scripts/audit_docs_links.py` and every
+  in-repo link updated; docs-link audit and secret scan both PASS.
+- README test counts re-measured at HEAD: backend 628 passed / 22 skipped
+  (650 collected), frontend 64 unit tests / 11 files, E2E 30 tests.
 
 - **Vercel demo rewrite (`frontend/vercel.json`).** The frontend calls the
   API on the relative path `/api/v1`; for the free demo deploy (Vercel +
