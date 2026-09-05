@@ -1,61 +1,14 @@
-/** Project status: Draft → Shared → Approved.
+/** Project status metadata.
  *
- *  HONESTY NOTE: the v1.1 `projects` table has no status column, and inventing
- *  a backend migration for a Phase 3 UI task would put schema churn on the
- *  critical path. So status is DERIVED from facts we actually have, plus one
- *  explicitly designer-set bit:
- *
- *    Draft    — no quizzes run yet (nothing exists to show a client)
- *    Shared   — a share link has been generated for one of its quizzes
- *    Approved — the designer marked it approved
- *
- *  "Shared" and "Approved" are recorded client-side (localStorage). That is a
- *  real limitation: it is per-browser and does not sync across devices. It is
- *  recorded in docs/DESIGN_SYSTEM_V2.md as the v2.1 migration candidate
- *  (`projects.status` enum + `projects.shared_at`).
+ *  Status is now a real column on `projects` (migration 0005) and travels with
+ *  the API payload. The previous implementation derived it from quiz counts
+ *  and kept the designer-set part in localStorage — which meant it did not
+ *  survive a change of browser and could not be seen by anyone else. The
+ *  localStorage read/write helpers are gone; this module is presentation
+ *  metadata only.
  */
 
-export type ProjectStatus = "draft" | "shared" | "approved";
-
-const KEY = "sd_project_status";
-
-type Store = Record<string, "shared" | "approved">;
-
-function read(): Store {
-  try {
-    return JSON.parse(localStorage.getItem(KEY) ?? "{}") as Store;
-  } catch {
-    return {};
-  }
-}
-
-function write(store: Store) {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(store));
-  } catch {
-    /* private mode — status simply falls back to derived-from-quizzes */
-  }
-}
-
-export function getStatus(projectId: string, quizCount: number): ProjectStatus {
-  const flag = read()[projectId];
-  if (flag) return flag;
-  return quizCount > 0 ? "shared" : "draft";
-}
-
-export function setStatus(projectId: string, status: "shared" | "approved") {
-  const store = read();
-  store[projectId] = status;
-  write(store);
-}
-
-export function markShared(projectId: string) {
-  const store = read();
-  // Never downgrade an approved project back to shared.
-  if (store[projectId] === "approved") return;
-  store[projectId] = "shared";
-  write(store);
-}
+export type ProjectStatus = "draft" | "shared" | "approved" | "completed";
 
 export const STATUS_META: Record<ProjectStatus, { label: string; dot: string; text: string; bg: string }> = {
   draft: {
@@ -76,7 +29,16 @@ export const STATUS_META: Record<ProjectStatus, { label: string; dot: string; te
     text: "text-[var(--color-ok)]",
     bg: "bg-[var(--color-ok)]/10",
   },
+  completed: {
+    label: "Completed",
+    dot: "bg-[var(--color-accent)]",
+    text: "text-[var(--color-accent)]",
+    bg: "bg-[var(--color-accent)]/10",
+  },
 };
+
+/** Lifecycle order, used by the status switcher in the project header. */
+export const STATUS_ORDER: ProjectStatus[] = ["draft", "shared", "approved", "completed"];
 
 /** Deterministic initials + hue for a client avatar. Same name always yields
  *  the same colour, so the list is scannable by colour alone. */

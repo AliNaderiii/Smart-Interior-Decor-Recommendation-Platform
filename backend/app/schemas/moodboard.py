@@ -29,6 +29,8 @@ class MoodboardIn(BaseModel):
 
     title: Title = "My Moodboard"
     quiz_id: str | None = Field(default=None, max_length=32)
+    #: Designer flow: bind the board to the client project it belongs to.
+    project_id: str | None = Field(default=None, max_length=32)
     items: list[MoodboardItem] = Field(default_factory=list, max_length=100)
     shopping_list: list[str] = Field(default_factory=list, max_length=200)
 
@@ -46,6 +48,7 @@ class MoodboardOut(BaseModel):
     user_id: str
     title: str
     quiz_id: str | None
+    project_id: str | None
     items: list
     shopping_list: list
 

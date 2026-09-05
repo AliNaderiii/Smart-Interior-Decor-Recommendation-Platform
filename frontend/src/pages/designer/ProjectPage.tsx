@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { get, post } from "@/lib/api";
+import { get, patch, post } from "@/lib/api";
 import type { Project } from "@/lib/types";
 import { Button, Card, Input, Skeleton } from "@/components/ui";
 import { EmptyState, ErrorState } from "@/components/states";
 import { useToast } from "@/components/Toast";
-import { STATUS_META, avatarFor, getStatus, markShared, setStatus } from "@/lib/projectStatus";
+import { STATUS_META, STATUS_ORDER, avatarFor, type ProjectStatus } from "@/lib/projectStatus";
 
 export default function DesignerProjectPage() {
   const { id } = useParams<{ id: string }>();
@@ -14,12 +14,22 @@ export default function DesignerProjectPage() {
   const [shareResult, setShareResult] = useState<{ share_url: string; token: string } | null>(null);
   const [email, setEmail] = useState("");
   const [copied, setCopied] = useState(false);
-  const [approved, setApproved] = useState(false);
 
   const { data: project, isLoading, isError, refetch } = useQuery({
     queryKey: ["project", id],
     queryFn: () => get<Project>(`/projects/${id}`),
     enabled: Boolean(id),
+  });
+
+  // Sharing a project moves it out of draft on the server, so the dashboard
+  // reflects it for anyone looking — not just this browser.
+  const statusMut = useMutation({
+    mutationFn: (next: string) => patch<Project>(`/projects/${id}/status`, { status: next }),
+    onSuccess: () => {
+      refetch();
+      toast.success("Project status updated.");
+    },
+    onError: () => toast.error("Could not update the project status."),
   });
 
   const share = useMutation({
@@ -30,7 +40,7 @@ export default function DesignerProjectPage() {
       }),
     onSuccess: (result) => {
       setShareResult(result);
-      if (id) markShared(id);
+      if (project?.status === "draft") statusMut.mutate("shared");
       toast.success(
         email ? `Share link created and emailed to ${email}.` : "Share link created.",
       );
@@ -51,7 +61,7 @@ export default function DesignerProjectPage() {
     return <ErrorState message="Project not found." onRetry={() => refetch()} />;
   }
 
-  const status = approved ? "approved" : getStatus(project.id, project.quiz_count);
+  const status = project.status as ProjectStatus;
   const meta = STATUS_META[status];
   const { initials, hue } = avatarFor(project.client_name || "Unassigned");
   const shareUrl = shareResult ? window.location.origin + shareResult.share_url : "";
@@ -104,18 +114,21 @@ export default function DesignerProjectPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          {status !== "approved" && (
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setStatus(project.id, "approved");
-                setApproved(true);
-                toast.success("Project marked as approved.");
-              }}
-            >
-              Mark approved
-            </Button>
-          )}
+          {/* Lifecycle switcher. Writes to the server so the state is the
+              same on every device and for every viewer of the project. */}
+          <select
+            value={status}
+            onChange={(e) => statusMut.mutate(e.target.value as ProjectStatus)}
+            disabled={statusMut.isPending}
+            aria-label="Project status"
+            className="rounded-xl border border-[var(--color-line)] bg-transparent px-3 py-2.5 text-sm font-medium text-[var(--color-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
+          >
+            {STATUS_ORDER.map((sVal) => (
+              <option key={sVal} value={sVal}>
+                {STATUS_META[sVal].label}
+              </option>
+            ))}
+          </select>
           <Link
             to={`/quiz?project=${project.id}`}
             className="rounded-xl bg-[var(--color-accent)] px-4 py-2.5 text-sm font-semibold text-[var(--color-canvas)] hover:opacity-90"
@@ -124,6 +137,85 @@ export default function DesignerProjectPage() {
           </Link>
         </div>
       </div>
+
+      {/* At-a-glance counters. Before Phase A a project page showed only a
+          list of quizzes, so a designer could not tell whether the client had
+          actually responded to anything. */}
+      <div className="mt-8 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-2xl border border-[var(--color-line)] p-4">
+          <p className="text-2xl font-semibold tabular-nums text-[var(--color-ink)]">
+            {project.moodboard_count}
+          </p>
+          <p className="mt-1 text-sm text-[var(--color-muted)]">Moodboards</p>
+        </div>
+        <div className="rounded-2xl border border-[var(--color-line)] p-4">
+          <p className="text-2xl font-semibold tabular-nums text-[var(--color-ok)]">
+            {project.approved_count}
+          </p>
+          <p className="mt-1 text-sm text-[var(--color-muted)]">Approved by client</p>
+        </div>
+        <div className="rounded-2xl border border-[var(--color-line)] p-4">
+          <p className="text-2xl font-semibold tabular-nums text-[var(--color-warn)]">
+            {project.rejected_count}
+          </p>
+          <p className="mt-1 text-sm text-[var(--color-muted)]">Rejected</p>
+        </div>
+      </div>
+
+      {/* The client's actual verdicts. A rejection with a reason is the most
+          actionable thing on this page, so it is shown before the quiz list. */}
+      {project.feedback && project.feedback.length > 0 && (
+        <>
+          <h2 className="mt-10 text-lg font-semibold text-[var(--color-ink)]">Client feedback</h2>
+          <ul className="mt-4 space-y-2">
+            {project.feedback.map((f) => (
+              <li
+                key={f.product_id}
+                className="flex flex-wrap items-start gap-3 rounded-2xl border border-[var(--color-line)] p-4"
+              >
+                <span
+                  className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                    f.verdict === "approved"
+                      ? "bg-[var(--color-ok)]/10 text-[var(--color-ok)]"
+                      : "bg-[var(--color-warn)]/10 text-[var(--color-warn)]"
+                  }`}
+                >
+                  {f.verdict === "approved" ? "Approved" : "Rejected"}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-[var(--color-ink)]">{f.title}</p>
+                  {f.comment && (
+                    <p className="mt-1 text-sm leading-relaxed text-[var(--color-muted)]">
+                      “{f.comment}”
+                    </p>
+                  )}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {project.moodboards && project.moodboards.length > 0 && (
+        <>
+          <h2 className="mt-10 text-lg font-semibold text-[var(--color-ink)]">Moodboards</h2>
+          <ul className="mt-4 grid gap-3 sm:grid-cols-2">
+            {project.moodboards.map((m) => (
+              <li key={m.id}>
+                <Link
+                  to={`/moodboard/${m.id}`}
+                  className="block rounded-2xl border border-[var(--color-line)] p-4 transition-colors hover:border-[var(--color-accent)]"
+                >
+                  <p className="font-medium text-[var(--color-ink)]">{m.title}</p>
+                  <p className="mt-1 text-sm text-[var(--color-muted)]">
+                    {m.item_count} items
+                  </p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       <h2 className="mt-10 text-lg font-semibold text-[var(--color-ink)]">Quizzes &amp; results</h2>
       {!project.quizzes || project.quizzes.length === 0 ? (

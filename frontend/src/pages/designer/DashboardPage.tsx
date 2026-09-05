@@ -7,7 +7,7 @@ import { Button, Card, Input, Skeleton } from "@/components/ui";
 import { EmptyState, ErrorState } from "@/components/states";
 import { useToast } from "@/components/Toast";
 import { useCommands } from "@/components/CommandPalette";
-import { STATUS_META, avatarFor, getStatus, type ProjectStatus } from "@/lib/projectStatus";
+import { STATUS_META, avatarFor, type ProjectStatus } from "@/lib/projectStatus";
 import { useDialog } from "@/hooks/useDialog";
 
 type Filter = "all" | ProjectStatus;
@@ -17,6 +17,7 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "draft", label: "Draft" },
   { id: "shared", label: "Shared" },
   { id: "approved", label: "Approved" },
+  { id: "completed", label: "Completed" },
 ];
 
 function Avatar({ name }: { name: string }) {
@@ -179,15 +180,15 @@ export default function DesignerDashboardPage() {
   );
 
   const rows = useMemo(() => {
-    const withStatus = (projects ?? []).map((p) => ({ p, status: getStatus(p.id, p.quiz_count) }));
+    const withStatus = (projects ?? []).map((p) => ({ p, status: p.status as ProjectStatus }));
     return filter === "all" ? withStatus : withStatus.filter((r) => r.status === filter);
   }, [projects, filter]);
 
   const counts = useMemo(() => {
-    const c: Record<Filter, number> = { all: 0, draft: 0, shared: 0, approved: 0 };
+    const c: Record<Filter, number> = { all: 0, draft: 0, shared: 0, approved: 0, completed: 0 };
     for (const p of projects ?? []) {
       c.all++;
-      c[getStatus(p.id, p.quiz_count)]++;
+      c[p.status as ProjectStatus]++;
     }
     return c;
   }, [projects]);

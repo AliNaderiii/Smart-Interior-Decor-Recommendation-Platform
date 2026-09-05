@@ -21,6 +21,14 @@ class Moodboard(Base, UUIDPk, TimestampMixin):
     quiz_id: Mapped[str | None] = mapped_column(
         ForeignKey("style_quizzes.id", ondelete="SET NULL"), nullable=True
     )
+    # A designer's board belongs to the client project it was made for.
+    # Without this a project could hold quizzes but none of the actual work
+    # product, so the designer portal listed projects that contained nothing.
+    # SET NULL rather than CASCADE: deleting a project must not destroy the
+    # board, which the designer may still want in their own library.
+    project_id: Mapped[str | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     # items: [{product_id, x, y, w, h}] — react-grid-layout JSONB
     items: Mapped[list] = mapped_column(JSON, default=list)
     # shopping list: [product_id, ...]

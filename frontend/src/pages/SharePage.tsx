@@ -1,6 +1,7 @@
 import { useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { get } from "@/lib/api";
+import { useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { get, post } from "@/lib/api";
 import type { RecommendedProduct } from "@/lib/types";
 import { CATEGORY_LABELS, formatToman } from "@/lib/constants";
 import { safeUrl } from "@/lib/safeUrl";
@@ -15,7 +16,88 @@ interface ShareData {
   categories: Record<string, RecommendedProduct[]>;
 }
 
-/** Public read-only recommendation view (no auth). */
+type Verdict = "approved" | "rejected";
+
+/** Per-product approve / reject control for the client.
+ *
+ *  This is what turns the share link from a brochure into a workflow. The
+ *  client has no account — the token in the URL is the credential — so the
+ *  control posts straight to the public endpoint and reflects the result
+ *  locally without any auth round-trip.
+ */
+function ApproveControls({
+  token,
+  productId,
+  current,
+  onDone,
+}: {
+  token: string;
+  productId: string;
+  current?: { verdict: Verdict; comment: string };
+  onDone: (v: Verdict, comment: string) => void;
+}) {
+  const t = useT();
+  const [comment, setComment] = useState(current?.comment ?? "");
+  const [showNote, setShowNote] = useState(false);
+
+  const vote = useMutation({
+    mutationFn: (verdict: Verdict) =>
+      post(`/share/${token}/approve`, { product_id: productId, verdict, comment }),
+    onSuccess: (_d, verdict) => onDone(verdict, comment),
+  });
+
+  return (
+    <div className="space-y-2 border-t border-[var(--color-line)] pt-3">
+      <div className="flex gap-2">
+        {(["approved", "rejected"] as const).map((v) => {
+          const active = current?.verdict === v;
+          return (
+            <button
+              key={v}
+              type="button"
+              onClick={() => vote.mutate(v)}
+              disabled={vote.isPending}
+              aria-pressed={active}
+              className={
+                "flex-1 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] " +
+                (active
+                  ? v === "approved"
+                    ? "bg-[var(--color-ok)] text-white"
+                    : "bg-[var(--color-warn)] text-white"
+                  : "border border-[var(--color-line)] text-[var(--color-ink)] hover:bg-[var(--color-line)]")
+              }
+            >
+              {v === "approved" ? t.share.approve : t.share.reject}
+            </button>
+          );
+        })}
+      </div>
+
+      {showNote ? (
+        <textarea
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          onBlur={() => current && vote.mutate(current.verdict)}
+          rows={2}
+          maxLength={1000}
+          placeholder={t.share.notePlaceholder}
+          className="w-full rounded-xl border border-[var(--color-line)] bg-transparent p-2 text-xs text-[var(--color-ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)]"
+        />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setShowNote(true)}
+          className="text-xs text-[var(--color-muted)] underline decoration-dotted underline-offset-2 hover:text-[var(--color-ink)]"
+        >
+          {comment ? `“${comment.slice(0, 40)}”` : t.share.addNote}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Public recommendation view (no auth). Read-only apart from the client's
+ *  own approve/reject verdicts, which the designer sees on their dashboard. */
 export default function SharePage() {
   const t = useT();
   const { token } = useParams<{ token: string }>();
@@ -25,6 +107,24 @@ export default function SharePage() {
     enabled: Boolean(token),
     retry: false,
   });
+
+  // Verdicts already recorded on this link, so returning to the page does not
+  // present a blank slate and invite the client to decide twice.
+  const { data: saved } = useQuery({
+    queryKey: ["share-approvals", token],
+    queryFn: () =>
+      get<{ product_id: string; verdict: Verdict; comment: string }[]>(
+        `/share/${token}/approvals`,
+      ),
+    enabled: Boolean(token),
+    retry: false,
+  });
+
+  const [verdicts, setVerdicts] = useState<Record<string, { verdict: Verdict; comment: string }>>({});
+  const merged = {
+    ...Object.fromEntries((saved ?? []).map((a) => [a.product_id, { verdict: a.verdict, comment: a.comment }])),
+    ...verdicts,
+  };
 
   if (isLoading) {
     return (
@@ -96,6 +196,16 @@ export default function SharePage() {
                       View at seller
                     </a>
                   )}
+                  {token && (
+                    <ApproveControls
+                      token={token}
+                      productId={p.id}
+                      current={merged[p.id]}
+                      onDone={(verdict, comment) =>
+                        setVerdicts((prev) => ({ ...prev, [p.id]: { verdict, comment } }))
+                      }
+                    />
+                  )}
                 </div>
               </Card>
             ))}
@@ -103,7 +213,7 @@ export default function SharePage() {
         </section>
       ))}
       <p className="mt-16 border-t border-[var(--color-line)] pt-8 text-center text-xs text-[var(--color-faint)]">
-        Powered by Smart Decor — read-only shared view
+        {t.share.footer}
       </p>
     </div>
   );

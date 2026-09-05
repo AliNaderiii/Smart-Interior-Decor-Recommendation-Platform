@@ -10,6 +10,7 @@ from app.db.session import get_db
 from app.models import audit_log as actions
 from app.models.moodboard import Moodboard
 from app.models.product import Product
+from app.models.project import Project
 from app.models.user import User
 from app.schemas.common import ok
 from app.schemas.moodboard import MoodboardIn, MoodboardOut, MoodboardUpdate
@@ -27,10 +28,19 @@ def _owned(db: Session, moodboard_id: str, user: User) -> Moodboard:
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 def create_moodboard(body: MoodboardIn, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    # A board may be filed under a project, but only one the caller owns —
+    # otherwise a designer could attach work to someone else's project and it
+    # would surface on their dashboard.
+    if body.project_id is not None:
+        project = db.get(Project, body.project_id)
+        if project is None or project.designer_id != user.id:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Project not found")
+
     board = Moodboard(
         user_id=user.id,
         title=body.title,
         quiz_id=body.quiz_id,
+        project_id=body.project_id,
         items=[i.model_dump() for i in body.items],
         shopping_list=body.shopping_list,
     )

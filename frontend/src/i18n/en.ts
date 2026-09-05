@@ -444,6 +444,14 @@ export const en: Dict = {
     totalProducts: (n: number) => `${n} products`,
   },
 
+  share: {
+    approve: "Approve",
+    reject: "Reject",
+    addNote: "Add a note",
+    notePlaceholder: "What do you think of this piece…",
+    footer: "Powered by Smart Decor — your choices are sent to your designer",
+  },
+
   errors: {
     generic: "Something went wrong. Please try again.",
     network: "The server could not be reached.",

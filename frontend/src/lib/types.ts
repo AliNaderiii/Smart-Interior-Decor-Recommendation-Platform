@@ -94,9 +94,24 @@ export interface Project {
   client_name: string;
   client_email: string;
   notes: string;
+  /** Server-side lifecycle (migration 0005), no longer localStorage-derived. */
+  status: "draft" | "shared" | "approved" | "completed";
   created_at: string;
   quiz_count: number;
+  moodboard_count: number;
+  approved_count: number;
+  rejected_count: number;
   quizzes?: { id: string; client_name: string; styles: string[]; created_at: string }[];
+  moodboards?: { id: string; title: string; item_count: number; created_at: string }[];
+  /** Every verdict the client has left, newest first. */
+  feedback?: {
+    product_id: string;
+    title: string;
+    title_fa?: string;
+    verdict: "approved" | "rejected";
+    comment: string;
+    updated_at: string;
+  }[];
 }
 
 export interface AdminProduct extends Omit<RecommendedProduct, "final_score" | "explanation"> {
