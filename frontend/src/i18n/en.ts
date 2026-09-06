@@ -136,6 +136,14 @@ export const en: Dict = {
     added: "Added ✓",
     aiNotice: "Extracted by AI from the retailer page — confirm before buying.",
     proLocked: "Unlock the full set with Pro",
+    lockedTitle: (n: number) => `${n} more ${n === 1 ? "match" : "matches"} in this room`,
+    unlockCta: "Unlock with Pro",
+    upgradeCta: "Upgrade to Pro",
+    createMoodboard: (n: number) => `Create moodboard (${n})`,
+    optionsCount: (n: number) => `${n} options`,
+    layoutLabel: "Layout",
+    layoutGrid: "Grid",
+    layoutMasonry: "Masonry",
     verifiedPrice: "Verified price",
     estimatedPrice: "Estimated price",
     whyMatched: (title: string, pct: number) =>
@@ -176,6 +184,10 @@ export const en: Dict = {
     addFromMoodboard: "Add from your moodboard",
     addFromMoodboardHint:
       "Create a moodboard first — its products appear here with real dimensions.",
+    doorLabel: "door 80",
+    windowLabel: "win 140",
+    footprint: (w: number, l: number, used: string, room: string, pct: number) =>
+      `${w}cm × ${l}cm · footprint ${used} m² of ${room} m² (${pct}%)`,
   },
 
   shoppingList: {

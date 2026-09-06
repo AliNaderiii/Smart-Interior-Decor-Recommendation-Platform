@@ -49,11 +49,16 @@ function useRecommendations(quizId: string | null) {
 /* ------------------------------------------------------------ layout toggle */
 
 function LayoutToggle({ mode, onChange }: { mode: LayoutMode; onChange: (m: LayoutMode) => void }) {
+  const t = useT();
+  const labels: Record<LayoutMode, string> = {
+    grid: t.recommendations.layoutGrid,
+    masonry: t.recommendations.layoutMasonry,
+  };
   return (
     <div
       className="inline-flex rounded-xl bg-[var(--color-line)] p-0.5"
       role="radiogroup"
-      aria-label="Layout"
+      aria-label={t.recommendations.layoutLabel}
     >
       {(["grid", "masonry"] as const).map((opt) => (
         <button
@@ -62,7 +67,7 @@ function LayoutToggle({ mode, onChange }: { mode: LayoutMode; onChange: (m: Layo
           role="radio"
           aria-checked={mode === opt}
           onClick={() => onChange(opt)}
-          className={`relative rounded-[10px] px-3 py-1.5 text-xs font-semibold capitalize transition-colors ${
+          className={`relative rounded-[10px] px-3 py-1.5 text-xs font-semibold transition-colors ${
             mode === opt ? "text-[var(--color-ink)]" : "text-[var(--color-muted)] hover:text-[var(--color-ink)]"
           }`}
         >
@@ -73,7 +78,7 @@ function LayoutToggle({ mode, onChange }: { mode: LayoutMode; onChange: (m: Layo
               transition={spring}
             />
           )}
-          <span className="relative">{opt}</span>
+          <span className="relative">{labels[opt]}</span>
         </button>
       ))}
     </div>
@@ -361,11 +366,11 @@ export default function RecommendationsPage() {
               to="/upgrade"
               className="rounded-xl border border-[var(--color-line)] px-4 py-2 text-sm font-semibold text-[var(--color-ink)] hover:bg-[var(--color-line)]"
             >
-              Upgrade to Pro
+              {t.recommendations.upgradeCta}
             </Link>
           )}
           <Button variant="accent" onClick={() => navigate("/moodboards")} disabled={picked.length === 0}>
-            Create moodboard ({picked.length})
+            {t.recommendations.createMoodboard(picked.length)}
           </Button>
         </div>
       </div>
@@ -398,7 +403,7 @@ export default function RecommendationsPage() {
             <h2 id={`h-${category}`} className="h2 text-[var(--color-ink)]">
               {CATEGORY_LABELS[category] ?? category}
             </h2>
-            <span className="text-xs tabular-nums text-[var(--color-faint)]">{items.length} options</span>
+            <span className="text-xs tabular-nums text-[var(--color-faint)]">{t.recommendations.optionsCount(items.length)}</span>
           </div>
           <motion.div
             className={gridClass}

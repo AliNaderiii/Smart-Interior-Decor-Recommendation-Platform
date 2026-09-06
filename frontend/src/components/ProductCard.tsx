@@ -230,14 +230,14 @@ function ProductCardInner({ product, rank, onAdd, added, feedback, onFeedback }:
         <div className="absolute inset-0 grid place-items-center bg-[var(--color-surface)]/60 p-4 text-center backdrop-blur-[2px]">
           <div>
             <p className="text-sm font-semibold text-[var(--color-ink)]">
-              {rank + 1} more match{rank === 0 ? "" : "es"} in this room
+              {t.recommendations.lockedTitle(rank + 1)}
             </p>
             <p className="mt-0.5 text-xs text-[var(--color-muted)]">{t.recommendations.proLocked}</p>
             <Link
               to="/upgrade"
               className="mt-3 inline-block rounded-xl bg-[var(--color-accent)] px-4 py-2 text-sm font-semibold text-[var(--color-canvas)] hover:opacity-90"
             >
-              Unlock with Pro
+              {t.recommendations.unlockCta}
             </Link>
           </div>
         </div>

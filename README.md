@@ -1,5 +1,12 @@
 # Smart Interior Decor Recommendation Platform
 
+[![CI](https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/actions/workflows/ci.yml)
+[![Stage 4 verification](https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/actions/workflows/stage4-verify.yml/badge.svg?branch=main)](https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/actions/workflows/stage4-verify.yml)
+
+**Live demo:** <https://smartdecor-demo.vercel.app> (Vercel frontend → Render
+API; the free tier sleeps, so the first request can take ~40 s). Bilingual
+(فارسی / English, RTL-aware) — switch with the `فا | EN` toggle in the header.
+
 AI-powered living-room furnishing recommendations with explainability, editable
 moodboards, a 2D floorplan preview, validated shopping lists, a designer (B2B2C)
 portal, an admin portal with human-in-the-loop AI feature extraction, and a
@@ -15,13 +22,15 @@ Zarinpal-based Pro paywall. **MVP scope: living_room only.**
 > 11 files**, strict build, lint (0 errors) and test typecheck clean, and the
 > **blocking Playwright projects green locally (21/21)** with the UI locale
 > pinned to `en` by `tests/e2e/locale.ts`.
-> Last fully green CI run:
-> [#33430375507](https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/actions/runs/33430375507)
-> (2026-08-31; `main` then went red from `459fbf4` until the 2026-09-05 fix
-> pass — see CHANGELOG › Unreleased). It ran the backend suite against **PostgreSQL 16 +
+> Verified in CI on `main` at `5e189ae` (run
+> [#34030059656](https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/actions/runs/34030059656),
+> 2026-09-06, all 10 jobs green): the backend suite against **PostgreSQL 16 +
 > pgvector and real Redis**, **Playwright E2E (30 tests, 4 role projects + sweep)**,
-> **Lighthouse CI ≥80**, seller-link liveness over the 150-product catalog,
-> `/recommend` p95 evidence, and Docker builds.
+> the **authenticated Lighthouse matrix** (6 pages × 2 form factors; home/mobile
+> perf 98, LCP 2257 ms against the 3000 ms gate), seller-link liveness over the
+> 150-product catalog, `/recommend` p95 evidence, and Docker builds.
+> `main` had been red from `459fbf4` (2026-09-04) until PR #20 — see
+> CHANGELOG › Unreleased for what was wrong and what changed.
 > Still not verified anywhere: real-model AI extraction accuracy (CI runs the
 > `--real` benchmark only when a provider secret is configured).
 > Read the checklist before quoting any number from this repository to a

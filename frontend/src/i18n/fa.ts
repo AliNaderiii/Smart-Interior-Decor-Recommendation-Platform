@@ -142,6 +142,14 @@ export const fa = {
     added: "افزوده شد ✓",
     aiNotice: "استخراج‌شده با هوش مصنوعی از صفحه فروشنده — پیش از خرید تأیید کنید.",
     proLocked: "با نسخه Pro همه گزینه‌ها را ببینید",
+    lockedTitle: (n: number) => `${n} گزینه دیگر برای این اتاق`,
+    unlockCta: "فعال‌سازی Pro",
+    upgradeCta: "ارتقا به Pro",
+    createMoodboard: (n: number) => `ساخت مودبورد (${n})`,
+    optionsCount: (n: number) => `${n} گزینه`,
+    layoutLabel: "چیدمان",
+    layoutGrid: "شبکه‌ای",
+    layoutMasonry: "آجری",
     verifiedPrice: "قیمت تأییدشده",
     estimatedPrice: "قیمت تخمینی",
     whyMatched: (title: string, pct: number) =>
@@ -182,6 +190,10 @@ export const fa = {
     addFromMoodboard: "افزودن از مودبورد",
     addFromMoodboardHint:
       "ابتدا یک مودبورد بسازید — محصولاتش با ابعاد واقعی اینجا ظاهر می‌شوند.",
+    doorLabel: "در ۸۰",
+    windowLabel: "پنجره ۱۴۰",
+    footprint: (w: number, l: number, used: string, room: string, pct: number) =>
+      `${w}×${l} سانتی‌متر · اشغال ${used} از ${room} متر مربع (${pct}٪)`,
   },
 
   shoppingList: {
