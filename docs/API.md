@@ -23,6 +23,9 @@ Auth: `Authorization: Bearer <access_token>` (HS256, 15 min; refresh 7 days).
 | GET | `/quiz`, `/quiz/{id}` | own quizzes |
 | POST | `/recommend` | body = inline quiz **or** `?quiz_id=`; 3-stage engine; Redis-cached 1 h; free users get rank-1 full + ranks 2-5 as locked teasers; each product carries `final_score` + `explanation{style_match,color_match,budget_fit,material_match,pattern_match,fit_match,fit_reason,matched_materials,summary}` — `fit_reason` is a stable code (`fit_unknown\|fit_neutral\|fit_ok\|fit_tight\|fit_too_big\|fit_too_small\|fit_too_tall`, ADR-012) |
 
+## Visual search (ADR-013)
+| POST | `/search/visual` | multipart `file` (JPEG/PNG/WebP ≤ 8 MB) + optional `?category=<taxonomy id>&limit=1..24`; any signed-in user, 10/min; photo processed in memory, never stored. Returns `items[]` (product payload + `similarity`, `palette_match`, `clip_similarity` in clip mode; free users: top hit per category full, rest `locked` teasers), `is_pro`, and `meta{mode: "clip"\|"palette", palette[], category, candidates, embedding_backend, query_image}` |
+
 ## Moodboards
 | POST/GET | `/moodboards` | items = `[{product_id,x,y,w,h}]` (react-grid-layout), `shopping_list` = product ids |
 | GET/PATCH/DELETE | `/moodboards/{id}` | GET embeds referenced product payloads |

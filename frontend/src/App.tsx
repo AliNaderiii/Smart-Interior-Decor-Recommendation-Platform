@@ -45,6 +45,7 @@ const MoodboardsPage = lazy(() => import("@/pages/MoodboardsPage"));
 const MoodboardEditorPage = lazy(() => import("@/pages/MoodboardEditorPage"));
 const FloorplanPage = lazy(() => import("@/pages/FloorplanPage"));
 const ShoppingListPage = lazy(() => import("@/pages/ShoppingListPage"));
+const VisualSearchPage = lazy(() => import("@/pages/VisualSearchPage"));
 const UpgradePage = lazy(() => import("@/pages/UpgradePage"));
 const SharePage = lazy(() => import("@/pages/SharePage"));
 const DesignerDashboardPage = lazy(() => import("@/pages/designer/DashboardPage"));
@@ -83,6 +84,7 @@ function AnimatedRoutes() {
               <Route path="/moodboard/:id" element={<RequireAuth><MoodboardEditorPage /></RequireAuth>} />
               <Route path="/floorplan" element={<RequireAuth><FloorplanPage /></RequireAuth>} />
               <Route path="/shopping-list" element={<RequireAuth><ShoppingListPage /></RequireAuth>} />
+              <Route path="/visual-search" element={<RequireAuth><VisualSearchPage /></RequireAuth>} />
               <Route path="/upgrade" element={<RequireAuth><UpgradePage /></RequireAuth>} />
 
               <Route path="/designer/dashboard" element={<RequireAuth roles={["designer", "admin"]}><DesignerDashboardPage /></RequireAuth>} />

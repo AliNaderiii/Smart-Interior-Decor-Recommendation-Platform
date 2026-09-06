@@ -17,6 +17,7 @@ from app.api.routes import (
     products,
     projects,
     quiz,
+    search,
     subscriptions,
     users,
 )
@@ -211,6 +212,7 @@ for router in (
     products.router,
     moodboards.router,
     projects.router,
+    search.router,
     subscriptions.router,
     admin.router,
 ):

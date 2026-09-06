@@ -94,6 +94,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
       { id: "nav.moodboards", label: "Go to Moodboards", group: "Navigate", keywords: "boards collage", run: () => navigate("/moodboards") },
       { id: "nav.floorplan", label: "Go to Floorplan", group: "Navigate", keywords: "layout room plan", run: () => navigate("/floorplan") },
       { id: "nav.shopping", label: "Go to Shopping list", group: "Navigate", keywords: "cart basket buy", run: () => navigate("/shopping-list") },
+      { id: "nav.visual", label: "Visual search — find by photo", group: "Navigate", keywords: "photo image similar camera upload", run: () => navigate("/visual-search") },
       { id: "nav.upgrade", label: "Upgrade to Pro", group: "Navigate", keywords: "billing subscription pay", run: () => navigate("/upgrade") },
       { id: "help.shortcuts", label: "Keyboard shortcuts", group: "Appearance", keywords: "keys hotkeys help ?", shortcut: "?", run: () => setHelp(true) },
       {

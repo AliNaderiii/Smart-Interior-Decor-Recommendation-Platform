@@ -22,6 +22,32 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Added — visual search: find catalogue pieces that look like a photo (ADR-013, 2026-09-06)
+
+- **`POST /api/v1/search/visual`** (`app/api/routes/search.py`,
+  `app/services/visual_search.py`): multipart photo + optional `category`
+  and `limit ≤ 24`, any signed-in user, `VISUAL_SEARCH_RATE_LIMIT_PER_MINUTE`
+  (10). The photo goes through the same hardened validator as admin uploads,
+  is processed **in memory only** and never stored, cached or turned into a
+  row (tested).
+- **Two honest retrieval modes**, reported in `meta.mode`: `clip` (photo →
+  CLIP image tower → cosine against product embeddings via pgvector/HNSW,
+  blended `0.8·clip + 0.2·palette`) when the real backend is loaded; `palette`
+  (median-cut dominant colours scored with the recommender's perceptual
+  `color_score`) under the hash backend used in CI/dev/demo. Both return the
+  extracted palette; the UI can push it into the style quiz.
+- **Paywall** mirrors `/recommend`: free users get the top hit per category
+  in full, the rest as `locked` teasers, enforced server-side.
+- **Frontend** `/visual-search` (lazy chunk, 3 KB gzip): drag-and-drop with
+  local preview and client-side size/type checks, category filter, palette
+  swatches → "use these colours in the quiz", similarity badges, add-to-
+  moodboard, and an explicit mode notice — a colour-only search never
+  pretends to be a vision model. Nav link for homeowners and designers,
+  command-palette entry, fa/en strings.
+- **Tests:** `tests/test_visual_search.py` (21 — palette extraction, both
+  modes with a fake CLIP, auth/415/422/429/paywall/audit/privacy),
+  `visualSearchPage.test.tsx` (8).
+
 ### Added — dimensional fit as a sixth recommender component (ADR-012, 2026-09-06)
 
 The quiz already asked for the room size and every catalogue row already had

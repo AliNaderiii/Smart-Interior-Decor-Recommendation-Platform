@@ -75,6 +75,9 @@ class Settings(BaseSettings):
     #: recommend, **share** and **upload**. The last two had none.
     SHARE_RATE_LIMIT_PER_MINUTE: int = 30
     UPLOAD_RATE_LIMIT_PER_MINUTE: int = 10
+    #: ADR-013 visual search: one embedding + one vector query per call, from
+    #: any signed-in user (not only admins) — throttled like an upload.
+    VISUAL_SEARCH_RATE_LIMIT_PER_MINUTE: int = 10
     EXPORT_RATE_LIMIT_PER_HOUR: int = 5
 
     # ---- Database ----
