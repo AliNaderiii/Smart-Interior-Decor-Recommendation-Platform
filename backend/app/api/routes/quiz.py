@@ -45,6 +45,8 @@ def _quiz_dict(q: StyleQuiz) -> dict:
         "budget_max_toman": q.budget_max_toman,
         "materials": q.materials,
         "patterns": q.patterns,
+        "room_width_cm": q.room_width_cm,
+        "room_length_cm": q.room_length_cm,
         "quiz_embedding": list(q.quiz_embedding) if q.quiz_embedding is not None else None,
     }
 

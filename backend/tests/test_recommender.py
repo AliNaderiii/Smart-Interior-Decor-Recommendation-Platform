@@ -196,7 +196,7 @@ def test_20_explanation_contains_all_components(db):
     item = next(iter(result["categories"].values()))[0]
     exp = item["explanation"]
     for key in ("style_match", "color_match", "budget_fit", "material_match",
-                "pattern_match", "summary"):
+                "pattern_match", "fit_match", "fit_reason", "summary"):
         assert key in exp
 
 
@@ -246,6 +246,7 @@ def test_24_calculate_score_final_is_weighted_sum(db):
         + WEIGHTS["budget"] * exp["budget_fit"] / 100
         + WEIGHTS["material"] * exp["material_match"] / 100
         + WEIGHTS["pattern"] * exp["pattern_match"] / 100
+        + WEIGHTS["fit"] * exp["fit_match"] / 100
     )
     assert score["final_score"] == pytest.approx(reconstructed, abs=0.02)
 

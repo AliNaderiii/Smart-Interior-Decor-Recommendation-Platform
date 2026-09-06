@@ -22,6 +22,37 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Added — dimensional fit as a sixth recommender component (ADR-012, 2026-09-06)
+
+The quiz already asked for the room size and every catalogue row already had
+`width/depth/height_cm`; the ranking ignored both. A 260 cm sofa scored the
+same in a 2.5 × 3 m studio as in a 5 × 6 m living room.
+
+- **Engine.** `recommender.fit_score()` — per-category footprint rules from
+  `recommender_config.json → fit` (seating/tables/storage decay past an ideal
+  ratio and floor when a side is longer than the room or no 76 cm walkway
+  remains; rugs penalise *too small*; curtains are height-only; lighting and
+  anything without dimensions are neutral 0.5). Weighted 10 %, funded equally
+  from style and colour: `current` = 0.25/0.25/0.20/0.15/0.05/**0.10**.
+  `config_version` and `AI_STACK_VERSION` → `2026-09-06.1`; the previous
+  weights survive as `current-v1` / `client-ad-v1` (`fit: 0`) for A/B via
+  `RECOMMENDER_WEIGHT_PROFILE`. Cache fingerprints now include the config
+  version. `POST /recommend` inline quizzes and `?quiz_id=` both pass room
+  dimensions through.
+- **API.** `explanation.fit_match` (%) and `explanation.fit_reason` (stable
+  code: `fit_unknown|fit_neutral|fit_ok|fit_tight|fit_too_big|fit_too_small|fit_too_tall`).
+- **Frontend.** Sixth row "Room fit / تناسب با اتاق" in the match breakdown
+  (localised reason + product W × D), and a card-face badge for the three
+  actionable states only (won't fit / tight / small); no badge when it fits.
+- **Tests & tooling.** `tests/test_fit_score.py` (26 cases incl. "fitting twin
+  outranks oversized twin" against the seeded catalogue), fidelity tests
+  reconstruct the score from all six components, `productCardFit.test.tsx`
+  (7), E2E breakdown assertion extended to the `fit` signal. The weights
+  harness now runs a 400 × 500 cm room and diffs profiles by `title|price`
+  instead of per-DB UUIDs — the previous `docs/reports/weights_profiles.md`
+  reported "0 of 5 kept" for every category because each profile was
+  snapshotted on a fresh database with new ids.
+
 ### Fixed — CI green again after the bilingual/RTL work (2026-09-05)
 
 `main` had been red for 22 consecutive commits, starting at `459fbf4`

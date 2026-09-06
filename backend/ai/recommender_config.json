@@ -1,38 +1,63 @@
 {
-  "config_version": "2026-08-26.1",
+  "config_version": "2026-09-06.1",
   "weights": {
-    "style": 0.30,
-    "color": 0.30,
-    "budget": 0.20,
+    "style": 0.25,
+    "color": 0.25,
+    "budget": 0.2,
     "material": 0.15,
-    "pattern": 0.05
+    "pattern": 0.05,
+    "fit": 0.1
   },
   "weights_source": {
     "kind": "heuristic",
-    "reference": "ADR-005 (docs/ARCHITECTURE.md): style and color dominate interior-design preference, budget is a strong practical filter, material is a secondary preference, pattern is a tiebreaker.",
+    "reference": "ADR-005 (docs/ARCHITECTURE.md) + ADR-012 (dimensional fit): style and color dominate interior-design preference, budget is a strong practical filter, material is a secondary preference, pattern is a tiebreaker; fit penalises furniture that physically does not belong in the room the quiz described.",
     "learned_from_data": false,
     "tuning_plan": "Not tuned on interaction data. Revisit only with an offline evaluation set and a logged experiment; any change bumps config_version and requires re-running the acceptance scenarios (tests/test_recommender.py) and the scenario harness (scripts/evaluate_recommender.py), including under every profile (see profiles below and docs/reports/weights_profiles.md)."
   },
   "profiles": {
     "current": {
       "weights": {
-        "style": 0.30,
-        "color": 0.30,
-        "budget": 0.20,
+        "style": 0.25,
+        "color": 0.25,
+        "budget": 0.2,
         "material": 0.15,
-        "pattern": 0.05
+        "pattern": 0.05,
+        "fit": 0.1
       },
-      "source": "ADR-005 heuristic baseline (unchanged): style/color .30/.30, budget .20, material .15, pattern .05"
+      "source": "ADR-005 baseline + ADR-012 fit component: style/color .25/.25 (each gave up .05 to fund fit), budget .20, material .15, pattern .05, fit .10. Fit is a physical constraint, not a taste signal, so it is funded from the two taste weights rather than from budget."
     },
     "client-ad": {
       "weights": {
-        "style": 0.30,
-        "color": 0.30,
-        "budget": 0.20,
-        "material": 0.10,
-        "pattern": 0.10
+        "style": 0.25,
+        "color": 0.25,
+        "budget": 0.2,
+        "material": 0.1,
+        "pattern": 0.1,
+        "fit": 0.1
       },
-      "source": "Client advertisement weights, normalised to sum to 1. The ad states pattern 10% alongside the existing weights, which as stated sum to 1.05; material is reduced .15 -> .10 to compensate (the alternative — reducing budget or style — is open client decision C-6, see docs/reports/weights_profiles.md)"
+      "source": "Client advertisement weights normalised to sum to 1 (material .15 -> .10 absorbs the ad's extra pattern .05, open client decision C-6), plus the ADR-012 fit component funded from style/color exactly as in `current`."
+    },
+    "current-v1": {
+      "weights": {
+        "style": 0.3,
+        "color": 0.3,
+        "budget": 0.2,
+        "material": 0.15,
+        "pattern": 0.05,
+        "fit": 0.0
+      },
+      "source": "Pre-2026-09-06 `current` (no fit component). Kept for A/B comparison in scripts/evaluate_recommender.py --compare-profiles; not the default. fit=0 makes it loadable under the six-key schema while ranking exactly as before."
+    },
+    "client-ad-v1": {
+      "weights": {
+        "style": 0.3,
+        "color": 0.3,
+        "budget": 0.2,
+        "material": 0.1,
+        "pattern": 0.1,
+        "fit": 0.0
+      },
+      "source": "Pre-2026-09-06 `client-ad` (no fit component). Kept for A/B comparison; not the default. fit=0 makes it loadable under the six-key schema while ranking exactly as before."
     }
   },
   "default_profile": "current",
@@ -55,5 +80,41 @@
     "duplicate_embedding_cosine": 0.995,
     "max_per_style": 4,
     "note": "applied after scoring, before truncation to max_results; identical or near-identical items are suppressed, and no single style may monopolise the final cut"
+  },
+  "fit": {
+    "note": "ADR-012. Per-category physical-fit rules; scores are in [0,1]; neutral_score when room or product dimensions are missing (or the category is footprint-neutral); never below floor. Dimensions are cm; footprint ratio = product (width x depth) / room (width x length) from the quiz. Seating/tables/storage: 1.0 up to ideal_footprint_ratio, linear decay to max_footprint_ratio; a side longer than the room, or no circulation_cm lane left along the short wall, is the floor. Rugs ramp UP from min to ideal (too small is the usual mistake) then decay to max. decor is height-only against assumed_ceiling_cm; lighting is neutral.",
+    "neutral_score": 0.5,
+    "floor": 0.05,
+    "circulation_cm": 76,
+    "assumed_ceiling_cm": 270,
+    "categories": {
+      "sofa": {
+        "max_footprint_ratio": 0.35,
+        "ideal_footprint_ratio": 0.12
+      },
+      "coffee_table": {
+        "max_footprint_ratio": 0.12,
+        "ideal_footprint_ratio": 0.04
+      },
+      "chair": {
+        "max_footprint_ratio": 0.16,
+        "ideal_footprint_ratio": 0.05
+      },
+      "storage": {
+        "max_footprint_ratio": 0.2,
+        "ideal_footprint_ratio": 0.05
+      },
+      "rug": {
+        "min_footprint_ratio": 0.15,
+        "ideal_footprint_ratio": 0.4,
+        "max_footprint_ratio": 0.75
+      },
+      "decor": {
+        "curtain_min_height_ratio": 0.85
+      },
+      "lighting": {
+        "neutral": true
+      }
+    }
   }
 }

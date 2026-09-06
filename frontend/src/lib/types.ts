@@ -33,9 +33,22 @@ export interface Explanation {
   budget_fit: number;
   material_match: number;
   pattern_match: number;
+  /** ADR-012 dimensional fit, 0–100; 50 = unknown/neutral. */
+  fit_match: number;
+  /** Stable reason code the UI localises (fit_ok, fit_tight, fit_too_big, fit_too_small, fit_too_tall, fit_unknown, fit_neutral). */
+  fit_reason: FitReason;
   matched_materials: string[];
   summary: string;
 }
+
+export type FitReason =
+  | "fit_ok"
+  | "fit_tight"
+  | "fit_too_big"
+  | "fit_too_small"
+  | "fit_too_tall"
+  | "fit_unknown"
+  | "fit_neutral";
 
 export interface RecommendedProduct {
   id: string;

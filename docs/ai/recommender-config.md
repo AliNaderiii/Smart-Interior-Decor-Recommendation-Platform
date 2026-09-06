@@ -1,7 +1,7 @@
 # Recommender Configuration & Weights — provenance and rules
 
 Owner: Master Prompt 04. Config: `backend/ai/recommender_config.json`
-(`config_version: 2026-08-26.1`). Loader/validator:
+(`config_version: 2026-09-06.1`). Loader/validator:
 `app/services/recommender.py::load_recommender_config` (runs at import,
 fail-fast).
 
@@ -12,10 +12,12 @@ top-level `weights` key mirrors `profiles[default_profile].weights` (the
 loader enforces the mirror — drift is a boot failure) and exists for
 backward compatibility with older readers.
 
-| profile | style | color | budget | material | pattern | source |
-|---|---:|---:|---:|---:|---:|---|
-| `current` *(default)* | 0.30 | 0.30 | 0.20 | 0.15 | 0.05 | ADR-005 heuristic baseline |
-| `client-ad` | 0.30 | 0.30 | 0.20 | 0.10 | 0.10 | client advertisement, normalised (see below) |
+| profile | style | color | budget | material | pattern | fit | source |
+|---|---:|---:|---:|---:|---:|---:|---|
+| `current` *(default)* | 0.25 | 0.25 | 0.20 | 0.15 | 0.05 | 0.10 | ADR-005 baseline + ADR-012 fit (funded from style/colour) |
+| `client-ad` | 0.25 | 0.25 | 0.20 | 0.10 | 0.10 | 0.10 | client advertisement, normalised (see below) + fit |
+| `current-v1` | 0.30 | 0.30 | 0.20 | 0.15 | 0.05 | 0 | pre-ADR-012 baseline, kept for A/B |
+| `client-ad-v1` | 0.30 | 0.30 | 0.20 | 0.10 | 0.10 | 0 | pre-ADR-012 client profile, kept for A/B |
 
 **Source of `current`: heuristic, from ADR-005 (docs/ARCHITECTURE.md). NOT
 learned from data.** No interaction dataset exists to learn from, and the
@@ -48,11 +50,41 @@ Activation is one environment variable, no code change:
 refuses to boot). Until the client decides, `current` stays the default.
 
 Weights are validated at import for the top-level set **and every profile**:
-exact key set, each in [0,1], Σ = 1 ± 1e-9; `default_profile` must exist; the
+exact key set (six keys since `2026-09-06.1` — `fit` is mandatory, `0.0` in
+the `*-v1` profiles), each in [0,1], Σ = 1 ± 1e-9; `default_profile` must exist; the
 top-level set must mirror the default profile. The version is stamped into
 every recommendation payload (`meta.weights_version`, `meta.weights_profile`,
 `meta.weights`) so an explanation is always auditable against the
 configuration that produced it.
+
+### 1.1 The `fit` component (ADR-012)
+
+`fit` is the only component that uses the quiz's `room_width_cm × room_length_cm`
+and the product's `width/depth/height_cm`. Its rules are data, under the
+top-level `fit` key:
+
+| knob | value | meaning |
+|---|---|---|
+| `neutral_score` | 0.5 | returned (with `fit_unknown`) when either side has no dimensions, and for `lighting` (`fit_neutral`) |
+| `floor` | 0.05 | never lower — the item still ranks, it just sinks |
+| `circulation_cm` | 76 | walkway that must remain along the short wall (same constant as the floor planner) |
+| `assumed_ceiling_cm` | 270 | curtains are judged height-only against this |
+| `categories.<cat>` | ratios | `ideal_footprint_ratio` / `max_footprint_ratio` (seating, tables, storage); rugs add `min_footprint_ratio`; decor has `curtain_min_height_ratio` |
+
+Footprint ratio = product `width × depth` ÷ room `width × length`. Score 1.0
+up to `ideal`, linear decay to the floor at `max`; a side longer than the room
+or no circulation lane is the floor immediately (`fit_too_big`). Rugs ramp *up*
+from `min` (too small → `fit_too_small`) to `ideal`, then decay to 0.3 at
+`max`. Every result carries `explanation.fit_match` (%) and
+`explanation.fit_reason` ∈ {`fit_unknown`, `fit_neutral`, `fit_ok`, `fit_tight`,
+`fit_too_big`, `fit_too_small`, `fit_too_tall`} — a stable code the frontend
+localises; the engine never emits prose.
+
+Ratios are expert judgement (a 3-seat 220 × 95 sofa is comfortable in a
+4 × 5 m room, 12 %; it must not be "fine" in a 2.5 × 3 m studio, 28 %), tested
+in `tests/test_fit_score.py` (26 cases including the property "fitting twin
+outranks oversized twin"). Changing a ratio follows the same three rules as a
+weight change above.
 
 ## 2. Stage B (semantic retrieval)
 

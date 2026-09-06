@@ -62,7 +62,7 @@ def _product(title: str, **kw) -> Product:
 
 class TestConfigValidation:
     def test_weights_sum_to_one_and_match_expected_keys(self):
-        assert set(WEIGHTS) == {"style", "color", "budget", "material", "pattern"}
+        assert set(WEIGHTS) == {"style", "color", "budget", "material", "pattern", "fit"}
         assert abs(sum(WEIGHTS.values()) - 1.0) < 1e-9
 
     def test_config_declares_source_and_learning_status(self):
@@ -241,6 +241,7 @@ class TestExplanationFidelity:
                     + WEIGHTS["budget"] * exp["budget_fit"] / 100
                     + WEIGHTS["material"] * exp["material_match"] / 100
                     + WEIGHTS["pattern"] * exp["pattern_match"] / 100
+                    + WEIGHTS["fit"] * exp["fit_match"] / 100
                 )
                 assert item["final_score"] == pytest.approx(recomputed, abs=0.021), \
                     f"{item['title']}: explanation does not sum to final score"

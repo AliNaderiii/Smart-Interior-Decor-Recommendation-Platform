@@ -33,7 +33,7 @@ def test_config_ships_both_validated_profiles():
     assert set(cfg["profiles"]) >= {"current", "client-ad"}
     for name in ("current", "client-ad"):
         w = cfg["profiles"][name]["weights"]
-        assert set(w) == {"style", "color", "budget", "material", "pattern"}
+        assert set(w) == {"style", "color", "budget", "material", "pattern", "fit"}
         assert abs(sum(w.values()) - 1.0) < 1e-9
     assert cfg["default_profile"] == "current"
     # Top-level weights must mirror the default profile (drift guard).
@@ -42,13 +42,22 @@ def test_config_ships_both_validated_profiles():
 
 def test_client_ad_weights_are_the_normalised_ad():
     w = rec.PROFILES["client-ad"]
+    # ADR-012: fit .10 is funded from style/color (.30 -> .25 each); the
+    # ad's material/pattern normalisation (.10/.10) is unchanged.
     assert w == {
-        "style": 0.30, "color": 0.30, "budget": 0.20, "material": 0.10, "pattern": 0.10
+        "style": 0.25, "color": 0.25, "budget": 0.20, "material": 0.10, "pattern": 0.10,
+        "fit": 0.10,
+    }
+    # The pre-fit ad weights are preserved verbatim as the `client-ad-v1`
+    # comparison profile (fit pinned to 0 so it loads under the 6-key schema).
+    assert rec.PROFILES["client-ad-v1"] == {
+        "style": 0.30, "color": 0.30, "budget": 0.20, "material": 0.10, "pattern": 0.10,
+        "fit": 0.0,
     }
     # And the ad as literally stated (pattern .10 on top of the old weights)
     # must be REJECTED by the validator — that is the 1.05 sum.
     ad_as_stated = {"style": 0.30, "color": 0.30, "budget": 0.20,
-                    "material": 0.15, "pattern": 0.10}
+                    "material": 0.15, "pattern": 0.10, "fit": 0.0}
     assert abs(sum(ad_as_stated.values()) - 1.05) < 1e-9
     bad = json.loads(json.dumps(rec.CONFIG))
     bad["profiles"]["client-ad"]["weights"] = ad_as_stated

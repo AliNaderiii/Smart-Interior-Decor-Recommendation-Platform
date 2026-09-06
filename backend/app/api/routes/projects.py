@@ -341,6 +341,8 @@ def public_share_view(
         "budget_max_toman": quiz.budget_max_toman,
         "materials": quiz.materials,
         "patterns": quiz.patterns,
+        "room_width_cm": quiz.room_width_cm,
+        "room_length_cm": quiz.room_length_cm,
         "quiz_embedding": list(quiz.quiz_embedding) if quiz.quiz_embedding is not None else None,
     }
     result = recommend(db, payload)

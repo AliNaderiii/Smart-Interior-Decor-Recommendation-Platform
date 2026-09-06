@@ -83,6 +83,10 @@ def make_quiz(**overrides) -> dict:
     quiz = {
         "styles": ["modern"],
         "color_palette": ["#2E2E2E", "#FFFFFF"],
+        # 4 x 5 m living room — the frontend quiz store's default, so the
+        # ADR-012 fit component is exercised (without room dims it is neutral).
+        "room_width_cm": 400,
+        "room_length_cm": 500,
         "budget_min_toman": 1_000_000,
         "budget_max_toman": 150_000_000,
         "materials": ["wood"],
@@ -137,9 +141,19 @@ def ranking_snapshot(db, profile_name: str) -> dict[str, list[dict]]:
     profile-vs-profile diff is a pure function of the weights.
     """
     res = recommend(db, make_quiz(), use_cache=False, profile=profile_name)
+    # ``key`` is the cross-database identity of a seeded product. Every profile
+    # is snapshotted on its own ``fresh_db()`` whose rows get new random UUIDs,
+    # so diffing on ``id`` compared nothing with nothing ("0 of 5 kept" for
+    # identical rankings). Title + price is stable across seeds.
     return {
         category: [
-            {"id": item["id"], "title": item["title"], "score": item["final_score"]}
+            {
+                "id": item["id"],
+                "key": f"{item['title']}|{item['price_toman']}",
+                "title": item["title"],
+                "score": item["final_score"],
+                "fit": item["explanation"].get("fit_reason"),
+            }
             for item in items
         ]
         for category, items in res["categories"].items()
@@ -230,6 +244,7 @@ def build_scenarios(db, profile_name: str) -> list[tuple[str, object]]:
                     + weights["budget"] * exp["budget_fit"] / 100
                     + weights["material"] * exp["material_match"] / 100
                     + weights["pattern"] * exp["pattern_match"] / 100
+                    + weights["fit"] * exp["fit_match"] / 100
                 )
                 assert abs(recomputed - item["final_score"]) <= 0.02 + 1e-9, \
                     f"{item['title']}: final {item['final_score']} != recomputed {recomputed:.4f}"
@@ -429,15 +444,15 @@ def compare_profiles() -> int:
     lines.append("")
     lines.append("## Weights")
     lines.append("")
-    lines.append("| profile | style | color | budget | material | pattern | sum |")
-    lines.append("|---|---:|---:|---:|---:|---:|---:|")
+    lines.append("| profile | style | color | budget | material | pattern | fit | sum |")
+    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|")
     for name in profiles:
         w = PROFILES[name]
         total = sum(w.values())
         flag = " *(active default)*" if name == default else ""
         lines.append(
             f"| {name}{flag} | {w['style']:.2f} | {w['color']:.2f} | {w['budget']:.2f} "
-            f"| {w['material']:.2f} | {w['pattern']:.2f} | {total:.2f} |"
+            f"| {w['material']:.2f} | {w['pattern']:.2f} | {w['fit']:.2f} | {total:.2f} |"
         )
     lines.append("")
     for name, src in CONFIG["profiles"].items():
@@ -477,13 +492,14 @@ def compare_profiles() -> int:
         lines.append(f"### `{base}` vs `{other}`")
         lines.append("")
         def label(item: dict) -> str:
-            return f"{item['title']} (`{item['id'][:8]}`)"
+            fit = f", {item['fit']}" if item.get("fit") and item["fit"] != "fit_neutral" else ""
+            return f"{item['title']} (score {item['score']:.3f}{fit})"
 
         base_snap, other_snap = snapshots[base], snapshots[other]
         cats = sorted(set(base_snap) | set(other_snap))
         for cat in cats:
-            b = {item["id"]: item for item in base_snap.get(cat, [])}
-            o = {item["id"]: item for item in other_snap.get(cat, [])}
+            b = {item["key"]: item for item in base_snap.get(cat, [])}
+            o = {item["key"]: item for item in other_snap.get(cat, [])}
             only_base = [i for i in b if i not in o]
             only_other = [i for i in o if i not in b]
             moved = []
