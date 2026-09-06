@@ -1,6 +1,7 @@
 from app.models.audit_log import AuditLog
 from app.models.base import Base
 from app.models.feedback import ProductFeedback
+from app.models.feedback_event import FeedbackEvent
 from app.models.moodboard import Moodboard
 from app.models.product import Product
 from app.models.project import ClientApproval, Project, ShareLink
@@ -12,6 +13,7 @@ __all__ = [
     "Base",
     "AuditLog",
     "ProductFeedback",
+    "FeedbackEvent",
     "User",
     "Product",
     "StyleQuiz",

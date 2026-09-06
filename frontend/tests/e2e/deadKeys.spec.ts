@@ -88,7 +88,7 @@ function accounts(): Record<"homeowner" | "designer" | "admin", Credentials> {
 type SweepRole = "homeowner" | "designer" | "admin";
 
 const ALL_ROUTES: Record<SweepRole, string[]> = {
-  homeowner: ["/", "/quiz", "/recommendations", "/moodboards", "/floorplan", "/shopping-list", "/upgrade"],
+  homeowner: ["/", "/quiz", "/recommendations", "/moodboards", "/floorplan", "/shopping-list", "/visual-search", "/upgrade"],
   designer: ["/designer/dashboard"],
   admin: ["/admin/products", "/admin/users", "/admin/subscriptions"],
 };
@@ -124,6 +124,8 @@ const SKIP = [
   /skip to content/i,
   /open command palette/i, // Modal overlay covered by dedicated test below
   /upload product image/i, // OS file picker trigger covered by dedicated test
+  /drop a photo here/i,    // ADR-013 visual-search dropzone: also an OS file picker trigger (unit-tested)
+  /choose photo/i,
   /^all$/i,         // initial default filter tabs
   /^همه/i,          // initial default Persian filter tabs
 ];

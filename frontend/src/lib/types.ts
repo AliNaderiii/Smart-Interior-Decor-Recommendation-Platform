@@ -77,10 +77,43 @@ export interface RecommendedProduct {
   is_verified?: boolean;
 }
 
+/** ADR-013 — one hit from POST /search/visual. Locked teasers carry only
+ *  id/title/category/image_url/similarity. */
+export interface VisualSearchItem
+  extends Partial<Omit<RecommendedProduct, "id" | "title" | "category" | "image_url">> {
+  id: string;
+  title: string;
+  category: string;
+  image_url: string;
+  /** Blended 0–1 score used for ranking. */
+  similarity: number;
+  /** Perceptual palette agreement, 0–1 (always present on full items). */
+  palette_match?: number;
+  /** Cross-modal CLIP cosine, 0–1 — only in `clip` mode. */
+  clip_similarity?: number;
+  locked?: boolean;
+}
+
+export interface VisualSearchResult {
+  items: VisualSearchItem[];
+  is_pro: boolean;
+  meta: {
+    /** `clip` = image embedding + palette; `palette` = colour-only (hash backend). */
+    mode: "clip" | "palette";
+    palette: string[];
+    category: string | null;
+    candidates: number;
+    embedding_backend: string;
+    query_image?: { width: number; height: number; content_type: string };
+  };
+}
+
 export interface RecommendResult {
   categories: Record<string, RecommendedProduct[]>;
   cached: boolean;
   is_pro: boolean;
+  /** Version stamps of the config that produced the list (ADR-014 attribution). */
+  meta?: { recommender_version?: string; weights_version?: string; weights_profile?: string };
 }
 
 export interface MoodboardItem {

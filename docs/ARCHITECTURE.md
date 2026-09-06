@@ -211,6 +211,88 @@ shows a badge only for the three actionable states.
   quiz, per-wall placement. Those belong to the floor planner (A1/room photo),
   not to a scalar score.
 
+## ADR-013 — Visual search on the existing embedding space
+
+**Context.** "Find me something that looks like this photo" is the feature
+every benchmarked competitor sells (Houzz *Visual Match*, RoomStudioAI *shop
+the look*, Wayfair). The platform already had the two expensive halves: a
+CLIP-space `style_embedding` on every product with an HNSW index (ADR-003/004)
+and an embedding service that accepts images. What was missing was an
+endpoint, a page, and an honest answer to the question "what happens when CLIP
+is not loaded?" — which is the case in CI, in tests, and on the current demo
+host.
+
+**Decision.** `POST /api/v1/search/visual` (multipart photo, optional
+`category`, `limit ≤ 24`) served by `app/services/visual_search.py`, with two
+retrieval modes selected by the active embedding backend and **reported in
+`meta.mode`**:
+
+| mode | when | ranking |
+|---|---|---|
+| `clip` | `EMBEDDING_BACKEND=clip` and the model loaded | photo → CLIP image tower → cosine against product text embeddings (pgvector `<=>` + HNSW on Postgres, Python cosine on SQLite), blended `0.8·clip + 0.2·palette` because CLIP is weak on exact colour |
+| `palette` | hash backend (dev / CI / demo) | median-cut dominant palette of the photo (Pillow, 128 px thumbnail, near-black/white swatches demoted) scored with the recommender's own perceptual `color_score` against each product's catalogued colours |
+
+The hash backend's vectors carry **no** visual semantics, so embedding a
+photo there would be theatre; the palette path is a real, explainable search
+("things in these colours") and the UI says which mode produced the results.
+Both modes return the extracted palette so the user can push it into the
+style quiz — the bridge back into the recommender.
+
+**Privacy.** The photo is validated by the same hardened pipeline as admin
+uploads (magic bytes, 8 MB / 40 MP bounds, re-encode), processed in memory
+and discarded: no storage write, no product row, no cache key. This is
+tested (`test_photo_is_never_persisted`). IKEA Kreativ is criticised for
+scanning rooms without a consent story; we do not keep the image at all.
+
+**Paywall.** Same shape as `/recommend` (ADR-011): free users get the best
+match per category in full and the rest as `locked` teasers, enforced in the
+route.
+
+**Consequences.**
+* One new setting, `VISUAL_SEARCH_RATE_LIMIT_PER_MINUTE` (10) — the call
+  costs an embedding and a vector query and is open to every signed-in user.
+* Turning on real CLIP is purely operational (`EMBEDDING_BACKEND=clip` +
+  torch/sentence-transformers) — no code path changes, `meta.mode` flips.
+* Not done: cropping the query to one object (a room photo embeds the whole
+  scene), and re-ranking by the user's saved quiz. Both are natural
+  follow-ups once real-model quality is measured (Phase A5).
+
+## ADR-014 — Behavioural event capture, no learning yet
+
+**Context.** `docs/ai/feedback-events.md` designed the event model a learning
+stage would need — with the key insight that *impressions are the
+denominator* and must be recorded from day one — but nothing captured it.
+Every competitor that "learns your taste" (Havenly's 2.4 M-render AI, Wayfair
+Muse) is built on exactly this stream; without it any later claim of a
+learned recommender would be unfounded.
+
+**Decision.** Build the capture side only, exactly as specified, and put a
+guard on the honesty boundary:
+
+* `feedback_events` (migration `0006`): append-only, closed vocabulary
+  (`impression, click, like, dislike, unlike, save, share, purchase_click`),
+  `position` and `weights_version` on every row, `session_id` for anonymous
+  viewers, `sample_rate` per row.
+* `POST /events`: batch ≤ 100, **always 202** with `{accepted, dropped}` — a
+  bad product id drops that event, a storage failure is logged; analytics can
+  never fail a user request. Authenticated *or* anonymous; a forged token is
+  still 401. Rate-limited per user/session.
+* `GET /admin/events/summary`: per-category funnel; rates are `null` without
+  impressions; `learning_ready` restates the spec's ≥ 10 000-event threshold
+  so the dashboard cannot imply a model.
+* Client: batched tracker with impression de-dup, `keepalive` flush on hide,
+  never throws. Emits from `/recommendations` (impressions with `quiz_id` +
+  `weights_version`, like/dislike/unlike, save), seller links
+  (`purchase_click`) and `/visual-search`.
+* GDPR: export section, erasure severs `user_id` (rows have no PII).
+* **Guard:** `test_ranking_pipeline_does_not_read_the_event_table` — the
+  recommender may not import the table until an ADR replaces this one.
+
+**Consequences.** Data starts accumulating now, correctly attributed to the
+config version that produced each list, so the A/B and offline-evaluation
+steps in the spec's §3 have something to evaluate. Nothing about ranking
+changed. One new setting (`EVENTS_RATE_LIMIT_PER_MINUTE`, 60).
+
 ## Data model (ERD)
 
 ```

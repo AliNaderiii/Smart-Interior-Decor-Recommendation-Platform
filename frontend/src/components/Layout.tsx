@@ -20,11 +20,13 @@ function navByRole(t: ReturnType<typeof useT>): Record<string, NavLinkDef[]> {
       { to: "/moodboards", label: t.nav.moodboards },
       { to: "/floorplan", label: t.nav.floorplan },
       { to: "/shopping-list", label: t.nav.shoppingList },
+      { to: "/visual-search", label: t.nav.visualSearch },
     ],
     designer: [
       { to: "/designer/dashboard", label: t.nav.designerDashboard },
       { to: "/quiz", label: t.nav.quiz },
       { to: "/recommendations", label: t.nav.recommendations },
+      { to: "/visual-search", label: t.nav.visualSearch },
     ],
     admin: [
       { to: "/admin/products", label: t.nav.adminProducts },

@@ -1,11 +1,13 @@
 # Feedback Event Design — like / dislike / click / save
 
-Owner: Master Prompt 04. **Status: design + partial implementation.** What
-exists today is a bounded heuristic re-rank (see
+Owner: Master Prompt 04. **Status: event capture implemented (ADR-014,
+2026-09-06); learning not started.** What ranks products today is a bounded
+heuristic re-rank on the thumbs (see
 [`recommender-config.md`](recommender-config.md) §4). **There is no trained
-feedback recommender in this codebase and none is claimed.** This document
-defines the event model that a future learning stage would need, so the data
-can start being captured correctly now.
+feedback recommender in this codebase and none is claimed** — a test
+(`test_ranking_pipeline_does_not_read_the_event_table`) fails if the
+recommender ever imports the event table without an ADR. This document defines
+the event model and, since ADR-014, describes what captures it.
 
 ## 1. What exists today (implemented, tested)
 
@@ -15,7 +17,24 @@ can start being captured correctly now.
 | 👍/👎 API | `app/api/routes/feedback.py` | idem |
 | Bounded re-rank after explainable scoring (+0.12 / −0.35), feedback in the cache fingerprint | `app/services/recommender.py` | `tests/test_recommender_v2.py`, real-Redis invalidation test |
 
-## 2. Designed, not yet built: the event stream
+## 1.1 Event capture (ADR-014 — implemented, tested)
+
+| Piece | Where | Test |
+|---|---|---|
+| `feedback_events` table (append-only; §2 columns + `sample_rate`) | `app/models/feedback_event.py`, migration `0006` | `tests/test_feedback_events.py` |
+| `POST /events` — batch ≤ 100, closed vocabulary (422 otherwise), always `202 {accepted, dropped}`, anonymous sessions allowed, forged tokens rejected, 60/min per user or session | `app/api/routes/events.py` | idem |
+| `GET /admin/events/summary?days=` — per-category funnel; rates only where impressions exist; `learning_ready` restates §3's 10 000-event threshold | idem | idem |
+| GDPR: export section `behavioural_events`; erasure nulls `user_id` (history kept, link severed) | `app/api/routes/users.py` | idem |
+| Client tracker: batched (4 s / 40 events), impression de-dup per session·product·context, `keepalive` flush on tab hide, never throws | `frontend/src/lib/events.ts` | `tests/unit/events.test.ts` |
+| Emitters: impressions + like/dislike/unlike + save on `/recommendations` (with `quiz_id`, `weights_version`), `purchase_click` on seller links, impressions + save on `/visual-search` | `RecommendationsPage.tsx`, `ProductCard.tsx`, `VisualSearchPage.tsx` | — |
+| Admin funnel panel | `frontend/src/components/EngagementFunnel.tsx` (on `/admin/subscriptions`) | — |
+
+Not captured yet: `click` (card open) — the card has no detail page; the
+explanation-chip open could be wired as `click` once a detail surface exists.
+Impressions are written unsampled (`sample_rate = 1.0`); sample when volume
+demands and record the rate per row.
+
+## 2. The event stream (designed here, built in §1.1)
 
 A thumb is a *decision*; an event stream records *behaviour*. Proposed
 `feedback_events` (append-only, no upserts — history is the point):
