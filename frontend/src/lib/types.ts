@@ -112,6 +112,8 @@ export interface RecommendResult {
   categories: Record<string, RecommendedProduct[]>;
   cached: boolean;
   is_pro: boolean;
+  /** Version stamps of the config that produced the list (ADR-014 attribution). */
+  meta?: { recommender_version?: string; weights_version?: string; weights_profile?: string };
 }
 
 export interface MoodboardItem {

@@ -18,16 +18,19 @@ colour 25 %, budget 20 %, material 15 %, pattern 5 % and **room fit 10 %**
 shows the per-signal breakdown in both languages. **Visual search** (ADR-013)
 finds catalogue pieces that look like an uploaded photo on the same CLIP
 embedding space, falls back to an honest palette search when the model is not
-loaded, and never stores the photo.
+loaded, and never stores the photo. **Behavioural events** (ADR-014) are
+captured — impressions as the denominator, position and config version on
+every row — but nothing learns from them yet, and a test keeps it that way
+until the evidence bar in `docs/ai/feedback-events.md` §3 is met.
 
 > **Release baseline.** The tree was first audited at commit `f97bfad` on
 > 2026-08-21 ([`docs/RELEASE_BASELINE.md`](docs/RELEASE_BASELINE.md)) and
 > re-audited at the Stage-1 HEAD on 2026-08-26
 > ([`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)).
 > Re-verified on 2026-09-06 in a clean sandbox (Python 3.13, Node 22.20)
-> after the dimensional-fit and visual-search work (ADR-012/013): backend
-> **675 passed / 22 skipped (697 collected)**, frontend **79 unit tests across
-> 13 files**, strict build, lint (0 errors) and test typecheck clean, and the
+> after the Phase A work (ADR-012/013/014): backend
+> **686 passed / 22 skipped (708 collected)**, frontend **86 unit tests across
+> 14 files**, strict build, lint (0 errors) and test typecheck clean, and the
 > **blocking Playwright projects green locally (21/21)** with the UI locale
 > pinned to `en` by `tests/e2e/locale.ts`.
 > Verified in CI on `main` at `5e189ae` (run
@@ -106,7 +109,7 @@ the separate no-Docker path documented under *Local development*.)
 
 Postgres parity was demonstrated on **2026-08-19 at commit `a847ad5`**, when the
 suite contained 45 tests (`docs/reports/postgres_parity.md`). The suite has since
-grown to **697 collected** (675 passed / 22 skipped, re-measured at HEAD on
+grown to **708 collected** (686 passed / 22 skipped, re-measured at HEAD on
 2026-09-06) and that Postgres run has **not** been repeated locally — the
 baseline audit environment has no Docker or PostgreSQL binary. Treat Postgres
 parity as *previously evidenced, currently unverified at HEAD*; re-run it before
@@ -160,7 +163,7 @@ policy.
 ```bash
 cd backend
 pip install -r requirements.lock.txt      # the lockfile is the contract, not requirements.txt
-pytest                                    # 675 passed, 22 skipped / 697 collected (SQLite + fakeredis + mock AI)
+pytest                                    # 686 passed, 22 skipped / 708 collected (SQLite + fakeredis + mock AI)
 ruff check app ai scripts tests           # 0 errors
 
 python scripts/verify_lock_install.py     # installed env == requirements.lock.txt
@@ -179,7 +182,7 @@ CI `backend` job against Postgres 16 + pgvector.
 cd frontend
 npm ci                                    # not npm install: package-lock.json is the lock of record
 
-npm test                                  # Vitest + Testing Library — 79 tests, 13 files (Node ≥22 required)
+npm test                                  # Vitest + Testing Library — 86 tests, 14 files (Node ≥22 required)
 npm run lint                              # oxlint — 0 errors, 18 warnings (react-hooks/refs advisories)
 npm run build                             # tsc strict + vite — 0 errors
 npx tsc -p tsconfig.tests.json            # type-check the test suites too (tsconfig.app.json covers only src/)
@@ -240,7 +243,7 @@ npx lighthouse http://localhost:4173/ --view   # >=80 target (npm run preview fi
 
 | Suite | Tests |
 |---|---:|
-| `backend/tests/` (full suite) | **697 collected** — 675 passed, 22 skipped |
+| `backend/tests/` (full suite) | **708 collected** — 686 passed, 22 skipped |
 | ↳ `test_recommender.py` | 30 (spec floor: ≥28) |
 | ↳ `test_security_v2.py` | 26 |
 | ↳ `test_feedback_v2.py` | 16 |
@@ -250,9 +253,10 @@ npx lighthouse http://localhost:4173/ --view   # >=80 target (npm run preview fi
 | ↳ `test_weights_profiles.py` | 13 (weight profiles, Stage 1) |
 | ↳ `test_fit_score.py` | 26 (dimensional fit, ADR-012) |
 | ↳ `test_visual_search.py` | 21 (visual search, ADR-013) |
+| ↳ `test_feedback_events.py` | 11 (behavioural events, ADR-014) |
 | ↳ `test_perf_v2.py` | 10 |
 | ↳ `test_rate_limit.py` | 2 |
-| `frontend/tests/unit/` (Vitest) | **79** across 13 files |
+| `frontend/tests/unit/` (Vitest) | **86** across 14 files |
 | `frontend/tests/e2e/` (Playwright) | **30** across 6 files — CI only |
 
 ## Repository layout
@@ -262,17 +266,17 @@ backend/
   ai/                embedding_service.py · feature_extractor.py (provider-agnostic)
   app/
     api/routes/      auth · users(GDPR) · quiz+recommend · products · moodboards
-                     projects+share · search(visual) · subscriptions+payment · admin
+                     projects+share · search(visual) · events(ADR-014) · subscriptions+payment · admin
     core/            config · security(JWT/bcrypt/Fernet-KMS) · storage(S3) · redis
     services/        recommender (3-stage) · payment · link_checker · emailer
     models/ db/      SQLAlchemy 2.0 models · pgvector column type
   alembic/           migrations (pgvector extension + HNSW index)
   scripts/           seed_products.py · load_realistic_products.py · evaluate_extraction.py
                      seed_perf_products.py · dev_postgres.py
-  tests/             697 collected — test_recommender.py (30) · test_security_v2.py (26)
+  tests/             708 collected — test_recommender.py (30) · test_security_v2.py (26)
                      test_feedback_v2.py (16) · test_auth.py (13) · test_projects_quota.py (14)
                      test_weights_profiles.py (13) · test_fit_score.py (26) · test_visual_search.py (21)
-                     test_designer_workflow.py (30)
+                     test_feedback_events.py (11) · test_designer_workflow.py (30)
                      test_perf_v2.py (10) · test_rate_limit.py (2)
                      benchmark_50_images.json
   security/          pip-audit-allowlist.yml (expiring, justified CVE acceptances)
@@ -281,7 +285,7 @@ frontend/
                      upgrade · share · designer/* · admin/*
   src/stores/        authStore · quizStore · moodboardStore (Zustand)
   src/lib/           api (fetch + JWT refresh + CSRF double-submit) · constants (i18n-ready) · types
-  tests/unit/        Vitest + Testing Library — 79 tests, 13 files (`npm test`)
+  tests/unit/        Vitest + Testing Library — 86 tests, 14 files (`npm test`)
                      renderWithProviders.tsx wraps pages in <LocaleProvider locale=en>
   tests/e2e/         Playwright — 30 tests, 6 files (`npm run e2e`): deadKeys · auth-negative
                      auth-smoke · journey-homeowner · journey-designer · journey-admin

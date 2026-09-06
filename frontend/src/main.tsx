@@ -9,12 +9,16 @@ import "@/lib/earlyRecommend";
 import "./fonts.css";
 import { useThemeStore, applyMode } from "@/stores/themeStore";
 import { applyLocale, readStoredLocale } from "@/i18n";
+import { installFlushOnHide } from "@/lib/events";
 
 // Apply the persisted theme before first paint to avoid a light-mode flash.
 applyMode(useThemeStore.getState().mode);
 // Same reasoning for direction: setting lang/dir after mount makes the whole
 // layout visibly jump from RTL to LTR on first paint.
 applyLocale(readStoredLocale());
+// ADR-014: behavioural events are batched; make sure the last batch of a tab
+// is delivered (keepalive) when the user navigates away or closes it.
+installFlushOnHide();
 import "./index.css";
 import App from "./App";
 

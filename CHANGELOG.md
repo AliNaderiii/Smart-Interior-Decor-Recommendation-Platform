@@ -22,6 +22,29 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Added — behavioural event capture, honestly scoped (ADR-014, 2026-09-06)
+
+- **`feedback_events` table** (migration `0006`) — the append-only stream
+  `docs/ai/feedback-events.md` designed: closed vocabulary (`impression,
+  click, like, dislike, unlike, save, share, purchase_click`), `position`,
+  `weights_version`, `session_id`, `sample_rate`. No PII, no free text.
+- **`POST /api/v1/events`** — batch ≤ 100, **always 202** `{accepted,
+  dropped}` (analytics never fails a user request), signed-in or anonymous
+  (forged token still 401), `EVENTS_RATE_LIMIT_PER_MINUTE` (60).
+- **`GET /api/v1/admin/events/summary`** — per-category funnel with rates
+  only where impressions exist and a `learning_ready` flag that restates the
+  spec's ≥ 10 000-event threshold. Rendered as an **Engagement funnel** panel
+  on `/admin/subscriptions`.
+- **Client tracker** `src/lib/events.ts`: batched, impression de-dup per
+  session·product·context, `keepalive` flush on tab hide, never throws.
+  Emitters on `/recommendations` (impressions with `quiz_id` +
+  `weights_version`, like/dislike/unlike, save), seller links
+  (`purchase_click`), `/visual-search` (impressions, save).
+- **GDPR:** export gains `behavioural_events`; erasure severs `user_id`.
+- **Honesty guard:** `test_ranking_pipeline_does_not_read_the_event_table` —
+  the recommender is still the bounded thumbs re-rank; nothing learns yet.
+- Tests: `tests/test_feedback_events.py` (11), `events.test.ts` (7).
+
 ### Added — visual search: find catalogue pieces that look like a photo (ADR-013, 2026-09-06)
 
 - **`POST /api/v1/search/visual`** (`app/api/routes/search.py`,

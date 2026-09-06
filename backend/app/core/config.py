@@ -78,6 +78,9 @@ class Settings(BaseSettings):
     #: ADR-013 visual search: one embedding + one vector query per call, from
     #: any signed-in user (not only admins) — throttled like an upload.
     VISUAL_SEARCH_RATE_LIMIT_PER_MINUTE: int = 10
+    #: ADR-014 behavioural events: batches of up to 100 events per call; a
+    #: normal session sends one batch per screen. 60/min per user or session.
+    EVENTS_RATE_LIMIT_PER_MINUTE: int = 60
     EXPORT_RATE_LIMIT_PER_HOUR: int = 5
 
     # ---- Database ----

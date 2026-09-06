@@ -40,6 +40,7 @@ from app.db.session import get_db
 from app.models import audit_log as actions
 from app.models.audit_log import AuditLog
 from app.models.feedback import ProductFeedback
+from app.models.feedback_event import FeedbackEvent
 from app.models.moodboard import Moodboard
 from app.models.project import Project, ShareLink
 from app.models.quiz import StyleQuiz
@@ -110,6 +111,10 @@ def gdpr_export(
         select(AuditLog).where(AuditLog.user_id == uid)
         .order_by(AuditLog.created_at.desc()).limit(500)
     ).all()
+    events = db.scalars(
+        select(FeedbackEvent).where(FeedbackEvent.user_id == uid)
+        .order_by(FeedbackEvent.created_at.desc()).limit(5000)
+    ).all()
 
     audit.record(db, actions.ACTION_GDPR_EXPORT, user_id=uid, request=request)
     return ok({
@@ -154,6 +159,13 @@ def gdpr_export(
              "created_at": f.created_at.isoformat()}
             for f in feedback
         ],
+        "behavioural_events": [
+            {"product_id": e.product_id, "event_type": e.event_type,
+             "category": e.category, "position": e.position,
+             "page_context": e.page_context, "quiz_id": e.quiz_id,
+             "at": e.created_at.isoformat()}
+            for e in events
+        ],
         "payments": [
             {"amount_toman": p.amount_toman, "status": p.status,
              "provider": p.provider, "created_at": p.created_at.isoformat()}
@@ -184,6 +196,12 @@ def gdpr_delete_me(
     pseudonym = pseudonym_for(uid)
 
     db.execute(delete(ProductFeedback).where(ProductFeedback.user_id == uid))
+    # ADR-014: behavioural rows are aggregate analytics data with no PII; sever
+    # the link to the person (user_id -> NULL, the FK is a user id so it cannot
+    # hold the pseudonym) rather than deleting the funnel history.
+    db.execute(
+        update(FeedbackEvent).where(FeedbackEvent.user_id == uid).values(user_id=None)
+    )
     db.execute(delete(ShareLink).where(ShareLink.created_by == uid))
     db.execute(delete(Payment).where(Payment.user_id == uid))
     db.execute(delete(Subscription).where(Subscription.user_id == uid))

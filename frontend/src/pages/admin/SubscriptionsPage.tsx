@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { get } from "@/lib/api";
 import { Badge, Card, Skeleton } from "@/components/ui";
 import { EmptyState, ErrorState } from "@/components/states";
+import { EngagementFunnel } from "@/components/EngagementFunnel";
 
 interface AdminSub {
   id: string;
@@ -45,6 +46,7 @@ export default function AdminSubscriptionsPage() {
             hint="Paid plans appear here once a customer completes checkout."
           />
         </div>
+        <EngagementFunnel />
       </div>
     );
   }
@@ -83,6 +85,7 @@ export default function AdminSubscriptionsPage() {
           </tbody>
         </table>
       </Card>
+      <EngagementFunnel />
     </div>
   );
 }

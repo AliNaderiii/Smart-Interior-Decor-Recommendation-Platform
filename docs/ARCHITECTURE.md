@@ -257,6 +257,42 @@ route.
   scene), and re-ranking by the user's saved quiz. Both are natural
   follow-ups once real-model quality is measured (Phase A5).
 
+## ADR-014 — Behavioural event capture, no learning yet
+
+**Context.** `docs/ai/feedback-events.md` designed the event model a learning
+stage would need — with the key insight that *impressions are the
+denominator* and must be recorded from day one — but nothing captured it.
+Every competitor that "learns your taste" (Havenly's 2.4 M-render AI, Wayfair
+Muse) is built on exactly this stream; without it any later claim of a
+learned recommender would be unfounded.
+
+**Decision.** Build the capture side only, exactly as specified, and put a
+guard on the honesty boundary:
+
+* `feedback_events` (migration `0006`): append-only, closed vocabulary
+  (`impression, click, like, dislike, unlike, save, share, purchase_click`),
+  `position` and `weights_version` on every row, `session_id` for anonymous
+  viewers, `sample_rate` per row.
+* `POST /events`: batch ≤ 100, **always 202** with `{accepted, dropped}` — a
+  bad product id drops that event, a storage failure is logged; analytics can
+  never fail a user request. Authenticated *or* anonymous; a forged token is
+  still 401. Rate-limited per user/session.
+* `GET /admin/events/summary`: per-category funnel; rates are `null` without
+  impressions; `learning_ready` restates the spec's ≥ 10 000-event threshold
+  so the dashboard cannot imply a model.
+* Client: batched tracker with impression de-dup, `keepalive` flush on hide,
+  never throws. Emits from `/recommendations` (impressions with `quiz_id` +
+  `weights_version`, like/dislike/unlike, save), seller links
+  (`purchase_click`) and `/visual-search`.
+* GDPR: export section, erasure severs `user_id` (rows have no PII).
+* **Guard:** `test_ranking_pipeline_does_not_read_the_event_table` — the
+  recommender may not import the table until an ADR replaces this one.
+
+**Consequences.** Data starts accumulating now, correctly attributed to the
+config version that produced each list, so the A/B and offline-evaluation
+steps in the spec's §3 have something to evaluate. Nothing about ranking
+changed. One new setting (`EVENTS_RATE_LIMIT_PER_MINUTE`, 60).
+
 ## Data model (ERD)
 
 ```

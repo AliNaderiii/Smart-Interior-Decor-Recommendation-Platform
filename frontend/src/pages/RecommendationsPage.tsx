@@ -15,6 +15,7 @@ import { useFeedbackMap, useSubmitFeedback } from "@/lib/useFeedback";
 import { useToast } from "@/components/Toast";
 import { useCommands } from "@/components/CommandPalette";
 import { spring, staggerContainer, staggerItem } from "@/lib/motion";
+import { track, trackImpressions } from "@/lib/events";
 
 import { useT } from "@/i18n";
 import { ScrollStage, CardTilt3D } from "@/components/Scroll3D";
@@ -151,22 +152,40 @@ export default function RecommendationsPage() {
   // render gives it a new `onAdd` identity each time and defeats the memo —
   // every card re-rendered whenever any card was added. useCallback keeps the
   // reference stable so only the changed card re-renders.
+  const weightsVersion = data?.meta?.weights_version ?? null;
+
   const addToBoard = useCallback(
     (p: RecommendedProduct) => {
       add(p);
       toast.success(`${p.title} added to your moodboard.`);
+      track({ product_id: p.id, event_type: "save", page_context: "recommend", quiz_id: quizId, weights_version: weightsVersion });
     },
-    [add, toast],
+    [add, toast, quizId, weightsVersion],
   );
 
   const handleFeedback = useCallback(
     (p: RecommendedProduct, signal: 1 | -1) => {
       submitFeedback.mutate({ productId: p.id, signal, category: p.category });
+      // Mirror the server's toggle: same thumb again = clearing the verdict.
+      const current = feedbackMap?.[p.id];
+      const type = current === signal ? "unlike" : signal === 1 ? "like" : "dislike";
+      track({ product_id: p.id, event_type: type, page_context: "recommend", quiz_id: quizId, weights_version: weightsVersion });
     },
-    [submitFeedback],
+    [submitFeedback, feedbackMap, quizId, weightsVersion],
   );
 
   const categories = useMemo(() => Object.keys(data?.categories ?? {}), [data]);
+
+  // ADR-014: impressions are the denominator of every behavioural rate. One
+  // batch per result set, position = rank within its category, locked
+  // teasers included (they were shown). Deduplicated per session in the
+  // tracker, so re-renders and tab switches do not inflate the count.
+  useEffect(() => {
+    if (!data) return;
+    for (const items of Object.values(data.categories)) {
+      trackImpressions(items, { page_context: "recommend", quiz_id: quizId, weights_version: weightsVersion });
+    }
+  }, [data, quizId, weightsVersion]);
 
   // T-2.1 progressive render (Directive 4 R2.3): three CI runs measured LCP
   // 6497-6570ms with TTI pinned at ~6.7-6.8s regardless of chunk layout or

@@ -21,6 +21,7 @@ import { Button, Card } from "@/components/ui";
 import { EmptyState, ErrorState } from "@/components/states";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { useToast } from "@/components/Toast";
+import { track, trackImpressions } from "@/lib/events";
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const CATEGORY_IDS = Object.keys(CATEGORY_LABELS);
@@ -65,6 +66,8 @@ export default function VisualSearchPage() {
       if (payload.category) qs.set("category", payload.category);
       return post<VisualSearchResult>(`/search/visual?${qs.toString()}`, form);
     },
+    // ADR-014: a visual-search result list is an impression set too.
+    onSuccess: (res) => trackImpressions(res.items, { page_context: "visual_search" }),
   });
 
   const accept = useCallback(
@@ -313,6 +316,7 @@ export default function VisualSearchPage() {
                                   onClick={() => {
                                     add(item);
                                     toast.success(`${title} — ${t.visualSearch.added}`);
+                                    track({ product_id: item.id, event_type: "save", page_context: "visual_search" });
                                   }}
                                 >
                                   {pickedIds.has(item.id) ? t.visualSearch.added : t.visualSearch.addToMoodboard}

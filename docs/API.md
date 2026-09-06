@@ -16,7 +16,8 @@ Auth: `Authorization: Bearer <access_token>` (HS256, 15 min; refresh 7 days).
 | GET | `/auth/me` | current user incl. subscription flags |
 
 ## Users (GDPR)
-| DELETE | `/users/me` | hard-deletes the user and ALL owned data |
+| DELETE | `/users/me` | hard-deletes the user and ALL owned data (audit rows pseudonymised; ADR-014 behavioural rows keep the aggregate history with `user_id` severed) |
+| GET | `/users/me/export` | GDPR Art. 15/20 inventory — account, quizzes, moodboards, projects, product_feedback, `behavioural_events` (ADR-014), payments, security_events; 5/hour |
 
 ## Quiz & Recommendations
 | POST | `/quiz` | validated quiz (styles⊆taxonomy, budget_max>min) → saved with embedding |
@@ -25,6 +26,10 @@ Auth: `Authorization: Bearer <access_token>` (HS256, 15 min; refresh 7 days).
 
 ## Visual search (ADR-013)
 | POST | `/search/visual` | multipart `file` (JPEG/PNG/WebP ≤ 8 MB) + optional `?category=<taxonomy id>&limit=1..24`; any signed-in user, 10/min; photo processed in memory, never stored. Returns `items[]` (product payload + `similarity`, `palette_match`, `clip_similarity` in clip mode; free users: top hit per category full, rest `locked` teasers), `is_pro`, and `meta{mode: "clip"\|"palette", palette[], category, candidates, embedding_backend, query_image}` |
+
+## Behavioural events (ADR-014)
+| POST | `/events` | `{session_id: 32-hex, events: [{product_id, event_type, page_context, position?, quiz_id?, weights_version?}]}` (≤ 100); closed vocabularies (422 otherwise); signed-in **or** anonymous (forged token → 401); 60/min; **always 202** `{accepted, dropped}` — analytics never fails a user request |
+| GET | `/admin/events/summary?days=30` | admin; per-category funnel (`impression, click, like, dislike, save, purchase_click`, `ctr`/`like_rate`/`save_rate` = per impression, `null` without a denominator), `sessions`, `learning_ready` (≥ 10 000 events) |
 
 ## Moodboards
 | POST/GET | `/moodboards` | items = `[{product_id,x,y,w,h}]` (react-grid-layout), `shopping_list` = product ids |
