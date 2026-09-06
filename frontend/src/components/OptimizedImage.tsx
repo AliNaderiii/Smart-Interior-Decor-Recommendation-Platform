@@ -43,6 +43,10 @@ export interface OptimizedImageProps {
   priority?: boolean;
   /** Set false for already-optimised or external URLs. */
   deriveSources?: boolean;
+  /** Explicit `srcset` for bundler-fingerprinted assets, where `deriveSources`
+   *  cannot apply (Vite hashes each file; there is no `?w=` convention to
+   *  derive from). Pass pre-rendered widths, e.g. `${hero768} 768w, ...`. */
+  srcSet?: string;
   /** Low-quality placeholder colour while loading. */
   placeholderColor?: string;
   onClick?: () => void;
@@ -83,6 +87,7 @@ function OptimizedImageInner({
   widths = DEFAULT_WIDTHS,
   priority = false,
   deriveSources = true,
+  srcSet: explicitSrcSet,
   placeholderColor = "#F1ECE4",
   onClick,
 }: OptimizedImageProps) {
@@ -131,7 +136,8 @@ function OptimizedImageInner({
           alt={alt}
           width={width}
           height={height}
-          sizes={canDerive ? sizes : undefined}
+          srcSet={explicitSrcSet}
+          sizes={canDerive || explicitSrcSet ? sizes : undefined}
           loading={priority ? "eager" : "lazy"}
           fetchPriority={priority ? "high" : "auto"}
           decoding={priority ? "sync" : "async"}

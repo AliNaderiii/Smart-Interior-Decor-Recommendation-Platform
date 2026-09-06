@@ -12,6 +12,22 @@
          recommendations/mobile LCP 4386ms, run 33078900123). -->
     <link rel="preconnect" href="https://images.unsplash.com" />
     <link rel="dns-prefetch" href="https://images.unsplash.com" />
+    <!-- Home LCP element. The hero is a fingerprinted import, so without this
+         hint the browser only discovers it after the entry chunk has downloaded
+         AND React has rendered: Lighthouse mobile measured 1.8-2.5 s of LCP
+         "load delay" (CI run 34025147386 tripped the 3000 ms gate at 3008 ms).
+         Vite rewrites every href here to the hashed URLs HomePage imports, so
+         the preload is consumed, never duplicated. imagesrcset/imagesizes
+         mirror the <img>, so a phone preloads the 768px file, not the 1440px
+         one. Non-home routes pay one cached ~50-150 KB fetch. -->
+    <link
+      rel="preload"
+      as="image"
+      href="/src/assets/hero.webp"
+      imagesrcset="/src/assets/hero-768.webp 768w, /src/assets/hero-1080.webp 1080w, /src/assets/hero.webp 1440w"
+      imagesizes="(max-width: 1024px) 100vw, 50vw"
+      fetchpriority="high"
+    />
     <title>اسمارت دکور — پیشنهاد هوشمند دکوراسیون نشیمن</title>
   </head>
   <body>

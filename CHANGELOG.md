@@ -57,6 +57,24 @@ written against the English catalogue.
   a React-rendered element (the header's palette button) before pressing.
 - **Backend lint.** Unsorted import in `app/models/project.py` (I001) — the one
   line that was failing the backend job and skipping six dependent jobs.
+- **Lighthouse › home/mobile LCP gate (3000 ms).** The first green-everything
+  run of this branch (34025147386) failed only here: 3008/3009 ms, 8 ms over,
+  with *render delay* — not download — as the dominant phase. The 2026-09-04
+  landing redesign (scroll-driven depth, gallery, pricing) had grown the entry
+  chunk to 423 KB while the hero was still discovered only after React
+  rendered. Three changes, each measured with the CI matrix script locally
+  (home/mobile median LCP 4565 → 3806 ms simulated in a 2-CPU sandbox; the
+  same script on the identical build in CI conditions: 2959 → 2536 ms):
+  1. `index.html` preloads the hero with `imagesrcset`/`imagesizes` and
+     `fetchpriority="high"` — Vite rewrites the hrefs to the hashed URLs the
+     component imports, so the hero request now starts at ~16 ms instead of
+     ~150 ms (after the entry chunk executed).
+  2. Two phone-sized derivatives (`hero-768.webp` 50 KB, `hero-1080.webp`
+     83 KB) via a new `srcSet` prop on `OptimizedImage`; a 412 px viewport
+     fetched 145 KB and now fetches 51 KB.
+  3. `LoginPage` is route-lazy like `RegisterPage`; it was the only eager
+     importer of zod + react-hook-form (entry chunk 423 → 330 KB raw,
+     135 → 107 KB gzip).
 
 ### Added
 

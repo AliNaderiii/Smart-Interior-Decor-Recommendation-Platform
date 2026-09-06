@@ -7,7 +7,6 @@ import { Spinner } from "@/components/ui";
 import { ToastProvider } from "@/components/Toast";
 import { CommandPaletteProvider } from "@/components/CommandPalette";
 import HomePage from "@/pages/HomePage";
-import LoginPage from "@/pages/LoginPage";
 
 // Perf (V2 Phase 2): every route below is auth-gated, so none of it can be
 // the first paint — an anonymous visitor always lands on /, /login or a
@@ -18,6 +17,14 @@ import LoginPage from "@/pages/LoginPage";
 // "/login" (or a "/share/:token" link). Reaching /register requires a click,
 // by which time the chunk has already been fetched in the background.
 const RegisterPage = lazy(() => import("@/pages/RegisterPage"));
+// Login is lazy for the same reason as Register, plus a measured one: it is
+// the only eager importer of zod + react-hook-form + @hookform/resolvers
+// (~88 KB raw / ~28 KB gz), which every "/" visitor was parsing before the
+// hero could paint. Home/mobile LCP was 3008 ms against a 3000 ms gate in CI
+// run 34025147386 with render delay — not download — as the dominant phase.
+// A visitor who lands on /login directly pays one extra small round trip,
+// which the Lighthouse matrix keeps measuring (login cell, no threshold).
+const LoginPage = lazy(() => import("@/pages/LoginPage"));
 
 // Route-level code splitting keeps the recommendation page bundle lean (LCP).
 const QuizPage = lazy(() => import("@/pages/QuizPage"));

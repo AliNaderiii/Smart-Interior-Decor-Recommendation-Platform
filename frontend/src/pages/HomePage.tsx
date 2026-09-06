@@ -9,6 +9,12 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 // so OptimizedImage's `deriveSources` URL derivation cannot apply; importing
 // the already-optimised file is the correct route.
 import heroImage from "@/assets/hero.webp";
+// Phone-sized derivatives of the same photo (Pillow, LANCZOS, q80). On a
+// 412px viewport the 1440px file was 105 KB of waste per Lighthouse
+// `uses-responsive-images`; the LCP image is fetched at high priority, so
+// every wasted byte sits directly in front of the largest paint.
+import heroImage768 from "@/assets/hero-768.webp";
+import heroImage1080 from "@/assets/hero-1080.webp";
 import { useLocale } from "@/i18n";
 import { ShowcaseGallery } from "@/components/landing/ShowcaseGallery";
 import { Faq } from "@/components/landing/Faq";
@@ -87,6 +93,7 @@ export default function HomePage() {
           height={640}
           priority
           deriveSources={false}
+          srcSet={`${heroImage768} 768w, ${heroImage1080} 1080w, ${heroImage} 1440w`}
           sizes="(max-width: 1024px) 100vw, 50vw"
           wrapperClassName="h-72 w-full rounded-3xl shadow-[var(--shadow-hover)] lg:h-[26rem]"
         />
