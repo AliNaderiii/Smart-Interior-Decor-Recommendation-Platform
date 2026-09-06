@@ -9,14 +9,17 @@ Zarinpal-based Pro paywall. **MVP scope: living_room only.**
 > 2026-08-21 ([`docs/RELEASE_BASELINE.md`](docs/RELEASE_BASELINE.md)) and
 > re-audited at the Stage-1 HEAD on 2026-08-26
 > ([`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)).
-> Re-verified at the current HEAD on 2026-09-01 in a clean sandbox
-> (Python 3.13, Node 22.23.2): backend **598 passed / 22 skipped
-> (620 collected)**, frontend **65 unit tests across 10 files**, strict build,
-> lint and test typecheck clean, secret scan clean, docs link audit clean.
-> Verified in CI at this HEAD (run
-> [#33430375507](https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/actions/runs/33430375507),
-> 2026-08-31, all jobs green): the backend suite against **PostgreSQL 16 +
-> pgvector and real Redis**, **Playwright E2E (29 tests, 4 role projects)**,
+> Re-verified on 2026-09-05 in a clean sandbox (Python 3.13, Node 22.20)
+> after the CI-green pass that followed the bilingual/RTL work: backend
+> **628 passed / 22 skipped (650 collected)**, frontend **64 unit tests across
+> 11 files**, strict build, lint (0 errors) and test typecheck clean, and the
+> **blocking Playwright projects green locally (21/21)** with the UI locale
+> pinned to `en` by `tests/e2e/locale.ts`.
+> Last fully green CI run:
+> [#33430375507](https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform/actions/runs/33430375507)
+> (2026-08-31; `main` then went red from `459fbf4` until the 2026-09-05 fix
+> pass — see CHANGELOG › Unreleased). It ran the backend suite against **PostgreSQL 16 +
+> pgvector and real Redis**, **Playwright E2E (30 tests, 4 role projects + sweep)**,
 > **Lighthouse CI ≥80**, seller-link liveness over the 150-product catalog,
 > `/recommend` p95 evidence, and Docker builds.
 > Still not verified anywhere: real-model AI extraction accuracy (CI runs the
@@ -86,8 +89,8 @@ the separate no-Docker path documented under *Local development*.)
 
 Postgres parity was demonstrated on **2026-08-19 at commit `a847ad5`**, when the
 suite contained 45 tests (`docs/reports/postgres_parity.md`). The suite has since
-grown to **620 collected** (598 passed / 22 skipped, re-measured at HEAD on
-2026-09-01) and that Postgres run has **not** been repeated locally — the
+grown to **650 collected** (628 passed / 22 skipped, re-measured at HEAD on
+2026-09-05) and that Postgres run has **not** been repeated locally — the
 baseline audit environment has no Docker or PostgreSQL binary. Treat Postgres
 parity as *previously evidenced, currently unverified at HEAD*; re-run it before
 release:
@@ -127,7 +130,7 @@ npm run dev
 
 ## Tests & acceptance gates
 
-Counts below were re-measured at the current HEAD on 2026-09-01 in a clean
+Counts below were re-measured at the current HEAD on 2026-09-05 in a clean
 sandbox (backend on Python 3.13, frontend on Node 22.23.2); the Stage-1 logs
 live in
 [`docs/agent-reports/stage1-evidence/final-sweep/`](docs/agent-reports/stage1-evidence/final-sweep/).
@@ -140,7 +143,7 @@ policy.
 ```bash
 cd backend
 pip install -r requirements.lock.txt      # the lockfile is the contract, not requirements.txt
-pytest                                    # 598 passed, 22 skipped / 620 collected (SQLite + fakeredis + mock AI)
+pytest                                    # 628 passed, 22 skipped / 650 collected (SQLite + fakeredis + mock AI)
 ruff check app ai scripts tests           # 0 errors
 
 python scripts/verify_lock_install.py     # installed env == requirements.lock.txt
@@ -159,8 +162,8 @@ CI `backend` job against Postgres 16 + pgvector.
 cd frontend
 npm ci                                    # not npm install: package-lock.json is the lock of record
 
-npm test                                  # Vitest + Testing Library — 65 tests, 10 files (Node ≥22 required)
-npm run lint                              # oxlint — 0 errors, 12 warnings
+npm test                                  # Vitest + Testing Library — 64 tests, 11 files (Node ≥22 required)
+npm run lint                              # oxlint — 0 errors, 18 warnings (react-hooks/refs advisories)
 npm run build                             # tsc strict + vite — 0 errors
 npx tsc -p tsconfig.tests.json            # type-check the test suites too (tsconfig.app.json covers only src/)
 ```
@@ -174,7 +177,8 @@ cd frontend
 npx playwright install chromium           # first run only (~150 MB, cached outside the repo)
 
 # The suite expects the app to be running: backend on :8000, vite on :5173.
-npm run e2e                               # 29 tests, 6 files, 4 role-scoped projects
+npm run e2e                               # 30 tests, 6 files, 4 role-scoped projects + sweep
+E2E_LOCALE=fa npm run e2e                 # same suite against the Persian UI (locale-independent specs only)
 npm run e2e -- --project=chromium-homeowner   # one role only
 ```
 
@@ -190,7 +194,13 @@ npm run e2e
 ```
 
 `globalSetup` logs in through the real UI as the seeded demo accounts and saves
-one `storageState` per role, so the journey specs start authenticated. That
+one `storageState` per role, so the journey specs start authenticated.
+
+> **Locale.** The UI defaults to Persian; the specs were written against the
+> English catalogue. `tests/e2e/locale.ts` pins `localStorage["smartdecor.locale"]`
+> into every storageState (role and anonymous alike) before the app boots, so
+> the selectors match. Language-independent hooks (`data-testid`, `data-signal`)
+> are being introduced where copy churns — start there when adding specs. That
 requires the backend to have been seeded with `SEED_DEMO_ACCOUNTS=true`
 (never possible in production — see `docs/security/DEMO_ACCOUNTS.md`).
 
@@ -213,17 +223,18 @@ npx lighthouse http://localhost:4173/ --view   # >=80 target (npm run preview fi
 
 | Suite | Tests |
 |---|---:|
-| `backend/tests/` (full suite) | **620 collected** — 598 passed, 22 skipped |
+| `backend/tests/` (full suite) | **650 collected** — 628 passed, 22 skipped |
 | ↳ `test_recommender.py` | 30 (spec floor: ≥28) |
 | ↳ `test_security_v2.py` | 26 |
 | ↳ `test_feedback_v2.py` | 16 |
 | ↳ `test_auth.py` | 13 |
 | ↳ `test_projects_quota.py` | 14 (designer quota, Stage 1) |
+| ↳ `test_designer_workflow.py` | 30 (project status + client approvals, migration 0005) |
 | ↳ `test_weights_profiles.py` | 13 (weight profiles, Stage 1) |
 | ↳ `test_perf_v2.py` | 10 |
 | ↳ `test_rate_limit.py` | 2 |
-| `frontend/tests/unit/` (Vitest) | **65** across 10 files |
-| `frontend/tests/e2e/` (Playwright) | **29** across 6 files — CI only |
+| `frontend/tests/unit/` (Vitest) | **64** across 11 files |
+| `frontend/tests/e2e/` (Playwright) | **30** across 6 files — CI only |
 
 ## Repository layout
 
@@ -239,9 +250,10 @@ backend/
   alembic/           migrations (pgvector extension + HNSW index)
   scripts/           seed_products.py · load_realistic_products.py · evaluate_extraction.py
                      seed_perf_products.py · dev_postgres.py
-  tests/             620 collected — test_recommender.py (30) · test_security_v2.py (26)
+  tests/             650 collected — test_recommender.py (30) · test_security_v2.py (26)
                      test_feedback_v2.py (16) · test_auth.py (13) · test_projects_quota.py (14)
-                     test_weights_profiles.py (13) · test_perf_v2.py (10) · test_rate_limit.py (2)
+                     test_weights_profiles.py (13) · test_designer_workflow.py (30)
+                     test_perf_v2.py (10) · test_rate_limit.py (2)
                      benchmark_50_images.json
   security/          pip-audit-allowlist.yml (expiring, justified CVE acceptances)
 frontend/
@@ -249,8 +261,9 @@ frontend/
                      upgrade · share · designer/* · admin/*
   src/stores/        authStore · quizStore · moodboardStore (Zustand)
   src/lib/           api (fetch + JWT refresh + CSRF double-submit) · constants (i18n-ready) · types
-  tests/unit/        Vitest + Testing Library — 65 tests, 10 files (`npm test`)
-  tests/e2e/         Playwright — 29 tests, 6 files (`npm run e2e`): deadKeys · auth-negative
+  tests/unit/        Vitest + Testing Library — 64 tests, 11 files (`npm test`)
+                     renderWithProviders.tsx wraps pages in <LocaleProvider locale=en>
+  tests/e2e/         Playwright — 30 tests, 6 files (`npm run e2e`): deadKeys · auth-negative
                      auth-smoke · journey-homeowner · journey-designer · journey-admin
 datasets/            products_realistic*.json · style_taxonomy · questionnaire · subscription_plans
 docs/                RELEASE_BASELINE · RELEASE_CHECKLIST · ROLLBACK_AND_VERSIONING · REPRODUCIBILITY
@@ -285,7 +298,7 @@ real-model AI extraction accuracy (needs a provider API key — run
 - [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) — pre-release gate checklist
 - [docs/ROLLBACK_AND_VERSIONING.md](docs/ROLLBACK_AND_VERSIONING.md) — SemVer/tagging policy, rollback runbook, ownership matrix
 - [docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md) — can a third party rebuild this from a clean clone?
-- [integration-request.md](integration-request.md) — cross-agent change requests raised by this stage
+- [docs/internal/integration-request.md](docs/internal/integration-request.md) — cross-agent change requests raised by this stage
 
 **Product & engineering docs:**
 

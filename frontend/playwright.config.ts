@@ -1,5 +1,5 @@
 import { defineConfig, devices } from "@playwright/test";
-import { statePath } from "./tests/e2e/statePaths";
+import { ANONYMOUS_STATE_PATH, statePath } from "./tests/e2e/statePaths";
 
 /**
  * Playwright config (Stage 1, T-1.4 + T-1.4 close-out).
@@ -17,6 +17,10 @@ import { statePath } from "./tests/e2e/statePaths";
  *                          project, quota wall
  *   chromium-admin       — admin session: product upload/review/approve,
  *                          users and subscriptions
+ *
+ *  Locale: the UI defaults to Persian, the specs are written against the
+ *  English catalogue. globalSetup pins `smartdecor.locale` into every
+ *  storageState (role and anonymous alike) — see tests/e2e/locale.ts.
  *
  *  The role projects depend on globalSetup implicitly: it writes all three
  *  storageState files before any project runs. Those paths come from
@@ -48,13 +52,20 @@ export default defineConfig({
     baseURL: BASE,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
+    // Safety net: no single locator action may wait longer than this. Without
+    // it, an auto-waiting call on an element that left the DOM (see the
+    // deadKeys `href` note) blocks until the TEST timeout — 12 minutes of CI
+    // for one vanished link. Specs that need longer pass an explicit timeout.
+    actionTimeout: 30_000,
   },
   projects: [
     {
       // Anonymous context, BLOCKING. The Stage-1 auth negatives live here.
       name: "chromium",
       testMatch: ["auth-negative.spec.ts"],
-      use: { ...devices["Desktop Chrome"] },
+      // No session — but the locale must still be pinned, or the login form
+      // renders in Persian and `/sign in/i` never matches (see locale.ts).
+      use: { ...devices["Desktop Chrome"], storageState: ANONYMOUS_STATE_PATH },
     },
     {
       // The legacy dead-key sweep, split into its own project so its verdicts
@@ -63,7 +74,7 @@ export default defineConfig({
       // one allowed to be non-blocking.
       name: "chromium-sweep",
       testMatch: ["deadKeys.spec.ts"],
-      use: { ...devices["Desktop Chrome"] },
+      use: { ...devices["Desktop Chrome"], storageState: ANONYMOUS_STATE_PATH },
     },
     {
       name: "chromium-homeowner",

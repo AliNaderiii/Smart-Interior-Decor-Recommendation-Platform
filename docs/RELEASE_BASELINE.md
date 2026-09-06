@@ -23,7 +23,7 @@
 | Working branch for this stage | `arena/01a0247e-smart-interior-decor-recommend` — see §1.1 |
 | PR target | `v2-strict-mode` (not merged by this agent) |
 | Audit date | 2026-08-21 (UTC) |
-| Governing prompts | `agent-master-prompts/00-README.md`, `agent-master-prompts/01-baseline-release-governance.md` |
+| Governing prompts | `docs/internal/agent-master-prompts/00-README.md`, `docs/internal/agent-master-prompts/01-baseline-release-governance.md` |
 | Existing git tags | **8**, none SemVer-compliant and none on the baseline commit: `v1.1-final-p0p1-fixed` (`a847ad5`), `v2-phase0-audit-complete`, `v2-phase2-performance`, `v2-phase3-ui`, `v2-phase4-deadkeys`, `v2-final` (`dd2c34d`), `v2-datasets-realistic`, `v2-datasets-realistic-merged` (`939e05c`). **0 GitHub Releases.** See §2.1 |
 
 ### 1.1 Branch-name deviation (must be read)
@@ -297,7 +297,7 @@ Nothing below can be resolved by an engineering agent — each needs the client.
 
 ## 10. Recommended next agents and execution order
 
-Wave 1 of `agent-master-prompts/00-README.md` is otherwise parallel-safe; these
+Wave 1 of `docs/internal/agent-master-prompts/00-README.md` is otherwise parallel-safe; these
 two exceptions are sequencing constraints discovered by this audit.
 
 | Order | Agent | Why now | Must fix |

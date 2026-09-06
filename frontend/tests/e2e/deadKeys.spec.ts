@@ -87,11 +87,27 @@ function accounts(): Record<"homeowner" | "designer" | "admin", Credentials> {
 /** Routes to sweep, per role. */
 type SweepRole = "homeowner" | "designer" | "admin";
 
-const ROUTES: Record<SweepRole, string[]> = {
+const ALL_ROUTES: Record<SweepRole, string[]> = {
   homeowner: ["/", "/quiz", "/recommendations", "/moodboards", "/floorplan", "/shopping-list", "/upgrade"],
   designer: ["/designer/dashboard"],
   admin: ["/admin/products", "/admin/users", "/admin/subscriptions"],
 };
+
+/** `E2E_SWEEP_ROUTES="/,/quiz"` narrows the sweep to a comma-separated list —
+ *  for bisecting a verdict locally without paying for all eleven routes, and
+ *  for memory-constrained sandboxes where the full homeowner sweep (which
+ *  dynamically loads html2canvas on /floorplan) gets the renderer OOM-killed.
+ *  Unset in CI, so the blocking job always runs the complete matrix. */
+const ROUTE_FILTER = (process.env.E2E_SWEEP_ROUTES ?? "")
+  .split(",")
+  .map((r) => r.trim())
+  .filter(Boolean);
+const ROUTES: Record<SweepRole, string[]> = Object.fromEntries(
+  (Object.keys(ALL_ROUTES) as SweepRole[]).map((role) => [
+    role,
+    ROUTE_FILTER.length ? ALL_ROUTES[role].filter((r) => ROUTE_FILTER.includes(r)) : ALL_ROUTES[role],
+  ]),
+) as Record<SweepRole, string[]>;
 
 /** Controls we must NOT click during a sweep, with the reason. */
 const SKIP = [
@@ -211,6 +227,7 @@ for (const role of Object.keys(ROUTES) as (keyof typeof ROUTES)[]) {
       const failures: Failure[] = [];
       const log: string[] = [];
 
+      test.skip(ROUTES[role].length === 0, `E2E_SWEEP_ROUTES excludes every ${role} route`);
       await login(page, role);
 
       for (const route of ROUTES[role]) {
@@ -249,6 +266,13 @@ for (const role of Object.keys(ROUTES) as (keyof typeof ROUTES)[]) {
           const beforeRoot = await page.evaluate(
             () => document.documentElement.className + "|" + document.documentElement.style.colorScheme,
           );
+          // Read `href` BEFORE clicking, while the element is guaranteed to
+          // exist. It used to be read afterwards, and when the click navigated
+          // to a page with FEWER controls than `i`, `controls.nth(i)` matched
+          // nothing and `getAttribute` auto-waited with no timeout — a 12-minute
+          // hang on the homeowner sweep the day the landing page grew a
+          // pricing/footer block full of links (2026-09-05).
+          const href = await el.getAttribute("href", { timeout: 5_000 }).catch(() => null);
 
           // Scroll the control clear of the sticky header BEFORE clicking.
           //
@@ -312,7 +336,6 @@ for (const role of Object.keys(ROUTES) as (keyof typeof ROUTES)[]) {
           // A nav link pointing at the route we are already on legitimately
           // changes nothing — same URL, no re-render, no request. That is
           // correct behaviour, not a dead control, so do not report it.
-          const href = await el.getAttribute("href").catch(() => null);
           const selfLink =
             href !== null && new URL(href, page.url()).pathname === new URL(beforeUrl).pathname;
 
@@ -423,6 +446,12 @@ test.describe("dead keys — specific known suspects", () => {
     await login(page, "homeowner");
     await page.goto(`${BASE}/`);
     await page.waitForLoadState("domcontentloaded");
+    // `domcontentloaded` fires before React mounts: the Cmd+K listener lives in
+    // CommandPaletteProvider's effect and is attached ~20-50 ms AFTER the
+    // static HTML is parsed. A key press sent in that window is silently lost
+    // (measured locally: keydown @241 ms, listener added @266 ms). Wait for a
+    // React-rendered element — the header's palette button — before pressing.
+    await page.getByRole("button", { name: /open search/i }).waitFor({ state: "visible", timeout: 15_000 });
     await page.keyboard.press("ControlOrMeta+k");
 
     // The overlay is loaded by CommandPalette.tsx, so the input exists once mounted.

@@ -11,12 +11,13 @@
  * tokens) every authenticated route bounced a valid session back to
  * /login — the logged-in half of the product was unreachable.
  */
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it } from "vitest";
 import { RequireAuth } from "@/components/guards";
 import { tokenStore } from "@/lib/api";
 import { useAuthStore } from "@/stores/authStore";
+import { renderWithProviders as render } from "./renderWithProviders";
 
 const HOMEOWNER = {
   id: "u1",

@@ -45,7 +45,7 @@ with the exact files to change.
 
 ### 2.1 Recon, before touching anything
 
-1. Read `agent-master-prompts/00-README.md` and `03-security-privacy.md`; confirmed
+1. Read `docs/internal/agent-master-prompts/00-README.md` and `03-security-privacy.md`; confirmed
    the allowed file list and the "integration request, not direct edit" rule.
 2. Read `docs/agent-reports/baseline-release-report.md` (CONDITIONAL PASS, 12
    production blockers, B-1 = demo accounts) and all eleven existing integration

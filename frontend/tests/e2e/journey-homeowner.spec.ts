@@ -224,9 +224,17 @@ test.describe.serial("homeowner journey", () => {
     await expect(chip).toBeVisible({ timeout: 60_000 });
     await chip.click({ timeout: 15_000 });
     // Radix HoverCard content: the per-signal breakdown the engine promises.
-    await expect(page.getByText(/match breakdown/i)).toBeVisible();
-    for (const signal of [/^Style$/, /^Colour$/, /^Budget$/, /^Material$/]) {
-      await expect(page.getByText(signal).first()).toBeVisible();
+    // Asserted through `data-testid` / `data-signal` rather than the label
+    // text: the i18n pass renamed "Style" -> "Style fit" etc. and would have
+    // silently kept breaking this test on every copy tweak. The hooks are
+    // locale-independent, so this passes under E2E_LOCALE=fa as well.
+    const breakdown = page.getByTestId("match-breakdown");
+    await expect(breakdown).toBeVisible();
+    for (const signal of ["style", "color", "budget", "material"]) {
+      await expect(
+        breakdown.locator(`[data-testid="match-signal"][data-signal="${signal}"]`),
+        `breakdown is missing the "${signal}" signal`,
+      ).toBeVisible();
     }
   });
 

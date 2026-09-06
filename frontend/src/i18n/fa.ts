@@ -129,6 +129,10 @@ export const fa = {
     emptyCta: "ویرایش آزمون",
     errorTitle: "بارگذاری پیشنهادها ممکن نشد",
     errorHint: "ارتباط با سرور برقرار نشد. لطفاً دوباره تلاش کنید.",
+    /** HoverCard heading + trigger. Were hardcoded English inside the
+     *  Persian UI until the CI-green pass of 2026-09-05. */
+    breakdownTitle: "تفکیک امتیاز تطابق",
+    matchWhy: (pct: number) => `${pct}٪ تطابق — چرا؟`,
     scoreStyle: "تناسب سبک",
     scoreColor: "هماهنگی رنگ",
     scoreBudget: "تناسب بودجه",

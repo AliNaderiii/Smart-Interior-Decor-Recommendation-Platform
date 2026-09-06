@@ -4,8 +4,12 @@
  * must (1) show the server's message as plain, escaped text — never as
  * live HTML — (2) keep the user on /login, and (3) never navigate to an
  * admin route.
+ *
+ * i18n: the page is rendered through `renderWithProviders` (LocaleProvider +
+ * `locale=en`). The app defaults to Persian, so without the pin the labels
+ * would be «ایمیل» / «ورود» and every English selector here would miss.
  */
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -19,9 +23,13 @@ vi.mock("@/lib/api", async (importOriginal) => {
 
 import { ApiError } from "@/lib/api";
 import LoginPage from "@/pages/LoginPage";
+import { en } from "@/i18n/en";
+import { renderWithProviders } from "./renderWithProviders";
 
 function renderLogin(path = "/login") {
-  return render(
+  // LoginPage calls useT(), so it must sit inside <LocaleProvider>; the helper
+  // also pins the English catalogue that the assertions below are written in.
+  return renderWithProviders(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -55,7 +63,7 @@ describe("login failure path", () => {
     await waitFor(() => expect(screen.getByText("Invalid credentials")).toBeTruthy());
     // The old code read err.response?.data?.error (always undefined on this
     // fetch-based client) and fell back to "Login failed".
-    expect(screen.queryByText("Login failed")).toBeNull();
+    expect(screen.queryByText(en.auth.loginFailed)).toBeNull();
     // The error is plain text: no HTML structure from the message.
     const errorNode = screen.getByText("Invalid credentials");
     expect(errorNode.tagName).toBe("P");
@@ -94,6 +102,8 @@ describe("login failure path", () => {
     renderLogin();
     await submitLogin("x@y.com", "WrongPass1!");
 
-    await waitFor(() => expect(screen.getByText("Login failed")).toBeTruthy());
+    // Read the copy from the catalogue so a wording tweak ("Login failed."
+    // gained its full stop in the i18n pass) cannot break the contract.
+    await waitFor(() => expect(screen.getByText(en.auth.loginFailed)).toBeTruthy());
   });
 });

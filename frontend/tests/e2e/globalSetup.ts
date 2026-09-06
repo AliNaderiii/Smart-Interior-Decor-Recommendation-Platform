@@ -29,6 +29,11 @@
  * whole job HERE, loudly (URL + on-page error + screenshot), rather than
  * surfacing later as an opaque ENOENT on a missing state file.
  *
+ * LOCALE: the app defaults to Persian; the specs assert English copy. Each
+ * context created here seeds `localStorage["smartdecor.locale"]` via an init
+ * script (see `locale.ts`), and the value rides along inside the saved
+ * storageState. Override with `E2E_LOCALE=fa`.
+ *
  * Rate limits: registration and login are both per-IP throttled
  * (`register:{ip}`, `login:{ip}`). This setup performs 4 registrations and
  * 5 logins sequentially, so the e2e job raises both limits — see
@@ -37,7 +42,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { chromium, type Browser } from "@playwright/test";
-import { STATE_DIR, statePath } from "./statePaths";
+import { E2E_LOCALE, localeInitScript, writeAnonymousStorageState } from "./locale";
+import { ANONYMOUS_STATE_PATH, STATE_DIR, statePath } from "./statePaths";
 import { DEMO_ACCOUNTS, makeUser, registerUser, type TestUser } from "./users";
 
 const BASE = process.env.E2E_BASE_URL ?? "http://localhost:5173";
@@ -79,6 +85,10 @@ async function saveSession(
   label: string,
 ): Promise<void> {
   const context = await browser.newContext();
+  // Pin the UI language BEFORE the app boots (main.tsx reads localStorage
+  // before React mounts). The value is captured into the storageState below,
+  // so every role project inherits it without touching a single spec.
+  await context.addInitScript(localeInitScript());
   const page = await context.newPage();
 
   try {
@@ -136,6 +146,11 @@ export default async function globalSetup() {
   // The projects read these files; make sure the directory exists even if a
   // previous run cleaned test-results away.
   fs.mkdirSync(STATE_DIR, { recursive: true });
+
+  // The anonymous projects never log in, so they get a session-less state
+  // that only pins the locale. Written first: it has no dependency on the API.
+  writeAnonymousStorageState(ANONYMOUS_STATE_PATH, new URL(BASE).origin);
+  console.log(`globalSetup: UI locale pinned to "${E2E_LOCALE}" -> ${ANONYMOUS_STATE_PATH}`);
 
   await waitForApi();
 
