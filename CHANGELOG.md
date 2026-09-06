@@ -76,6 +76,13 @@ written against the English catalogue.
      importer of zod + react-hook-form (entry chunk 423 → 330 KB raw,
      135 → 107 KB gzip).
 
+- **i18n › recommendations page.** Six strings were still hardcoded English
+  inside the Persian UI — the header actions (`Upgrade to Pro`,
+  `Create moodboard (N)`), the layout toggle (`Grid` / `Masonry`), the
+  per-category `N options` counter and the Pro-locked card overlay
+  (`N more matches in this room`, `Unlock with Pro`). All moved to the
+  catalogues under `recommendations.*`; the English rendering is unchanged.
+
 ### Added
 
 - **`backend/tests/test_designer_workflow.py` (30 tests).** Migration 0005
