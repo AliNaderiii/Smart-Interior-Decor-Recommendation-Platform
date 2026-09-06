@@ -230,7 +230,7 @@ test.describe.serial("homeowner journey", () => {
     // locale-independent, so this passes under E2E_LOCALE=fa as well.
     const breakdown = page.getByTestId("match-breakdown");
     await expect(breakdown).toBeVisible();
-    for (const signal of ["style", "color", "budget", "material"]) {
+    for (const signal of ["style", "color", "budget", "material", "fit"]) {
       await expect(
         breakdown.locator(`[data-testid="match-signal"][data-signal="${signal}"]`),
         `breakdown is missing the "${signal}" signal`,

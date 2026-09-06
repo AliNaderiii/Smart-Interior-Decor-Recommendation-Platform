@@ -84,12 +84,16 @@ the platform never hard-fails on missing internet.
 2. **Stage B — semantic retrieval:** on Postgres, fused into the same query:
    `ORDER BY style_embedding <=> :user_embedding LIMIT 100` (HNSW, cosine).
 3. **Stage C — weighted scoring with explainability:**
-   `final = 0.30·style + 0.30·color + 0.20·budget + 0.15·material + 0.05·pattern`
+   `final = 0.25·style + 0.25·color + 0.20·budget + 0.15·material + 0.05·pattern + 0.10·fit`
+   (profile `current`, config `2026-09-06.1`; the pre-fit split 0.30/0.30/0.20/0.15/0.05
+   is kept as profile `current-v1` — see ADR-012)
    - style: cosine similarity (mapped to [0,1])
    - color: perceptual "redmean" RGB distance (cheap Delta-E approximation),
      best-match average across the user palette
    - budget: 1 at window midpoint, linear falloff to edges
    - material/pattern: Jaccard overlap (neutral 0.5 when either side unknown)
+   - fit: physical fit of the product footprint in the quiz room (ADR-012;
+     neutral 0.5 when either side has no dimensions)
 
 Every result carries `explanation` with per-component percentages and a
 Havenly-style summary: *"Style Match 92% | Color Match 85% | Budget Fit 90% |
@@ -159,6 +163,53 @@ Free users get the full payload for the **top product per category** only; ranks
 are stripped to teaser fields (`id`, `title`, `image_url`, `locked: true`) *in the
 API*, not just blurred in the UI. The frontend additionally ships a
 `withSubscription` HOC for gated views.
+
+## ADR-012 — Dimensional fit as a sixth score component
+
+**Context.** The quiz has collected `room_width_cm × room_length_cm` since the
+floor-planner work and the catalogue carries `width/depth/height_cm` for every
+product, yet the ranking never looked at either: a 260 cm sofa scored exactly
+the same in a 250 × 300 cm studio as in a 5 × 6 m living room. Every consumer
+tool we benchmarked (IKEA Kreativ, Houzz, Wayfair Muse) is criticised for
+ignoring room geometry — it is the cheapest differentiator we can ship without
+computer vision, and it is *data we already have*.
+
+**Decision.** Add a `fit ∈ [0,1]` component computed by
+`recommender.fit_score(category, w, d, h, room_w, room_l) -> (score, reason)`
+and give it **10 % of the final score**, funded equally from style and colour
+(0.30/0.30 → 0.25/0.25). Budget, material and pattern keep their weights so the
+client-facing story ("budget 20 %, material 15 %, pattern 5 %") is unchanged.
+Rules are per category and live in `recommender_config.json → fit`, not in code:
+
+| category | rule (footprint ratio `r` = product w·d / room w·l) |
+|---|---|
+| sofa, chair, coffee_table, storage | 1.0 while `r ≤ ideal`; linear to the floor (0.05) at `max`; **floor immediately** if any side is longer than the room or no 76 cm circulation lane remains along the short wall |
+| rug | ramps *up* from `min` → 1.0 at `ideal` (too-small rugs are the classic mistake), then decays to 0.3 at `max` |
+| decor (curtains) | height only: 1.0 at ≥ 85 % of an assumed 270 cm ceiling, floor above 105 % (`fit_too_tall`) |
+| lighting | neutral 0.5 — a pendant's footprint says nothing about fit |
+| anything without dimensions | neutral 0.5, `fit_unknown` — **never penalise missing data** |
+
+The explanation gains two keys: `fit_match` (percentage, like the others) and
+`fit_reason` — a stable machine code (`fit_unknown | fit_neutral | fit_ok |
+fit_tight | fit_too_big | fit_too_small | fit_too_tall`). The engine never emits
+prose for it; both locales translate the code in the frontend, and the card
+shows a badge only for the three actionable states.
+
+**Consequences.**
+* `config_version` → `2026-09-06.1`; every profile must now carry the `fit`
+  key (the validator's exact-key rule). The previous weights survive as
+  `current-v1` / `client-ad-v1` with `fit: 0.0`, so an A/B against the old
+  ranking is one environment variable (`RECOMMENDER_WEIGHT_PROFILE`).
+* Cache fingerprints include the config version (`_cfg`), so upgrading never
+  serves a stale 5-component explanation under the new weights.
+* The harness (`scripts/evaluate_recommender.py --compare-profiles`) exercises
+  a 400 × 500 cm room and diffs profiles by `title|price` rather than UUID, so
+  the report shows real reorder/drop deltas between `current` and `current-v1`.
+* Quiz payloads without room dimensions degrade gracefully: `fit` is neutral
+  for every product, i.e. the ranking is a pure re-scaling of the old one.
+* Not done (deliberately): door/window positions, ceiling height from the
+  quiz, per-wall placement. Those belong to the floor planner (A1/room photo),
+  not to a scalar score.
 
 ## Data model (ERD)
 

@@ -54,7 +54,7 @@ function product(id: string, title: string, sellerLink = "https://www.digikala.c
     description: "",
     final_score: 0.87,
     explanation: {
-      style_match: 90, color_match: 80, budget_fit: 100, material_match: 70, pattern_match: 60,
+      style_match: 90, color_match: 80, budget_fit: 100, material_match: 70, pattern_match: 60, fit_match: 100, fit_reason: "fit_ok",
       matched_materials: ["wood"], summary: "Fits your modern brief.",
     },
   };

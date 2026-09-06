@@ -5,8 +5,10 @@ Stage B — Semantic candidate retrieval: pgvector cosine distance
           ``style_embedding <=> :user_embedding LIMIT 100`` on Postgres;
           Python cosine fallback on SQLite (tests).
 Stage C — Weighted scoring with full explainability (default "current"
-          profile: 0.30*style + 0.30*color + 0.20*budget + 0.15*material +
-          0.05*pattern). Stage 1 (T-1.2) makes the weights a validated,
+          profile: 0.25*style + 0.25*color + 0.20*budget + 0.15*material +
+          0.05*pattern + 0.10*fit). ``fit`` is the ADR-012 dimensional-fit
+          component (does the piece physically belong in the room the quiz
+          described). Stage 1 (T-1.2) makes the weights a validated,
           switchable profile (RECOMMENDER_WEIGHT_PROFILE; the "client-ad"
           profile carries the normalised client-advertisement weights) — see
           ai/recommender_config.json and docs/reports/weights_profiles.md.
@@ -68,7 +70,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 CONFIG_PATH = Path(__file__).resolve().parents[2] / "ai" / "recommender_config.json"
 
-_EXPECTED_WEIGHT_KEYS = {"style", "color", "budget", "material", "pattern"}
+_EXPECTED_WEIGHT_KEYS = {"style", "color", "budget", "material", "pattern", "fit"}
 
 
 def load_recommender_config(path: Path = CONFIG_PATH) -> dict[str, Any]:
@@ -189,6 +191,12 @@ _DUP_EMBEDDING_COSINE: float = CONFIG["diversity"]["duplicate_embedding_cosine"]
 _MAX_PER_STYLE: int = CONFIG["diversity"]["max_per_style"]
 _DUP_NORMALIZED_TITLE: bool = CONFIG["diversity"]["duplicate_title_normalized"]
 
+FIT_CONFIG: dict[str, Any] = CONFIG["fit"]
+_FIT_NEUTRAL: float = float(FIT_CONFIG["neutral_score"])
+_FIT_FLOOR: float = float(FIT_CONFIG["floor"])
+_FIT_CIRCULATION_CM: float = float(FIT_CONFIG["circulation_cm"])
+_FIT_CEILING_CM: float = float(FIT_CONFIG["assumed_ceiling_cm"])
+
 
 # ---------------------------------------------------------------------------
 # Color math — hex -> RGB distance (approximate Delta-E via weighted RGB)
@@ -240,6 +248,116 @@ def jaccard(a: list[str], b: list[str]) -> float:
     if not sa or not sb:
         return 0.5
     return len(sa & sb) / len(sa | sb)
+
+
+# ---------------------------------------------------------------------------
+# Dimensional fit (ADR-012) — does this piece physically belong in that room?
+# ---------------------------------------------------------------------------
+# The quiz already carries room_width_cm / room_length_cm and every catalog
+# row carries width/depth/height, yet until 2026-09-06 the ranking ignored
+# both and only the floorplan page warned after the fact. Published critiques
+# of Wayfair Muse and IKEA Kreativ single out exactly this gap ("ignores
+# proportion and sizing"). fit_score() turns it into a sixth explainable
+# component. Rules are per category and live in recommender_config.json so
+# they are versioned with the weights; the maths here is deliberately simple
+# and monotone so every number in the breakdown can be reasoned about.
+#
+#   * footprint_ratio = (product width x depth) / (room width x length)
+#   * seating/tables/storage: 1.0 at or below the ideal ratio, linear decay to
+#     the category's max ratio, floor beyond it. A hard "does not fit through
+#     the room at all" (either product side longer than the room's long side,
+#     or the piece leaving less than the 76 cm circulation lane along the
+#     room's short side) also collapses to the floor.
+#   * rugs: the opposite shape — too SMALL is the common mistake, so the score
+#     ramps up from min ratio to ideal, then decays towards max.
+#   * decor (curtains, tall pieces): only height matters, against an assumed
+#     270 cm ceiling; other decor is neutral.
+#   * lighting: neutral (pendants/floor lamps are not footprint-bound here).
+#   * unknown dimensions on either side -> neutral 0.5, mirroring the
+#     taxonomy's unknown_value_policy for optional fields.
+
+
+def _linear(x: float, x0: float, x1: float, y0: float, y1: float) -> float:
+    """Piecewise-linear helper: y0 at x<=x0, y1 at x>=x1, straight line between."""
+    if x1 <= x0:
+        return y1 if x >= x1 else y0
+    if x <= x0:
+        return y0
+    if x >= x1:
+        return y1
+    return y0 + (y1 - y0) * (x - x0) / (x1 - x0)
+
+
+def fit_score(
+    category: str,
+    width_cm: int | None,
+    depth_cm: int | None,
+    height_cm: int | None,
+    room_width_cm: int | None,
+    room_length_cm: int | None,
+) -> tuple[float, str]:
+    """Return ``(score in [0, 1], reason code)`` for one product in one room.
+
+    Reason codes are stable identifiers the UI localises
+    (``fit_unknown``, ``fit_ok``, ``fit_tight``, ``fit_too_big``,
+    ``fit_too_small``, ``fit_too_tall``, ``fit_neutral``).
+    """
+    rules = FIT_CONFIG["categories"].get(category)
+    if not rules or rules.get("neutral"):
+        return _FIT_NEUTRAL, "fit_neutral"
+    if not room_width_cm or not room_length_cm or room_width_cm <= 0 or room_length_cm <= 0:
+        return _FIT_NEUTRAL, "fit_unknown"
+
+    room_short, room_long = sorted((float(room_width_cm), float(room_length_cm)))
+    room_area = room_short * room_long
+
+    # Height-only categories (curtains and other tall decor).
+    if "curtain_min_height_ratio" in rules:
+        if not height_cm or height_cm <= 0:
+            return _FIT_NEUTRAL, "fit_unknown"
+        if height_cm > _FIT_CEILING_CM * 1.05:
+            return _FIT_FLOOR, "fit_too_tall"
+        ratio = height_cm / _FIT_CEILING_CM
+        # Curtains that stop far above the floor look wrong; ramp from 0.5 at
+        # 60% of ceiling height to 1.0 at the configured minimum ratio.
+        return round(_linear(ratio, 0.60, float(rules["curtain_min_height_ratio"]), 0.5, 1.0), 4), (
+            "fit_ok" if ratio >= float(rules["curtain_min_height_ratio"]) else "fit_too_small"
+        )
+
+    if not width_cm or not depth_cm or width_cm <= 0 or depth_cm <= 0:
+        return _FIT_NEUTRAL, "fit_unknown"
+
+    prod_short, prod_long = sorted((float(width_cm), float(depth_cm)))
+    footprint_ratio = (prod_short * prod_long) / room_area
+
+    # Rugs: too small is the failure mode.
+    if "min_footprint_ratio" in rules:
+        lo, ideal, hi = (float(rules["min_footprint_ratio"]),
+                         float(rules["ideal_footprint_ratio"]),
+                         float(rules["max_footprint_ratio"]))
+        if prod_long > room_long or prod_short > room_short:
+            return _FIT_FLOOR, "fit_too_big"
+        if footprint_ratio < lo:
+            return round(max(_FIT_FLOOR, _linear(footprint_ratio, 0.0, lo, _FIT_FLOOR, 0.5)), 4), "fit_too_small"
+        if footprint_ratio <= ideal:
+            return round(_linear(footprint_ratio, lo, ideal, 0.5, 1.0), 4), "fit_ok"
+        return round(max(_FIT_FLOOR, _linear(footprint_ratio, ideal, hi, 1.0, 0.3)), 4), (
+            "fit_ok" if footprint_ratio <= (ideal + hi) / 2 else "fit_tight"
+        )
+
+    # Seating, tables, storage: too big is the failure mode.
+    ideal, hi = float(rules["ideal_footprint_ratio"]), float(rules["max_footprint_ratio"])
+    if prod_long > room_long or prod_short > room_short:
+        return _FIT_FLOOR, "fit_too_big"
+    # Circulation: the piece must leave a walking lane along the short wall.
+    if room_short - prod_short < _FIT_CIRCULATION_CM and room_short - prod_long < _FIT_CIRCULATION_CM:
+        return _FIT_FLOOR, "fit_too_big"
+    if footprint_ratio <= ideal:
+        return 1.0, "fit_ok"
+    if footprint_ratio >= hi:
+        return _FIT_FLOOR, "fit_too_big"
+    score = round(_linear(footprint_ratio, ideal, hi, 1.0, _FIT_FLOOR), 4)
+    return score, ("fit_ok" if score >= 0.7 else "fit_tight")
 
 
 # ---------------------------------------------------------------------------
@@ -384,6 +502,11 @@ def calculate_score(
     )
     m_score = jaccard(quiz.get("materials", []), product.materials or [])
     p_score = jaccard(quiz.get("patterns", []), product.patterns or [])
+    f_score, f_reason = fit_score(
+        product.category,
+        product.width_cm, product.depth_cm, product.height_cm,
+        quiz.get("room_width_cm"), quiz.get("room_length_cm"),
+    )
 
     final = (
         weights["style"] * style_sim
@@ -391,6 +514,7 @@ def calculate_score(
         + weights["budget"] * b_score
         + weights["material"] * m_score
         + weights["pattern"] * p_score
+        + weights["fit"] * f_score
     )
 
     matched_materials = sorted(set(quiz.get("materials", [])) & set(product.materials or []))
@@ -402,6 +526,8 @@ def calculate_score(
             "budget_fit": round(b_score * 100),
             "material_match": round(m_score * 100),
             "pattern_match": round(p_score * 100),
+            "fit_match": round(f_score * 100),
+            "fit_reason": f_reason,
             "matched_materials": matched_materials,
             "summary": (
                 f"Style Match {round(style_sim * 100)}% | "
@@ -637,6 +763,9 @@ def recommend(
         "_categories": categories,
         "_fb": sorted(feedback.items()) if feedback else None,
         "_profile": profile_name,
+        # A config bump (new weights or fit rules) must never serve a payload
+        # whose breakdown was computed under the previous version.
+        "_cfg": CONFIG["config_version"],
     }
     cache_key = quiz_cache_key(fingerprint, user_id)
     redis = get_redis()

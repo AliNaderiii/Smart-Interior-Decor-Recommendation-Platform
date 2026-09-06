@@ -29,7 +29,7 @@ interface Props {
  *  in the a11y tree. Aesop's rule — secondary detail hides behind interaction
  *  rather than cluttering the card face. */
 function MatchBreakdown({ product }: { product: RecommendedProduct }) {
-  const { t, money } = useLocale();
+  const { t, money, num } = useLocale();
   // Controlled rather than hover-only. Radix opens the card on pointer hover,
   // but a touch user has no hover — without an explicit tap handler the
   // explainability panel (the whole point of the feature) is unreachable on
@@ -48,6 +48,19 @@ function MatchBreakdown({ product }: { product: RecommendedProduct }) {
       label: t.recommendations.scoreMaterial,
       value: exp.material_match,
       detail: exp.matched_materials.length ? exp.matched_materials.join(", ") : product.materials.join(", ") || "—",
+    },
+    // ADR-012 — dimensional fit. The reason code is localised here; the
+    // engine only ever emits the stable identifier.
+    {
+      key: "fit",
+      label: t.recommendations.scoreFit,
+      value: exp.fit_match,
+      detail: [
+        t.recommendations.fitReason[exp.fit_reason] ?? exp.fit_reason,
+        product.width_cm && product.depth_cm
+          ? t.recommendations.fitDims(num(product.width_cm), num(product.depth_cm))
+          : null,
+      ].filter(Boolean).join(" · "),
     },
   ];
 
@@ -201,6 +214,53 @@ function PriceBadge({ verified }: { verified?: boolean }) {
   );
 }
 
+/** ADR-012 fit warning on the card face. Only the three actionable states get
+ *  a badge — a comfortable fit is the expectation, not news. Colour is paired
+ *  with text (and an icon for the hard "won't fit") so it survives greyscale. */
+function FitBadge({ reason }: { reason?: string }) {
+  const t = useT();
+  if (reason === "fit_too_big" || reason === "fit_too_tall") {
+    return (
+      <span
+        className="inline-flex items-center gap-1 rounded-full bg-[var(--color-surface)]/90 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-danger)] ring-1 ring-inset ring-[var(--color-danger)]/40 backdrop-blur"
+        data-testid="fit-badge"
+        data-fit={reason}
+        title={t.recommendations.fitReason[reason]}
+      >
+        <svg width="9" height="9" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+          <path d="M6 2.2v4.6M6 9.3v.4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+        {t.recommendations.fitBadgeTooBig}
+      </span>
+    );
+  }
+  if (reason === "fit_tight") {
+    return (
+      <span
+        className="rounded-full bg-[var(--color-surface)]/90 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-warn)] ring-1 ring-inset ring-[var(--color-warn)]/40 backdrop-blur"
+        data-testid="fit-badge"
+        data-fit={reason}
+        title={t.recommendations.fitReason[reason]}
+      >
+        {t.recommendations.fitBadgeTight}
+      </span>
+    );
+  }
+  if (reason === "fit_too_small") {
+    return (
+      <span
+        className="rounded-full bg-[var(--color-surface)]/90 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-warn)] ring-1 ring-inset ring-[var(--color-warn)]/40 backdrop-blur"
+        data-testid="fit-badge"
+        data-fit={reason}
+        title={t.recommendations.fitReason[reason]}
+      >
+        {t.recommendations.fitBadgeSmall}
+      </span>
+    );
+  }
+  return null;
+}
+
 /* -------------------------------------------------------------------- card */
 
 function ProductCardInner({ product, rank, onAdd, added, feedback, onFeedback }: Props) {
@@ -294,8 +354,9 @@ function ProductCardInner({ product, rank, onAdd, added, feedback, onFeedback }:
         <span className="absolute left-2 top-2 rounded-full bg-[var(--color-surface)]/90 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-[var(--color-ink)] backdrop-blur">
           #{rank + 1}
         </span>
-        <div className="absolute right-2 top-2">
+        <div className="absolute right-2 top-2 flex flex-col items-end gap-1">
           <PriceBadge verified={product.is_verified} />
+          <FitBadge reason={product.explanation?.fit_reason} />
         </div>
       </div>
 

@@ -21,7 +21,7 @@ Auth: `Authorization: Bearer <access_token>` (HS256, 15 min; refresh 7 days).
 ## Quiz & Recommendations
 | POST | `/quiz` | validated quiz (styles⊆taxonomy, budget_max>min) → saved with embedding |
 | GET | `/quiz`, `/quiz/{id}` | own quizzes |
-| POST | `/recommend` | body = inline quiz **or** `?quiz_id=`; 3-stage engine; Redis-cached 1 h; free users get rank-1 full + ranks 2-5 as locked teasers; each product carries `final_score` + `explanation{style_match,color_match,budget_fit,material_match,pattern_match,matched_materials,summary}` |
+| POST | `/recommend` | body = inline quiz **or** `?quiz_id=`; 3-stage engine; Redis-cached 1 h; free users get rank-1 full + ranks 2-5 as locked teasers; each product carries `final_score` + `explanation{style_match,color_match,budget_fit,material_match,pattern_match,fit_match,fit_reason,matched_materials,summary}` — `fit_reason` is a stable code (`fit_unknown\|fit_neutral\|fit_ok\|fit_tight\|fit_too_big\|fit_too_small\|fit_too_tall`, ADR-012) |
 
 ## Moodboards
 | POST/GET | `/moodboards` | items = `[{product_id,x,y,w,h}]` (react-grid-layout), `shopping_list` = product ids |

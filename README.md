@@ -12,14 +12,19 @@ moodboards, a 2D floorplan preview, validated shopping lists, a designer (B2B2C)
 portal, an admin portal with human-in-the-loop AI feature extraction, and a
 Zarinpal-based Pro paywall. **MVP scope: living_room only.**
 
+Every recommendation is scored on six explainable signals — style 25 %,
+colour 25 %, budget 20 %, material 15 %, pattern 5 % and **room fit 10 %**
+(does a 260 cm sofa actually fit a 2.5 × 3 m studio? — ADR-012) — and the card
+shows the per-signal breakdown in both languages.
+
 > **Release baseline.** The tree was first audited at commit `f97bfad` on
 > 2026-08-21 ([`docs/RELEASE_BASELINE.md`](docs/RELEASE_BASELINE.md)) and
 > re-audited at the Stage-1 HEAD on 2026-08-26
 > ([`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)).
-> Re-verified on 2026-09-05 in a clean sandbox (Python 3.13, Node 22.20)
-> after the CI-green pass that followed the bilingual/RTL work: backend
-> **628 passed / 22 skipped (650 collected)**, frontend **64 unit tests across
-> 11 files**, strict build, lint (0 errors) and test typecheck clean, and the
+> Re-verified on 2026-09-06 in a clean sandbox (Python 3.13, Node 22.20)
+> after the dimensional-fit work (ADR-012): backend
+> **654 passed / 22 skipped (676 collected)**, frontend **71 unit tests across
+> 12 files**, strict build, lint (0 errors) and test typecheck clean, and the
 > **blocking Playwright projects green locally (21/21)** with the UI locale
 > pinned to `en` by `tests/e2e/locale.ts`.
 > Verified in CI on `main` at `5e189ae` (run
@@ -98,8 +103,8 @@ the separate no-Docker path documented under *Local development*.)
 
 Postgres parity was demonstrated on **2026-08-19 at commit `a847ad5`**, when the
 suite contained 45 tests (`docs/reports/postgres_parity.md`). The suite has since
-grown to **650 collected** (628 passed / 22 skipped, re-measured at HEAD on
-2026-09-05) and that Postgres run has **not** been repeated locally — the
+grown to **676 collected** (654 passed / 22 skipped, re-measured at HEAD on
+2026-09-06) and that Postgres run has **not** been repeated locally — the
 baseline audit environment has no Docker or PostgreSQL binary. Treat Postgres
 parity as *previously evidenced, currently unverified at HEAD*; re-run it before
 release:
@@ -152,7 +157,7 @@ policy.
 ```bash
 cd backend
 pip install -r requirements.lock.txt      # the lockfile is the contract, not requirements.txt
-pytest                                    # 628 passed, 22 skipped / 650 collected (SQLite + fakeredis + mock AI)
+pytest                                    # 654 passed, 22 skipped / 676 collected (SQLite + fakeredis + mock AI)
 ruff check app ai scripts tests           # 0 errors
 
 python scripts/verify_lock_install.py     # installed env == requirements.lock.txt
@@ -171,7 +176,7 @@ CI `backend` job against Postgres 16 + pgvector.
 cd frontend
 npm ci                                    # not npm install: package-lock.json is the lock of record
 
-npm test                                  # Vitest + Testing Library — 64 tests, 11 files (Node ≥22 required)
+npm test                                  # Vitest + Testing Library — 71 tests, 12 files (Node ≥22 required)
 npm run lint                              # oxlint — 0 errors, 18 warnings (react-hooks/refs advisories)
 npm run build                             # tsc strict + vite — 0 errors
 npx tsc -p tsconfig.tests.json            # type-check the test suites too (tsconfig.app.json covers only src/)
@@ -232,7 +237,7 @@ npx lighthouse http://localhost:4173/ --view   # >=80 target (npm run preview fi
 
 | Suite | Tests |
 |---|---:|
-| `backend/tests/` (full suite) | **650 collected** — 628 passed, 22 skipped |
+| `backend/tests/` (full suite) | **676 collected** — 654 passed, 22 skipped |
 | ↳ `test_recommender.py` | 30 (spec floor: ≥28) |
 | ↳ `test_security_v2.py` | 26 |
 | ↳ `test_feedback_v2.py` | 16 |
@@ -240,9 +245,10 @@ npx lighthouse http://localhost:4173/ --view   # >=80 target (npm run preview fi
 | ↳ `test_projects_quota.py` | 14 (designer quota, Stage 1) |
 | ↳ `test_designer_workflow.py` | 30 (project status + client approvals, migration 0005) |
 | ↳ `test_weights_profiles.py` | 13 (weight profiles, Stage 1) |
+| ↳ `test_fit_score.py` | 26 (dimensional fit, ADR-012) |
 | ↳ `test_perf_v2.py` | 10 |
 | ↳ `test_rate_limit.py` | 2 |
-| `frontend/tests/unit/` (Vitest) | **64** across 11 files |
+| `frontend/tests/unit/` (Vitest) | **71** across 12 files |
 | `frontend/tests/e2e/` (Playwright) | **30** across 6 files — CI only |
 
 ## Repository layout
@@ -259,9 +265,9 @@ backend/
   alembic/           migrations (pgvector extension + HNSW index)
   scripts/           seed_products.py · load_realistic_products.py · evaluate_extraction.py
                      seed_perf_products.py · dev_postgres.py
-  tests/             650 collected — test_recommender.py (30) · test_security_v2.py (26)
+  tests/             676 collected — test_recommender.py (30) · test_security_v2.py (26)
                      test_feedback_v2.py (16) · test_auth.py (13) · test_projects_quota.py (14)
-                     test_weights_profiles.py (13) · test_designer_workflow.py (30)
+                     test_weights_profiles.py (13) · test_fit_score.py (26) · test_designer_workflow.py (30)
                      test_perf_v2.py (10) · test_rate_limit.py (2)
                      benchmark_50_images.json
   security/          pip-audit-allowlist.yml (expiring, justified CVE acceptances)
@@ -270,7 +276,7 @@ frontend/
                      upgrade · share · designer/* · admin/*
   src/stores/        authStore · quizStore · moodboardStore (Zustand)
   src/lib/           api (fetch + JWT refresh + CSRF double-submit) · constants (i18n-ready) · types
-  tests/unit/        Vitest + Testing Library — 64 tests, 11 files (`npm test`)
+  tests/unit/        Vitest + Testing Library — 71 tests, 12 files (`npm test`)
                      renderWithProviders.tsx wraps pages in <LocaleProvider locale=en>
   tests/e2e/         Playwright — 30 tests, 6 files (`npm run e2e`): deadKeys · auth-negative
                      auth-smoke · journey-homeowner · journey-designer · journey-admin
