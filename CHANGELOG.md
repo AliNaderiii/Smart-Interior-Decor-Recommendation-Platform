@@ -82,6 +82,13 @@ written against the English catalogue.
   per-category `N options` counter and the Pro-locked card overlay
   (`N more matches in this room`, `Unlock with Pro`). All moved to the
   catalogues under `recommendations.*`; the English rendering is unchanged.
+- **Floorplan in the Persian UI.** The SVG inherited `direction: rtl` from
+  the document, which flipped `text-anchor` semantics and pushed the y-axis
+  ruler ticks (100…500, "cm") outside the viewBox — they rendered clipped.
+  The plan is now `direction="ltr"` (a metric drawing reads the same in any
+  language); the `door 80` / `win 140` labels and the footprint caption moved
+  to the catalogues (`floorplan.doorLabel/windowLabel/footprint`), and the
+  door label sits under the swing arc instead of colliding with the top ruler.
 
 ### Added
 

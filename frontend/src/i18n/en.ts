@@ -184,6 +184,10 @@ export const en: Dict = {
     addFromMoodboard: "Add from your moodboard",
     addFromMoodboardHint:
       "Create a moodboard first — its products appear here with real dimensions.",
+    doorLabel: "door 80",
+    windowLabel: "win 140",
+    footprint: (w: number, l: number, used: string, room: string, pct: number) =>
+      `${w}cm × ${l}cm · footprint ${used} m² of ${room} m² (${pct}%)`,
   },
 
   shoppingList: {

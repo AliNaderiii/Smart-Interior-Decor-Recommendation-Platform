@@ -239,6 +239,11 @@ export default function FloorplanPage() {
             width="100%"
             style={{ maxHeight: 600, aspectRatio: `${width + GUTTER} / ${length + GUTTER}` }}
             className="touch-none rounded-xl bg-white"
+            // The drawing is a metric plan: rulers run left→right regardless
+            // of UI language. Without this, the RTL document direction flips
+            // text-anchor semantics and pushes the y-axis tick labels out of
+            // the viewBox (they rendered clipped in the Persian UI).
+            direction="ltr"
             onPointerMove={onPointerMove}
             onPointerUp={() => (dragRef.current = null)}
             role="application"
@@ -309,8 +314,10 @@ export default function FloorplanPage() {
                 />
                 <line x1={width * 0.12} y1={0} x2={width * 0.12} y2={80}
                       stroke="#6B7280" strokeWidth={2.5} />
-                <text x={width * 0.12 + 40} y={-WALL_CM - 6} textAnchor="middle"
-                      fontSize={Math.max(10, width / 70)} fill="#6B7280">door 80</text>
+                {/* Label sits inside the room under the swing arc: above the
+                    wall it collided with the top ruler's "100" tick. */}
+                <text x={width * 0.12 + 40} y={96} textAnchor="middle"
+                      fontSize={Math.max(10, width / 70)} fill="#6B7280">{t.floorplan.doorLabel}</text>
               </g>
 
               {/* ---------- Window: 140cm, right wall ---------- */}
@@ -321,7 +328,7 @@ export default function FloorplanPage() {
                 <line x1={width + WALL_CM} y1={length * 0.3} x2={width + WALL_CM} y2={length * 0.3 + 140}
                       stroke="#60A5FA" strokeWidth={3} />
                 <text x={width + WALL_CM + 8} y={length * 0.3 + 70}
-                      fontSize={Math.max(10, width / 70)} fill="#6B7280" dominantBaseline="middle">win 140</text>
+                      fontSize={Math.max(10, width / 70)} fill="#6B7280" dominantBaseline="middle">{t.floorplan.windowLabel}</text>
               </g>
 
               {/* ---------- Clearance violations: red dashed corridor ---------- */}
@@ -368,8 +375,13 @@ export default function FloorplanPage() {
           </svg>
           </div>
           <p className="mt-3 text-xs text-[var(--color-muted)]">
-            {width}cm × {length}cm · footprint {(usedArea / 10000).toFixed(1)} m² of{" "}
-            {(roomArea / 10000).toFixed(1)} m² ({Math.round((usedArea / roomArea) * 100)}%)
+            {t.floorplan.footprint(
+              width,
+              length,
+              (usedArea / 10000).toFixed(1),
+              (roomArea / 10000).toFixed(1),
+              Math.round((usedArea / roomArea) * 100),
+            )}
           </p>
           {overflows.length > 0 && (
             <p className="mt-2 rounded-xl bg-[var(--color-danger)]/8 px-3 py-2 text-sm text-[var(--color-danger)]" role="alert">

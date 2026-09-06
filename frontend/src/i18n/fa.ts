@@ -190,6 +190,10 @@ export const fa = {
     addFromMoodboard: "افزودن از مودبورد",
     addFromMoodboardHint:
       "ابتدا یک مودبورد بسازید — محصولاتش با ابعاد واقعی اینجا ظاهر می‌شوند.",
+    doorLabel: "در ۸۰",
+    windowLabel: "پنجره ۱۴۰",
+    footprint: (w: number, l: number, used: string, room: string, pct: number) =>
+      `${w}×${l} سانتی‌متر · اشغال ${used} از ${room} متر مربع (${pct}٪)`,
   },
 
   shoppingList: {
