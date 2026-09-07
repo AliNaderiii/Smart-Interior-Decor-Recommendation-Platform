@@ -40,7 +40,18 @@ Also reported: per-feature micro precision/recall, confidence calibration
 (expected calibration error), per-call latency percentiles, failure rate,
 human-review rate and an estimated provider cost for REAL mode.
 
+Since 2026-09-07 the report also carries ``style_rank1_accuracy`` (the first
+listed style is the ground truth) and ``hedge_gain`` (contract mean minus the
+mean with only the first style counted). The contract term is overlap-based,
+so a model that lists two styles is rewarded for hedging; the rank-1 figure is
+what the catalogue actually stores first and what a reviewer should read next
+to the headline (docs/ai/evaluation-report.md §3.3).
+
 Acceptance criterion: mean accuracy >= 0.80 in REAL mode.
+
+Artefact protection: ``docs/reports/extraction_report.json`` is release
+evidence. A MOCK run never overwrites a REAL artefact there — it is written to
+``extraction_report.mock.json`` next to it instead (and says so).
 """
 from __future__ import annotations
 
@@ -59,6 +70,22 @@ from app.core.config import settings  # noqa: E402
 
 BENCHMARK = Path(__file__).resolve().parents[1] / "tests" / "benchmark_50_images.json"
 REPORT = Path(__file__).resolve().parents[1] / ".." / "docs" / "reports" / "extraction_report.json"
+
+
+def protected_report_path(path: Path, is_mock: bool) -> Path:
+    """Where this run may write: never clobber a committed REAL artefact with MOCK.
+
+    Pure function so the rule is unit-testable without running a benchmark.
+    """
+    if not is_mock or not path.is_file():
+        return path
+    try:
+        existing = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return path
+    if existing.get("is_mock") is False or str(existing.get("mode", "")).startswith("REAL"):
+        return path.with_name(path.stem + ".mock" + path.suffix)
+    return path
 
 #: Per-image token assumptions for the REAL cost estimate (Gemini bills images
 #: as input tokens; a 768x768 image ≈ 258 tokens at standard detail). Prices
@@ -194,6 +221,8 @@ def main() -> int:
     failures: list[dict] = []
     style_pairs: list[tuple[set, set]] = []
     material_pairs: list[tuple[set, set]] = []
+    rank1_scores: list[float] = []
+    rank1_hits = 0
 
     for idx, item in enumerate(items):
         target = item["image_url"]
@@ -211,6 +240,8 @@ def main() -> int:
         dt = time.perf_counter() - t0
         latencies.append(dt)
         s = score_item(pred, item["ground_truth"])
+        rank1_scores.append(score_item({**pred, "style": pred.get("style", [])[:1]}, item["ground_truth"]))
+        rank1_hits += int(bool(set(pred.get("style", [])[:1]) & set(item["ground_truth"]["style"])))
         style_pairs.append((set(pred.get("style", [])), set(item["ground_truth"]["style"])))
         material_pairs.append((set(pred.get("material", [])), set(item["ground_truth"]["material"])))
         per_item.append({
@@ -263,6 +294,8 @@ def main() -> int:
         "mean_accuracy": round(accuracy, 4),
         "images_at_or_above_0_8": sum(1 for p in per_item if p["score"] >= 0.8),
         "below_threshold_ids": below,
+        "style_rank1_accuracy": round(rank1_hits / len(per_item), 4),
+        "hedge_gain": round(accuracy - sum(rank1_scores) / len(rank1_scores), 4),
         "style_micro": _prf(style_pairs),
         "material_micro": _prf(material_pairs),
         "calibration": {"buckets": buckets, "expected_calibration_error": round(ece_n, 4)},
@@ -292,6 +325,8 @@ def main() -> int:
               f"(429/5xx/transport, max {os.getenv('GEMINI_MAX_ATTEMPTS', '5')} attempts)")
     print(f"mean accuracy    : {accuracy:.1%}   (contract: >= 80% in REAL mode)")
     print(f"images >= 0.8    : {report['images_at_or_above_0_8']}/{len(per_item)}")
+    print(f"style rank-1 acc : {report['style_rank1_accuracy']:.1%}   "
+          f"(hedge gain in the contract mean: {report['hedge_gain']:+.1%})")
     print(f"style micro P/R/F1     : {report['style_micro']['precision']:.3f} / "
           f"{report['style_micro']['recall']:.3f} / {report['style_micro']['f1']:.3f}")
     print(f"material micro P/R/F1  : {report['material_micro']['precision']:.3f} / "
@@ -310,7 +345,11 @@ def main() -> int:
         print(f"below threshold  : {below}")
     print("=" * 72)
 
-    payloads = [REPORT, Path(json_out)] if json_out else [REPORT]
+    default_target = protected_report_path(REPORT, is_mock)
+    if default_target != REPORT:
+        print(f"artefact guard   : {REPORT.name} holds a REAL run; this MOCK run is written "
+              f"to {default_target.name} instead")
+    payloads = [default_target, Path(json_out)] if json_out else [default_target]
     for path in payloads:
         try:
             path.parent.mkdir(parents=True, exist_ok=True)

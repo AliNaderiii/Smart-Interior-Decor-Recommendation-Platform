@@ -38,7 +38,7 @@ from __future__ import annotations
 from app.core.config import settings
 
 #: Coarse version of the AI stack as deployed by this branch.
-AI_STACK_VERSION = "2026-09-06.1"
+AI_STACK_VERSION = "2026-09-07.1"
 
 #: Version of the extraction prompt template in ``ai.feature_extractor``.
 EXTRACTION_PROMPT_VERSION = "p5"

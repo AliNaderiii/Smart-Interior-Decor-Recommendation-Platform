@@ -33,7 +33,7 @@ and never submits it; a heuristic provider can only ever add colours.
 > ([`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)).
 > Re-verified on 2026-09-06 in a clean sandbox (Python 3.13, Node 22.20)
 > after the Phase A work (ADR-012/013/014/015): backend
-> **713 passed / 22 skipped (735 collected)**, frontend **94 unit tests across
+> **743 passed / 22 skipped (765 collected)**, frontend **94 unit tests across
 > 15 files**, strict build, lint (0 errors) and test typecheck clean, and the
 > **blocking Playwright projects green locally (21/21)** with the UI locale
 > pinned to `en` by `tests/e2e/locale.ts`.
@@ -46,8 +46,11 @@ and never submits it; a heuristic provider can only ever add colours.
 > 150-product catalog, `/recommend` p95 evidence, and Docker builds.
 > `main` had been red from `459fbf4` (2026-09-04) until PR #20 — see
 > CHANGELOG › Unreleased for what was wrong and what changed.
-> Still not verified anywhere: real-model AI extraction accuracy (CI runs the
-> `--real` benchmark only when a provider secret is configured).
+> Real-model AI extraction was measured once off-sandbox (2026-09-02,
+> `gemini-3.5-flash-lite`, prompt `p5`): **82.2 % on the 50-image benchmark
+> (PASS ≥ 80 %)**, rank-1 style accuracy 60 % — read
+> `docs/ai/evaluation-report.md` §3.2–3.3 before quoting either figure. CI
+> re-runs the `--real` benchmark only when a provider secret is configured.
 > Read the checklist before quoting any number from this repository to a
 > client.
 
@@ -113,7 +116,7 @@ the separate no-Docker path documented under *Local development*.)
 
 Postgres parity was demonstrated on **2026-08-19 at commit `a847ad5`**, when the
 suite contained 45 tests (`docs/reports/postgres_parity.md`). The suite has since
-grown to **735 collected** (713 passed / 22 skipped, re-measured at HEAD on
+grown to **765 collected** (743 passed / 22 skipped, re-measured at HEAD on
 2026-09-07) and that Postgres run has **not** been repeated locally — the
 baseline audit environment has no Docker or PostgreSQL binary. Treat Postgres
 parity as *previously evidenced, currently unverified at HEAD*; re-run it before
@@ -167,12 +170,13 @@ policy.
 ```bash
 cd backend
 pip install -r requirements.lock.txt      # the lockfile is the contract, not requirements.txt
-pytest                                    # 713 passed, 22 skipped / 735 collected (SQLite + fakeredis + mock AI)
+pytest                                    # 743 passed, 22 skipped / 765 collected (SQLite + fakeredis + mock AI)
 ruff check app ai scripts tests           # 0 errors
 
 python scripts/verify_lock_install.py     # installed env == requirements.lock.txt
 python scripts/audit_dependencies.py      # pip-audit the LOCKED set + expiring allowlist
-python scripts/evaluate_extraction.py     # 50-image benchmark, >=80% required — MOCK mode, 100%
+python scripts/evaluate_extraction.py     # 50-image benchmark, >=80% required — MOCK mode, 100% (harness baseline)
+python scripts/audit_review_gate.py       # replay the review gate over the committed REAL run: 27 flagged / 23 passed / 0 unflagged style misses
 python scripts/evaluate_recommender.py --compare-profiles   # weight-profile comparison (C-6)
 python -m ai.embedding_service            # backend=hash dim=512 sanity check
 ```
@@ -247,7 +251,7 @@ npx lighthouse http://localhost:4173/ --view   # >=80 target (npm run preview fi
 
 | Suite | Tests |
 |---|---:|
-| `backend/tests/` (full suite) | **735 collected** — 713 passed, 22 skipped |
+| `backend/tests/` (full suite) | **765 collected** — 743 passed, 22 skipped |
 | ↳ `test_recommender.py` | 30 (spec floor: ≥28) |
 | ↳ `test_security_v2.py` | 26 |
 | ↳ `test_feedback_v2.py` | 16 |
@@ -259,6 +263,7 @@ npx lighthouse http://localhost:4173/ --view   # >=80 target (npm run preview fi
 | ↳ `test_visual_search.py` | 21 (visual search, ADR-013) |
 | ↳ `test_feedback_events.py` | 11 (behavioural events, ADR-014) |
 | ↳ `test_room_analysis.py` | 27 (room photo → quiz prefill, ADR-015) |
+| ↳ `test_review_gate_replay.py` + `test_evaluate_extraction_harness.py` | 30 (review gate vs the REAL benchmark artefact; harness guards) |
 | ↳ `test_perf_v2.py` | 10 |
 | ↳ `test_rate_limit.py` | 2 |
 | `frontend/tests/unit/` (Vitest) | **94** across 15 files |
@@ -314,10 +319,11 @@ only) · no secrets in the repo — re-verified at `f97bfad` (244 tracked files,
 HEAD on 2026-09-01 (**RESULT: PASS**, 0 findings, 0 forbidden paths).
 CI is active (`.github/workflows/ci.yml` — Postgres/pgvector + real-Redis suite,
 E2E, Lighthouse, security probes) and the hardcoded-demo-account blocker (B-1) is
-closed with boot-time refusal in production. Remaining unverified item:
-real-model AI extraction accuracy (needs a provider API key — run
-`python scripts/evaluate_extraction.py --real` on a networked host; see
-[`docs/RELEASE_BASELINE.md`](docs/RELEASE_BASELINE.md) §7).
+closed with boot-time refusal in production. Real-model AI extraction
+accuracy has since been measured (B-5 closed 2026-09-02: 82.2 %,
+`docs/reports/extraction_report.json`); what remains open is a second
+provider/model and a larger sample — see
+[`docs/ai/evaluation-report.md`](docs/ai/evaluation-report.md) §7.
 
 ## Documentation
 

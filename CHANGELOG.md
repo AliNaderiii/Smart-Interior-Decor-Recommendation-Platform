@@ -22,6 +22,37 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Changed — AI evaluation report aligned with the REAL benchmark; review gate made structural (2026-09-07)
+
+- **`docs/ai/evaluation-report.md`** — §3.2 no longer says BLOCKED: it
+  records the 2026-09-02 REAL run (`gemini-3.5-flash-lite`, prompt `p5`,
+  **82.2 % PASS**, 50/50 model-analysed) and a new §3.3 decomposes it from
+  the per-item predictions: rank-1 style accuracy **60 %** (the overlap
+  style term contributes +8 pts via the second slot), material P/R
+  0.85/0.94, ECE 0.368 (0.95 confidence on 48/50), 95 % CI ≈ ±6 pts, and a
+  confusion matrix showing every style miss is a two-style hedge inside
+  `{modern, scandinavian, minimal}` (rugs 4/6, curtains 3/6 wrong). §1, §2,
+  §7, §8, README, RELEASE_CHECKLIST (B-5/BL-3 closed), RELEASE_BASELINE,
+  model-versions and risk register (new **AI-19**) follow.
+- **`ai/extraction_review.py` — `ambiguous_style` flag.** The confidence
+  rule flagged **0/50** real extractions (provider confidence is
+  uninformative), so the gate now also pre-flags a multi-style answer
+  confined to one confusable cluster (`AMBIGUOUS_STYLE_CLUSTERS`). Replayed
+  against the committed artefact: 27 flagged (mean 0.72) / 23 passed (mean
+  0.94, **0 unflagged style misses**). A pre-flag for the reviewer, never a
+  rejection; single styles and cross-cluster blends are untouched.
+  `AI_STACK_VERSION` → `2026-09-07.1`.
+- **`scripts/audit_review_gate.py`** (new) — replays the current gate over
+  any REAL artefact without an API key and reports what passed unflagged
+  and how much of it was wrong; refuses MOCK artefacts.
+- **`scripts/evaluate_extraction.py`** — prints/stores `style_rank1_accuracy`
+  and `hedge_gain` beside the headline; a MOCK run can no longer overwrite a
+  REAL `docs/reports/extraction_report.json` (goes to
+  `extraction_report.mock.json`, git-ignored).
+- Tests: `tests/test_review_gate_replay.py` (22: rule + replay tripwire),
+  `tests/test_evaluate_extraction_harness.py` (8: artefact guard, scoring
+  rule). Suite: 743 passed / 22 skipped.
+
 ### Added — room photo → pre-filled style quiz (ADR-015, 2026-09-07)
 
 - **`POST /api/v1/quiz/analyze-room`** — one photo of the user's living room
