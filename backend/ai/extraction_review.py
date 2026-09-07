@@ -5,7 +5,7 @@ extraction". The gate itself lives here so the extractor, the (requested) admin
 review queue and the evaluation harness all apply **the same** rule instead of
 each re-implementing a threshold.
 
-Policy (v2026-08-21.1):
+Policy (v2026-08-21.1, structural flag added v2026-09-07.1):
 
 * ``confidence >= AUTO_ACCEPT_THRESHOLD`` (0.80) **and** no failure markers →
   ``auto_accept``: eligible for the normal verification flow (an admin still
@@ -18,7 +18,18 @@ Failure markers that force review regardless of confidence:
   keyword fallback produced the values;
 * ``unknown_taxonomy_values`` — the model returned values outside the taxonomy;
   they were discarded, not guessed;
-* empty required feature lists (style or material) — nothing to recommend on.
+* empty required feature lists (style or material) — nothing to recommend on;
+* ``ambiguous_style`` — every predicted style comes from one *confusable
+  cluster* (see :data:`AMBIGUOUS_STYLE_CLUSTERS`). Added after the first REAL
+  benchmark (2026-09-02, ``gemini-3.5-flash-lite``, prompt ``p5``): the model
+  reported 0.95 confidence on 48/50 images, so the confidence rule flagged
+  **nothing** while 12/50 items had no correct style at all. Every one of
+  those 12 was a two-style answer drawn entirely from
+  ``{modern, scandinavian, minimal}``, and no answer outside that signature
+  was wrong — replayed by ``tests/test_review_gate_replay.py`` and
+  ``scripts/audit_review_gate.py`` against ``docs/reports/extraction_report.json``.
+  The flag is a pre-flag for the reviewer, never a rejection, and it is a
+  heuristic from n=50: re-evaluate it at the next benchmark.
 
 The contracted quality bar is 80% on the 50-image benchmark
 (docs/ARCHITECTURE.md §Benchmarks); the auto-accept threshold mirrors it so a
@@ -36,6 +47,12 @@ AUTO_ACCEPT_THRESHOLD = 0.80
 REVIEW_FLOOR = 0.60
 #: Hard cap applied to any fallback result so it can never reach auto-accept.
 FALLBACK_CONFIDENCE_CAP = 0.30
+#: Style ids the vision model demonstrably cannot tell apart (p5 benchmark,
+#: docs/ai/evaluation-report.md §3.3). A multi-style answer that stays inside
+#: one cluster is a hedge, not a blend, and is routed to a human.
+AMBIGUOUS_STYLE_CLUSTERS: tuple[frozenset[str], ...] = (
+    frozenset({"modern", "scandinavian", "minimal"}),
+)
 
 _REASONS = {
     "low_confidence": "confidence below AUTO_ACCEPT_THRESHOLD (0.80)",
@@ -47,7 +64,19 @@ _REASONS = {
     "unknown_taxonomy_values": "model returned values outside the taxonomy; they were discarded",
     "missing_style": "no style recognised — recommendations would be blind on the dominant signal",
     "missing_material": "no material recognised",
+    "ambiguous_style": (
+        "every predicted style is from one confusable cluster "
+        "(modern/scandinavian/minimal) — the model is hedging; confirm the style"
+    ),
 }
+
+
+def ambiguous_style(styles: Any) -> bool:
+    """True when ≥2 distinct styles were predicted and all sit in one cluster."""
+    if not isinstance(styles, (list, tuple, set)):
+        return False
+    chosen = {s for s in styles if isinstance(s, str)}
+    return len(chosen) >= 2 and any(chosen <= cluster for cluster in AMBIGUOUS_STYLE_CLUSTERS)
 
 
 def review_decision(extraction: dict[str, Any]) -> dict[str, Any]:
@@ -71,6 +100,8 @@ def review_decision(extraction: dict[str, Any]) -> dict[str, Any]:
         reasons.append("missing_style")
     if not extraction.get("material"):
         reasons.append("missing_material")
+    if ambiguous_style(extraction.get("style")):
+        reasons.append("ambiguous_style")
 
     state = "auto_accept" if not reasons else "human_review"
     return {

@@ -81,7 +81,8 @@ Legend: `[x]` verified at this HEAD · `[!]` verified FAILING · `[ ]` not verif
 
 - [x] Offline embedding backend sanity — `hash`, 512-dim
 - [x] Extraction benchmark in **MOCK** mode — CI `backend` job step; mock extraction verified live this stage (colour/style/material/confidence returned, draft created unverified) — `stage1-evidence/t-1.4b/02-journey-protocol-harness.log`
-- [ ] Extraction benchmark in **REAL** mode ≥80 % on 50 images — **blocked (B-5 / BL-3)**, needs client credential C-1
+- [x] Extraction benchmark in **REAL** mode ≥80 % on 50 images — **82.2 % PASS** (2026-09-02, `gemini-3.5-flash-lite`, prompt `p5`, 50/50 model-analysed, `docs/reports/extraction_report.json`); caveats recorded in `docs/ai/evaluation-report.md` §3.2–3.3 (rank-1 style 60 %, ECE 0.37, CI ±6 pts). B-5 / BL-3 closed.
+- [x] Human-review gate validated against real provider output — confidence rule flagged 0/50; `ambiguous_style` structural flag added and replayed: 0 unflagged style misses (`scripts/audit_review_gate.py`, `tests/test_review_gate_replay.py`, 2026-09-07)
 - [ ] Real CLIP embeddings generated and seeded — blocked (BL-4)
 - [ ] Seller links 200 OK — **blocked (BL-5)**, sandbox egress is blocked; local run returned 0/100 for that reason, not because the links are bad
 - [x] Dataset provenance disclosed
@@ -116,10 +117,14 @@ Legend: `[x]` verified at this HEAD · `[!]` verified FAILING · `[ ]` not verif
 | C. Build & deps | 9 | 0 | 0 |
 | D. Tests | 4 | 0 | 4 |
 | E. Security | 9 | 0 | 3 |
-| F. Data & AI | 4 | 0 | 5 |
+| F. Data & AI | 6 | 0 | 4 |
 | G. Performance | 1 | 0 | 2 |
 | H. Release mechanics | 4 | 0 | 3 |
-| **Total** | **44** | **0** | **20** |
+| **Total** | **46** | **0** | **19** |
+
+> 2026-09-07: section F re-tallied after the REAL extraction benchmark and the
+> review-gate replay landed (+2 verified, −1 blocked; the gate-validation line is
+> new). Other sections are as counted at the Stage 1 HEAD.
 
 Baseline (`f97bfad`) was 28 verified / **7 failing** / 21 not verified.
 **All 7 failing items are resolved**; verified items rose 28 → 44.

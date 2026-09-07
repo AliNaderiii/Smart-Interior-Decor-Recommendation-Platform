@@ -116,7 +116,14 @@ admin human-in-the-loop review flags it.
 
 Benchmark: `backend/tests/benchmark_50_images.json` (50 items with ground truth) +
 `backend/scripts/evaluate_extraction.py`. Score = style hit (0.5) + material
-precision (0.5); acceptance ≥ 80 %.
+precision (0.5); acceptance ≥ 80 %. Measured 2026-09-02 with
+`gemini-3.5-flash-lite` / prompt `p5`: **82.2 % PASS**, rank-1 style 60 %,
+material P/R 0.85/0.94 (`docs/reports/extraction_report.json`;
+`docs/ai/evaluation-report.md` §3.2–3.3). Because the provider's confidence
+proved uninformative on that run (0.95 on 48/50), the review gate also flags
+`ambiguous_style` — a multi-style answer confined to the confusable cluster
+`modern/scandinavian/minimal` — replayed to 0 unflagged style misses
+(`scripts/audit_review_gate.py`).
 
 ## ADR-007 — Auth
 
