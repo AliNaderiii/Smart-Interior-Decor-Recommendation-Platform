@@ -22,6 +22,32 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Added — room photo → pre-filled style quiz (ADR-015, 2026-09-07)
+
+- **`POST /api/v1/quiz/analyze-room`** — one photo of the user's living room
+  → a quiz-shaped `suggestion` (styles, materials, colour palette, pattern)
+  plus a server-decided `confidence_tier`. Same upload hardening as admin
+  uploads, analysed in memory, never stored;
+  `ROOM_ANALYSIS_RATE_LIMIT_PER_MINUTE` (10).
+- **`app/services/room_analysis.py`** — pixels first: `accent_colors`
+  (hue-binned saturated accent pieces that share-weighted median-cut
+  swallows) + `extract_palette`; then the configured vision provider with a
+  dedicated **room prompt** (`ROOM_PROMPT`, `ROOM_PROMPT_VERSION = "r1"`,
+  stamped separately from the product benchmark prompt). Tiers:
+  `confident` / `suggested` / `palette_only` — a heuristic (mock) provider
+  can never pre-select a style. Room dimensions are explicitly *not*
+  estimated (`meta.dimensions_estimated: false`).
+- **`FeatureExtractor.extract_bytes(data, prompt_kind=…)`** — additive
+  in-memory entry point sharing stamping, fallback and review gate with
+  `extract(image_url)`; Gemini/OpenAI/Mock providers gained `extract_bytes`.
+- **Quiz page** — `RoomPhotoPrefill` card at the top of step 1: photo →
+  `quizStore.applySuggestion` (clamped to the store's limits, replace not
+  merge) → every step stays editable; copy follows the tier, demo badge
+  instead of a confidence figure when the provider is heuristic. Step-1 hint
+  is now localised (was English-only in the Persian UI).
+- Tests: `backend/tests/test_room_analysis.py` (27),
+  `frontend/tests/unit/roomPhotoPrefill.test.tsx` (8).
+
 ### Added — behavioural event capture, honestly scoped (ADR-014, 2026-09-06)
 
 - **`feedback_events` table** (migration `0006`) — the append-only stream

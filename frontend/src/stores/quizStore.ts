@@ -11,7 +11,24 @@ interface QuizState extends QuizAnswers {
   setDimensions: (w: number, l: number) => void;
   setBudget: (min: number, max: number) => void;
   setClientMeta: (projectId: string | null, clientName: string) => void;
+  /** ADR-015: replace styles/colours/materials/patterns with an AI suggestion
+   *  (clamped to the same per-field limits the toggles enforce). Dimensions
+   *  and budget are untouched — a photo cannot estimate them honestly. */
+  applySuggestion: (s: QuizSuggestion) => void;
   reset: () => void;
+}
+
+export interface QuizSuggestion {
+  styles: string[];
+  color_palette: string[];
+  materials: string[];
+  patterns: string[];
+}
+
+export const SUGGESTION_LIMITS = { styles: 3, color_palette: 5, materials: 6, patterns: 3 } as const;
+
+function clampUnique(list: string[], max: number): string[] {
+  return Array.from(new Set(list)).slice(0, max);
 }
 
 const initial: QuizAnswers & { step: number } = {
@@ -43,5 +60,12 @@ export const useQuizStore = create<QuizState>()((set) => ({
   setDimensions: (room_width_cm, room_length_cm) => set({ room_width_cm, room_length_cm }),
   setBudget: (budget_min_toman, budget_max_toman) => set({ budget_min_toman, budget_max_toman }),
   setClientMeta: (project_id, client_name) => set({ project_id, client_name }),
+  applySuggestion: (sg) =>
+    set({
+      styles: clampUnique(sg.styles, SUGGESTION_LIMITS.styles),
+      color_palette: clampUnique(sg.color_palette.map((c) => c.toUpperCase()), SUGGESTION_LIMITS.color_palette),
+      materials: clampUnique(sg.materials, SUGGESTION_LIMITS.materials),
+      patterns: clampUnique(sg.patterns, SUGGESTION_LIMITS.patterns),
+    }),
   reset: () => set(initial),
 }));

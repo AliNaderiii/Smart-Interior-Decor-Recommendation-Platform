@@ -19,6 +19,7 @@ import { useCommands } from "@/components/CommandPalette";
 import { spring } from "@/lib/motion";
 import clsx from "clsx";
 import { OptimizedImage } from "@/components/OptimizedImage";
+import { RoomPhotoPrefill } from "@/components/RoomPhotoPrefill";
 
 type ColorPalette = { id: string; label_fa: string; colors: string[]; mood: string };
 type BudgetRange = { id: string; label_fa: string; min: number; max: number; color: string };
@@ -132,10 +133,10 @@ export default function QuizPage() {
       <Card className="mt-6 p-6">
         {step === 0 && (
           <div>
-            <p className="mb-5 text-sm text-[var(--color-muted)]">
-              Pick the rooms you are drawn to. We infer your style from what you choose —
-              you never have to name it.
-            </p>
+            {/* ADR-015: photo-first entry. Optional; the grid below stays the
+                manual path and reflects whatever the photo pre-selected. */}
+            <RoomPhotoPrefill />
+            <p className="mb-5 text-sm text-[var(--color-muted)]">{t.quiz.stylesHint}</p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {STYLES.map((s) => {
                 const active = quiz.styles.includes(s.id);

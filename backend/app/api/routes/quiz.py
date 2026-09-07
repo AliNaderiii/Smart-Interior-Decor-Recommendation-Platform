@@ -1,20 +1,24 @@
 """Quiz CRUD + POST /recommend."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ai.embedding_service import get_embedding, quiz_to_text
 from app.api.deps import get_current_user
+from app.core.config import settings
 from app.core.datasets import recommendation_limit
 from app.core.rate_limit import enforce_rate_limit
+from app.core.uploads import validate_image_upload
 from app.db.session import get_db
+from app.models import audit_log as actions
 from app.models.project import Project
 from app.models.quiz import StyleQuiz
 from app.models.user import User
 from app.schemas.common import ok
 from app.schemas.quiz import QuizIn
+from app.services import audit, room_analysis
 from app.services.recommender import recommend
 
 router = APIRouter(tags=["quiz"])
@@ -49,6 +53,42 @@ def _quiz_dict(q: StyleQuiz) -> dict:
         "room_length_cm": q.room_length_cm,
         "quiz_embedding": list(q.quiz_embedding) if q.quiz_embedding is not None else None,
     }
+
+
+@router.post("/quiz/analyze-room")
+def analyze_room_photo(
+    request: Request,
+    file: UploadFile = File(...),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Turn one room photo into a pre-filled (never submitted) quiz — ADR-015.
+
+    Same upload hardening as admin product uploads; analysed in memory; no
+    storage write, no database row. Returns ``suggestion`` (quiz-shaped
+    fields), a ``confidence_tier`` the UI uses to decide how much to
+    pre-select, and honest ``meta`` (provider, heuristic flag, and the fact
+    that room dimensions are *not* estimated from a photo).
+    """
+    enforce_rate_limit(
+        f"room-analysis:{user.id}", limit=settings.ROOM_ANALYSIS_RATE_LIMIT_PER_MINUTE
+    )
+    try:
+        image = validate_image_upload(file)
+    except HTTPException as exc:
+        audit.record(
+            db, actions.ACTION_UPLOAD_REJECTED, user_id=user.id,
+            detail=f"room-analysis status={exc.status_code} reason={str(exc.detail)[:120]}",
+            request=request,
+        )
+        raise
+    result = room_analysis.analyse_room(
+        image.data, image_hint=image.original_filename or f"room{image.extension}"
+    )
+    result["meta"]["query_image"] = {
+        "width": image.width, "height": image.height, "content_type": image.content_type,
+    }
+    return ok(result)
 
 
 @router.post("/quiz", status_code=status.HTTP_201_CREATED)

@@ -167,6 +167,35 @@ export const en: Dict = {
     fewerLike: (title: string) => `Fewer like ${title}`,
   },
 
+  roomPhoto: {
+    title: "Show us your room — we'll do the rest",
+    subtitle:
+      "Upload one photo of your current living room. We detect its style, materials and dominant colours and pre-fill the quiz. Everything stays editable.",
+    cta: "Choose a room photo",
+    analyzing: "Analysing photo…",
+    skip: "Continue without a photo",
+    privacy: "The photo is processed in memory and never stored.",
+    tierConfident: "High-confidence read — options were pre-selected for you.",
+    tierSuggested: "Uncertain read — we pre-selected our best guess; please review.",
+    tierPaletteOnly:
+      "No vision model is active in this environment; only the photo's dominant colours were added. Pick style and materials yourself.",
+    detected: "What we saw",
+    styles: "Style",
+    materials: "Materials",
+    colors: "Dominant colours",
+    noneDetected: "—",
+    confidence: (pct: string) => `${pct}% confidence`,
+    heuristicBadge: "Demo mode (no vision model)",
+    dimensionsNote: "Room dimensions are not estimated from a photo — enter them in step 3.",
+    applied: "Quiz pre-filled from your room photo. Every step stays editable.",
+    retry: "Another photo",
+    errorTitle: "Could not analyse the photo",
+    tooLarge: "The photo is larger than 8 MB.",
+    notImage: "That file is not an image.",
+    rateLimited: "Too many analyses; try again in a minute.",
+    previewAlt: "Selected room photo",
+    prefilledBadge: "Pre-filled from photo",
+  },
   visualSearch: {
     title: "Visual search",
     subtitle:
