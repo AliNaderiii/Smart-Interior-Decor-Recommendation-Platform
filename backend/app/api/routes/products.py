@@ -35,15 +35,25 @@ from app.core.storage import get_storage
 from app.core.uploads import validate_image_upload
 from app.db.session import get_db
 from app.models import audit_log as actions
+from app.models.base import utcnow
 from app.models.product import Product
 from app.models.user import User
 from app.schemas.common import ok
-from app.schemas.product import ProductIn, ProductUpdate
+from app.schemas.product import ALLOWED_CATEGORIES, ProductIn, ProductUpdate
 from app.schemas.sanitize import strip_html
 from app.services import audit
+from app.services import catalog_integrity as integrity
 from app.services.link_checker import check_product_link
 
 router = APIRouter(prefix="/products", tags=["products"])
+
+
+def _integrity_error(decision: dict) -> str:
+    """409 body: machine-readable codes first, operator text after."""
+    from ai.catalog_integrity import describe
+
+    codes = ",".join(decision["reasons"])
+    return f"catalog integrity failed [{codes}]: " + "; ".join(describe(decision["reasons"]))
 
 
 def _reembed(product: Product) -> None:
@@ -101,9 +111,11 @@ def create_product(
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
-    product = Product(**body.model_dump(), is_verified=False)
+    product = Product(**body.model_dump(), is_verified=False, source="manual")
     _reembed(product)
     db.add(product)
+    db.flush()  # id assigned -> duplicate-image lookup can exclude self
+    integrity.refresh(product, db)
     db.commit()
     if product.seller_link:
         background.add_task(check_product_link, product.id)
@@ -162,12 +174,18 @@ def upload_product_image(
     description = _clean_ai_text(
         extraction.get("description_for_embedding"), limit=2000
     )
+    # ADR-016: the draft's category comes from what the model SAW, not from a
+    # hard-coded "sofa". Anything outside the taxonomy ("other"/None) falls back
+    # to sofa exactly as before, but the row keeps ``detected_category`` in
+    # ``extraction_raw`` so the integrity gate can flag a later mismatch.
+    detected = extraction.get("detected_category")
+    category = detected if detected in ALLOWED_CATEGORIES else "sofa"
     product = Product(
         title=_clean_ai_text(
             extraction.get("description_for_embedding"), limit=200,
             fallback="New product",
         ),
-        category="sofa",
+        category=category,
         price_toman=1,
         image_url=url,
         colors=extraction["colors"],
@@ -178,9 +196,13 @@ def upload_product_image(
         extraction_confidence=extraction["confidence"],
         extraction_raw=extraction,
         is_verified=False,
+        source="manual",
+        image_phash=image.phash,
     )
     _reembed(product)
     db.add(product)
+    db.flush()
+    integrity.refresh(product, db)
     db.commit()
     audit.record(
         db, actions.ACTION_PRODUCT_UPLOAD, user_id=admin.id,
@@ -212,6 +234,18 @@ def update_product(
         setattr(product, key, value)
     if {"title", "styles", "colors", "materials", "description", "patterns"} & changes.keys():
         _reembed(product)
+    if "price_toman" in changes:
+        # An admin who edits the price has just looked at it.
+        product.price_checked_at = utcnow()
+    decision = integrity.refresh(product, db)
+    if changes.get("is_verified") is True and not decision["ok"]:
+        # Same contract as POST /{id}/verify: verification is refused for a
+        # row that fails the truth tier. PATCH has no force switch on purpose.
+        db.rollback()
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            _integrity_error(decision),
+        )
     db.commit()
     if "seller_link" in changes and product.seller_link:
         background.add_task(check_product_link, product.id)
@@ -234,19 +268,44 @@ def delete_product(product_id: str, db: Session = Depends(get_db), _: User = Dep
 def verify_product(
     product_id: str,
     request: Request,
+    force: bool = Query(False, description="ADR-016: verify despite failing integrity checks (audited)"),
     db: Session = Depends(get_db),
     admin: User = Depends(require_admin),
 ):
-    """Human-in-the-loop: mark AI-extracted features as verified."""
+    """Human-in-the-loop: mark AI-extracted features as verified.
+
+    ADR-016: verification is refused (409) while the row fails the
+    catalog-integrity gate — the reasons are returned so the reviewer can fix
+    the row. ``?force=true`` overrides for a legitimate outlier; the override is
+    audited and stays visible on the row as ``admin_override``.
+    """
     product = db.get(Product, product_id)
     if product is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found")
+    decision = integrity.evaluate(product, db=db)
+    if not decision["ok"] and not force:
+        integrity.stamp(product, decision)
+        db.commit()
+        raise HTTPException(status.HTTP_409_CONFLICT, _integrity_error(decision))
+    if not decision["ok"]:
+        integrity.force_override(product, decision)
+    else:
+        integrity.stamp(product, decision)
     product.is_verified = True
     db.commit()
     # A09: verification is the gate that makes a product recommendable, so it
     # is a privileged decision and needs an attributable record.
     audit.record(
         db, actions.ACTION_PRODUCT_VERIFY, user_id=admin.id,
-        detail=f"product={product.id}", request=request,
+        detail=(
+            f"product={product.id}"
+            + (f" FORCED integrity_reasons={','.join(decision['reasons'])}" if not decision["ok"] else "")
+        ),
+        request=request,
     )
-    return ok({"id": product.id, "is_verified": True})
+    return ok({
+        "id": product.id,
+        "is_verified": True,
+        "integrity_ok": product.integrity_ok,
+        "integrity_reasons": product.integrity_reasons,
+    })

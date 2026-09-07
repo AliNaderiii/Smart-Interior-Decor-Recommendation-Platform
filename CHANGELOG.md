@@ -22,6 +22,96 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Added — Catalog-integrity gate: a product must be true before it can be recommended (ADR-016, 2026-09-07)
+
+Root cause fixed: a live probe returned, for *rug*, a card titled «فرش modern»
+with a **sofa photo**, materials `metal, leather` and a marketplace-root seller
+link. The engine was right, the data was wrong, and nothing could see it.
+
+- **`backend/ai/catalog_integrity.py`** (new, `INTEGRITY_POLICY_VERSION
+  2026-09-07.1`) — pure two-tier policy. Truth tier, always blocking:
+  `image_category_mismatch`, `image_unreachable`, `material_implausible`,
+  `dimensions_out_of_band`, `title_fa_invalid`, `seller_link_dead`,
+  `category_unknown`. Sellability tier, blocking only in production:
+  `synthetic_row`, `duplicate_image`, `seller_link_missing`,
+  `seller_link_shallow`, `price_stale` (> 30 d), `price_out_of_band`,
+  `title_fa_missing`. Bilingual reason texts.
+- **Migration `0007_product_integrity`** — `source`, `source_product_id`,
+  `image_phash`, `price_checked_at`, `integrity_ok` (nullable; NULL = legacy,
+  still eligible), `integrity_reasons`, `integrity_checked_at`.
+- **Enforcement** — `POST/PATCH /products` and `/products/upload` stamp the
+  verdict; `POST /products/{id}/verify` (and `PATCH … is_verified`) return
+  **409** with the codes while the truth tier fails, `?force=true` overrides
+  with an audit record and an `admin_override` marker; recommender Stage A
+  (SQLite + pgvector paths) and visual-search candidates add
+  `integrity_ok IS NOT FALSE`; `meta.catalog_quality` per queried category;
+  `GET /admin/stats` gains `integrity_excluded_products` + `catalog_integrity`.
+  `RECOMMENDER_CONFIG_VERSION` → `2026-09-07.1` (weights unchanged; filter
+  semantics changed → cache identity changed).
+- **Extraction prompt `p6`** — adds the scalar `detected_category` (7 categories
+  + `other`); `_sanitize`, mock provider (filename keywords), failed-extraction
+  shape and `review_decision(expected_category=…)` → `category_mismatch`.
+  `POST /products/upload` drafts the row **in the detected category** (was a
+  hard-coded `sofa`) and stores a 64-bit dHash (`image_phash`). Scoring fields
+  unchanged; the p5 REAL artefact (82.2 %) remains the reference.
+  `AI_STACK_VERSION` → `2026-09-07.2`.
+- **Scripts** — `scripts/audit_catalog.py` (CI gate; `--strict`, `--json`,
+  `--check-images`, `--file <catalog.json>`; exit 1 on a failing verified row),
+  `scripts/backfill_integrity.py` (`--unverify-failing`, `--reset-overrides`,
+  `--dry-run`). `seed_products.py` rebuilt: per-category photo pools (curated,
+  HTTP-200-checked), materials ⊆ category-plausible set, real Persian titles,
+  dimension bands, `source="synthetic-demo"`, and a **production refusal**
+  (exit 0, nothing written) unless `--allow-synthetic`.
+  `load_realistic_products.py` stamps `source="synthetic-demo"` and
+  `detected_category`, and reports what strict mode excludes.
+- **Data** — `datasets/products_realistic.json`: the rug that shared the sofa
+  photo, the chair that shared the coffee-table photo and the storage row with
+  a dead (404) photo now have category-correct, live photos; the 150-row
+  expansions regenerated (image URLs only). No photo is shared across
+  categories in any committed catalog.
+- **CI** — new "Catalog integrity" steps audit the three committed catalogs and
+  the seeded test DB (truth tier, blocking) and upload the strict report as an
+  artefact. `docker-compose.yml` `catalog-bootstrap` prints the strict audit
+  after loading.
+- **Frontend** — `ProductCard`: `Demo item` provenance badge for synthetic rows
+  and price-check age for verified rows; `RecommendationsPage`: note when the
+  gate hid products; admin `ProductsPage`: Integrity column with localised
+  reasons and a 409 → confirm → `?force=true` verify flow; `lib/integrity.ts`;
+  fa/en strings; 8 new unit tests.
+- **Tests** — `backend/tests/test_catalog_integrity.py` (61 tests: policy,
+  service, recommender/visual-search exclusion, HTTP verify gate, p6 plumbing,
+  seed scripts, audit CLI). Backend 804 passed / 22 skipped on SQLite
+  (Python 3.12 / 3.13 / 3.14) and 812 passed / 14 skipped on PostgreSQL 16 +
+  pgvector across three consecutive runs on one persistent database; vitest 102.
+- **Docs** — ADR-016 in `docs/ARCHITECTURE.md`; `docs/API.md` (products,
+  recommend meta, admin stats); `docs/DEPLOYMENT.md` upgrade checklist;
+  `docs/ai/model-versions.md`, `docs/ai/evaluation-report.md` (p6 stance);
+  risk register **AI-19**.
+- **Fixed (found by the smoke run)** — `link_checker.check_product_link`
+  raised `StaleDataError` in the background task when the product was deleted
+  while its seller-link HEAD was still in flight; the result is now discarded
+  with an info log. `seed_perf_products.py` writes the new columns
+  (`source='perf'`).
+- **Fixed (found by rehearsing the Render upgrade on a replica)** — migration
+  `0006_feedback_events` is now idempotent: every seed script calls
+  `Base.metadata.create_all`, so a database seeded by newer code *before*
+  `alembic upgrade head` ever ran already owns `feedback_events`, and the first
+  real migration died with `DuplicateTable` — exactly the state of the live
+  demo database (stamped 0005). The migration adopts the existing table and
+  advances the stamp.
+- **Fixed (Windows dev boxes)** — `requirements.lock.txt` pins `uvloop` with
+  `sys_platform != "win32"`; it is a Linux/macOS-only extra of
+  `uvicorn[standard]` with no Windows wheel, so the unmarked pin made the whole
+  locked install fail on Windows (`docs/DEPENDENCIES.md`).
+- **Tightened** — `title_fa_invalid` no longer flags real listings that carry a
+  Latin model name («مبل راحتی مدل Modern»): an English taxonomy word is
+  invalid only when it is not introduced by a model marker
+  (مدل/طرح/سری/کد/برند). The template leak «فرش modern» is still caught.
+- **Test hygiene on a persistent database** — the HTTP-created rows of
+  `test_catalog_integrity.py` and the twin sofas of `test_fit_score.py` are
+  removed/cleared per run; CI PostgreSQL runs pytest more than once per job
+  and the leftovers crowded a narrow budget window past `MAX_RESULTS`.
+
 ### Changed — AI evaluation report aligned with the REAL benchmark; review gate made structural (2026-09-07)
 
 - **`docs/ai/evaluation-report.md`** — §3.2 no longer says BLOCKED: it

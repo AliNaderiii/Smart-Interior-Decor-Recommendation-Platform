@@ -54,12 +54,18 @@ insert into products (id, title, title_fa, description, category, room_type,
                       colors, styles, materials, patterns,
                       width_cm, depth_cm, height_cm,
                       extraction_confidence, extraction_raw, is_verified,
+                      source, integrity_ok, integrity_reasons,
                       style_embedding, created_at, updated_at)
 values (:id, :title, :title, 'perf seed', :category, :room_type,
         :price, 'https://example.com/p.jpg', 'https://example.com', true,
         CAST('["#C1633F"]' AS json), CAST(:styles AS json),
         CAST('["wood"]' AS json), CAST('["solid"]' AS json),
         180, 90, 75, 0.9, CAST('{}' AS json), true,
+        -- ADR-016: load-test rows are provenance "perf"; integrity_ok is left
+        -- TRUE on purpose so the benchmark measures the ranking path with the
+        -- gate's predicate in the WHERE clause (the realistic production shape),
+        -- while the "perf" source still labels them as never-inventory.
+        'perf', true, CAST('[]' AS json),
         CAST(:emb AS vector), now(), now())
 on conflict (id) do nothing
 """)

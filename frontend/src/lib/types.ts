@@ -75,7 +75,34 @@ export interface RecommendedProduct {
   /** +1 / -1 when this user has already rated the product (V2 Phase 3). */
   feedback?: number;
   is_verified?: boolean;
+  /** ADR-016 provenance: "manual" | "synthetic-demo" | "perf" | "feed:<seller>" | "basalam" … */
+  source?: string;
+  /** ADR-016: when the price was last confirmed with the seller (ISO), or null. */
+  price_checked_at?: string | null;
+  /** ADR-016: last verdict of the catalog-integrity gate; null = not yet evaluated. */
+  integrity_ok?: boolean | null;
 }
+
+/** ADR-016 reason codes written by ai/catalog_integrity.py (plus the override marker). */
+export type IntegrityReason =
+  | "image_category_mismatch"
+  | "image_unreachable"
+  | "material_implausible"
+  | "dimensions_out_of_band"
+  | "title_fa_invalid"
+  | "seller_link_dead"
+  | "category_unknown"
+  | "synthetic_row"
+  | "duplicate_image"
+  | "seller_link_missing"
+  | "seller_link_shallow"
+  | "price_stale"
+  | "price_out_of_band"
+  | "title_fa_missing"
+  | "admin_override";
+
+/** Per-category verified counts split by the integrity verdict (ADR-016). */
+export type CatalogQuality = Record<string, { eligible: number; excluded: number }>;
 
 /** ADR-013 — one hit from POST /search/visual. Locked teasers carry only
  *  id/title/category/image_url/similarity. */
@@ -136,7 +163,14 @@ export interface RecommendResult {
   cached: boolean;
   is_pro: boolean;
   /** Version stamps of the config that produced the list (ADR-014 attribution). */
-  meta?: { recommender_version?: string; weights_version?: string; weights_profile?: string };
+  meta?: {
+    recommender_version?: string;
+    weights_version?: string;
+    weights_profile?: string;
+    /** ADR-016: how much of the verified catalog the integrity gate excluded per queried category. */
+    catalog_quality?: CatalogQuality;
+    empty_categories?: string[];
+  };
 }
 
 export interface MoodboardItem {
@@ -187,4 +221,7 @@ export interface AdminProduct extends Omit<RecommendedProduct, "final_score" | "
   room_type: string;
   extraction_confidence: number;
   is_verified: boolean;
+  /** ADR-016 */
+  integrity_reasons?: IntegrityReason[] | string[] | null;
+  integrity_checked_at?: string | null;
 }

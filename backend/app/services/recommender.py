@@ -52,7 +52,7 @@ from pathlib import Path
 from typing import Any
 
 import orjson
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from ai.embedding_service import cosine_similarity, get_embedding, quiz_to_text
@@ -398,6 +398,10 @@ def _stage_a_hard_filter(
             Product.room_type == "living_room",
             Product.category == category,
             Product.is_verified.is_(True),
+            # ADR-016: rows that failed the catalog-integrity gate are never
+            # recommended. NULL (never evaluated) stays eligible so a partially
+            # backfilled catalog degrades to the pre-gate behaviour, not to empty.
+            Product.integrity_ok.isnot(False),
             Product.price_toman >= lo,
             Product.price_toman <= hi,
         )
@@ -474,6 +478,7 @@ def _stage_ab_postgres(
             Product.room_type == "living_room",
             Product.category == category,
             Product.is_verified.is_(True),
+            Product.integrity_ok.isnot(False),  # ADR-016, see _stage_a_hard_filter
             Product.price_toman >= lo,
             Product.price_toman <= hi,
             Product.style_embedding.isnot(None),
@@ -553,6 +558,11 @@ def _product_payload(p: Product) -> dict[str, Any]:
         "image_url": p.image_url,
         "seller_link": p.seller_link,
         "seller_link_ok": p.seller_link_ok,
+        "link_status": p.link_status,
+        # ADR-016 provenance: the SPA renders trust badges from these three.
+        "source": p.source,
+        "price_checked_at": p.price_checked_at.isoformat() if p.price_checked_at else None,
+        "integrity_ok": p.integrity_ok,
         "colors": p.colors,
         "styles": p.styles,
         "materials": p.materials,
@@ -804,6 +814,25 @@ def recommend(
         _release_inflight(cache_key, lock)
 
 
+def _catalog_quality(db: Session, categories: list[str]) -> dict[str, dict[str, int]]:
+    """Per-category verified counts split by integrity verdict (cheap GROUP BY).
+
+    ``eligible`` = verified and not excluded (NULL counts as eligible, see
+    ``_stage_a_hard_filter``); ``excluded`` = verified but ``integrity_ok`` is
+    False. Only categories in the query are reported.
+    """
+    stmt = (
+        select(Product.category, Product.integrity_ok, func.count(Product.id))
+        .where(Product.is_verified.is_(True), Product.category.in_(list(categories)))
+        .group_by(Product.category, Product.integrity_ok)
+    )
+    out: dict[str, dict[str, int]] = {c: {"eligible": 0, "excluded": 0} for c in categories}
+    for category, ok, n in db.execute(stmt).all():
+        bucket = "excluded" if ok is False else "eligible"
+        out.setdefault(category, {"eligible": 0, "excluded": 0})[bucket] += int(n)
+    return out
+
+
 def _compute(
     db: Session,
     quiz: dict[str, Any],
@@ -872,5 +901,9 @@ def _compute(
             "empty_categories": empty_categories,
             "budget_min_toman": lo,
             "budget_max_toman": hi,
+            # ADR-016: how much of the verified catalog the gate excluded for
+            # the queried categories — the honest denominator behind an empty
+            # or thin category, visible to the SPA and to load tests.
+            "catalog_quality": _catalog_quality(db, categories),
         },
     }

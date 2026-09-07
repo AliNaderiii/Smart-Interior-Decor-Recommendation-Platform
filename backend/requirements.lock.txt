@@ -2,7 +2,9 @@
 # Audited on every CI run against security/pip-audit-allowlist.yml via
 # scripts/audit_dependencies.py; the installed env is proved to match this file
 # by scripts/verify_lock_install.py. Policy: docs/DEPENDENCIES.md (Stage 1, T-1.5).
-# Regenerate after ANY requirements.txt change:
+# Regenerate after ANY requirements.txt change (then re-add the platform marker
+# on uvloop: it is a Linux/macOS-only extra of uvicorn[standard] with no Windows
+# wheel, so an unmarked pin makes the whole install fail on a Windows dev box):
 #   python3 -m venv /tmp/lockvenv && /tmp/lockvenv/bin/pip install -r requirements.txt && /tmp/lockvenv/bin/pip freeze > requirements.lock.txt
 #
 alembic==1.19.1
@@ -66,6 +68,6 @@ typing-inspection==0.4.4
 typing_extensions==4.16.0
 urllib3==2.7.0
 uvicorn==0.52.4
-uvloop==0.22.1
+uvloop==0.22.1; sys_platform != "win32"
 watchfiles==1.2.0
 websockets==17.0.1

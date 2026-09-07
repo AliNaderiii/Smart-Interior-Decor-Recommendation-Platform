@@ -198,6 +198,44 @@ jobs:
         run: |
           python ../docs/security/probes/probe_production_failsafe.py
 
+      # ADR-016: the committed catalogs must pass the truth tier (image ↔
+      # category ↔ material ↔ dimensions ↔ Persian title, no cross-category
+      # photo reuse) BEFORE they can be imported anywhere. The strict tier is
+      # reported for information: these catalogs are samples, so every row
+      # carries synthetic_row/price_stale and the production gate excludes
+      # them by design — a sold deployment imports a real feed instead.
+      - name: Catalog integrity — committed sample catalogs (truth tier, blocking)
+        working-directory: backend
+        run: |
+          python scripts/audit_catalog.py --file ../datasets/products_realistic.json
+          python scripts/audit_catalog.py --file ../datasets/products_realistic_150.json
+          python scripts/audit_catalog.py --file seed_data/products_realistic_150.json
+
+      - name: Catalog integrity — seeded test database (truth tier, blocking)
+        working-directory: backend
+        env:
+          APP_ENV: test
+          AI_PROVIDER: mock
+          EMBEDDING_BACKEND: hash
+        run: |
+          python scripts/audit_catalog.py --json > catalog-integrity.json
+          python scripts/audit_catalog.py --strict --json > catalog-integrity.strict.json || true
+          python - <<'PY'
+          import json
+          r = json.load(open("catalog-integrity.strict.json"))
+          print(f"strict tier (informational): {r['verified_failing']}/{r['rows']} rows would be "
+                f"excluded in production; reasons={r['reason_counts']}")
+          PY
+
+      - name: Upload catalog-integrity reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: catalog-integrity
+          path: |
+            backend/catalog-integrity.json
+            backend/catalog-integrity.strict.json
+
       - name: Extraction benchmark — MOCK mode
         working-directory: backend
         run: |

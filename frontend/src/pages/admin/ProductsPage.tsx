@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { get, patch, post } from "@/lib/api";
+import { ApiError, get, patch, post } from "@/lib/api";
+import { parseIntegrityCodes } from "@/lib/integrity";
 import type { AdminProduct } from "@/lib/types";
 import { CATEGORY_LABELS, STYLES, formatToman } from "@/lib/constants";
 import { Badge, Button, Card, Skeleton } from "@/components/ui";
@@ -17,6 +18,45 @@ interface ProductList {
   total: number;
   page: number;
   page_size: number;
+}
+
+/** Thrown when the reviewer declines the force-verify confirmation. */
+class VerifyRefused extends Error {
+  constructor() {
+    super("verify refused");
+    this.name = "VerifyRefused";
+  }
+}
+
+/** ADR-016 integrity cell: verdict badge + reason list (bilingual via i18n). */
+function IntegrityCell({ p, labels }: { p: AdminProduct; labels: ReturnType<typeof useT>["admin"] }) {
+  const reasons = (p.integrity_reasons ?? []) as string[];
+  const forced = reasons.includes("admin_override");
+  const tone = p.integrity_ok === false ? "warning" : p.integrity_ok === true ? "success" : "neutral";
+  const label =
+    p.integrity_ok === false
+      ? labels.integrityExcluded
+      : p.integrity_ok === true
+        ? forced
+          ? labels.integrityOverride
+          : labels.integrityOk
+        : labels.integrityUnchecked;
+  return (
+    <div className="space-y-1" data-testid="integrity-cell">
+      <Badge tone={tone}>{label}</Badge>
+      {reasons.length > 0 && (
+        <ul className="max-w-[16rem] list-disc space-y-0.5 ps-4 text-[10px] leading-snug text-[var(--color-muted)]">
+          {reasons
+            .filter((c) => c !== "admin_override")
+            .map((c) => (
+              <li key={c} title={c}>
+                {labels.integrityReasons[c] ?? c}
+              </li>
+            ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 /** The subset of a product the reviewer may correct. Kept in one place so the
@@ -189,10 +229,31 @@ export default function AdminProductsPage() {
     return sorted;
   }, [data, sortLowConfidence, sortPrice]);
 
+  /** ADR-016: the API refuses (409) to verify a row that fails the integrity
+   *  gate. The reasons come back in the error string as `[code,code]`; we show
+   *  them and let the reviewer either fix the row or force (audited). */
+  const describeReasons = (codes: string[]) =>
+    codes.map((c) => `• ${t.admin.integrityReasons[c] ?? c}`).join("\n");
+
   const verify = useMutation({
-    mutationFn: (id: string) => post(`/products/${id}/verify`),
+    mutationFn: async (id: string) => {
+      try {
+        return await post(`/products/${id}/verify`);
+      } catch (err) {
+        if (!(err instanceof ApiError) || err.status !== 409) throw err;
+        const codes = parseIntegrityCodes(err.message);
+        const proceed = window.confirm(t.admin.verifyForceConfirm(describeReasons(codes)));
+        if (!proceed) throw new VerifyRefused();
+        const out = await post(`/products/${id}/verify?force=true`);
+        toast.success(t.admin.verifyForced);
+        return out;
+      }
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin-products"] }),
-    onError: () => toast.error("Could not verify that product."),
+    onError: (err) => {
+      if (err instanceof VerifyRefused) toast.error(t.admin.verifyRefused);
+      else toast.error("Could not verify that product.");
+    },
   });
 
   /** Bulk verify: fire all PATCHes, then report how many actually landed. */
@@ -507,6 +568,7 @@ export default function AdminProductsPage() {
                   </button>
                 </th>
                 <th className="px-4 py-3">Status / Seller Link</th>
+                <th className="px-4 py-3">{t.admin.integrityColumn}</th>
                 <th className="px-4 py-3">Actions</th>
               </tr>
             </thead>
@@ -636,6 +698,9 @@ export default function AdminProductsPage() {
                           </div>
                         )}
                       </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <IntegrityCell p={p} labels={t.admin} />
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1.5">

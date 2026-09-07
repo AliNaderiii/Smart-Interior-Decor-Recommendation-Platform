@@ -68,6 +68,10 @@ _REASONS = {
         "every predicted style is from one confusable cluster "
         "(modern/scandinavian/minimal) — the model is hedging; confirm the style"
     ),
+    "category_mismatch": (
+        "the model saw a different product category than the row declares "
+        "(ADR-016) — check the image before trusting any extracted feature"
+    ),
 }
 
 
@@ -79,12 +83,17 @@ def ambiguous_style(styles: Any) -> bool:
     return len(chosen) >= 2 and any(chosen <= cluster for cluster in AMBIGUOUS_STYLE_CLUSTERS)
 
 
-def review_decision(extraction: dict[str, Any]) -> dict[str, Any]:
+def review_decision(
+    extraction: dict[str, Any], *, expected_category: str | None = None
+) -> dict[str, Any]:
     """Return ``{"needs_review": bool, "review_reasons": [codes], "state": ...}``.
 
     Pure function over the extraction payload (the same dict that is stored in
     ``products.extraction_raw``), so stored rows can be re-audited if the
-    thresholds ever change.
+    thresholds ever change. ``expected_category`` (ADR-016) is the category the
+    row *claims*; when the p6 ``detected_category`` is a known category and
+    disagrees, ``category_mismatch`` is added. It defaults to ``None`` so the
+    50-image benchmark replay (no row, no claim) is unaffected.
     """
     reasons: list[str] = []
     conf = float(extraction.get("confidence", 0.0) or 0.0)
@@ -102,6 +111,14 @@ def review_decision(extraction: dict[str, Any]) -> dict[str, Any]:
         reasons.append("missing_material")
     if ambiguous_style(extraction.get("style")):
         reasons.append("ambiguous_style")
+    detected = extraction.get("detected_category")
+    if (
+        expected_category
+        and isinstance(detected, str)
+        and detected not in ("", "other")
+        and detected != expected_category
+    ):
+        reasons.append("category_mismatch")
 
     state = "auto_accept" if not reasons else "human_review"
     return {

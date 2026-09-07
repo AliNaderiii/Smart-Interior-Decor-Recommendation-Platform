@@ -23,7 +23,7 @@ Auth: `Authorization: Bearer <access_token>` (HS256, 15 min; refresh 7 days).
 | POST | `/quiz` | validated quiz (styles⊆taxonomy, budget_max>min) → saved with embedding |
 | GET | `/quiz`, `/quiz/{id}` | own quizzes |
 | POST | `/quiz/analyze-room` | ADR-015: multipart `file` (JPEG/PNG/WebP ≤ 8 MB); any signed-in user, 10/min; analysed in memory, never stored. Returns `suggestion{styles, materials, color_palette, patterns}` (directly submittable to `POST /quiz`), `labels` (fa/en), `confidence_tier: "confident"\|"suggested"\|"palette_only"`, `confidence`, `palette[]`, `review_reasons[]`, `meta{provider, model, prompt_version (r1), taxonomy_version, heuristic, dimensions_estimated: false, unknown_taxonomy_values, query_image}` — a heuristic (mock) provider always yields `palette_only` |
-| POST | `/recommend` | body = inline quiz **or** `?quiz_id=`; 3-stage engine; Redis-cached 1 h; free users get rank-1 full + ranks 2-5 as locked teasers; each product carries `final_score` + `explanation{style_match,color_match,budget_fit,material_match,pattern_match,fit_match,fit_reason,matched_materials,summary}` — `fit_reason` is a stable code (`fit_unknown\|fit_neutral\|fit_ok\|fit_tight\|fit_too_big\|fit_too_small\|fit_too_tall`, ADR-012) |
+| POST | `/recommend` | body = inline quiz **or** `?quiz_id=`; 3-stage engine; Redis-cached 1 h; free users get rank-1 full + ranks 2-5 as locked teasers; each product carries `final_score` + `explanation{style_match,color_match,budget_fit,material_match,pattern_match,fit_match,fit_reason,matched_materials,summary}` — `fit_reason` is a stable code (`fit_unknown\|fit_neutral\|fit_ok\|fit_tight\|fit_too_big\|fit_too_small\|fit_too_tall`, ADR-012); ADR-016: only rows with `integrity_ok IS NOT FALSE` are candidates; `meta.catalog_quality{<category>: {eligible, excluded}}` reports what the gate hid; each product carries `source`, `integrity_ok`, `price_checked_at` |
 
 ## Visual search (ADR-013)
 | POST | `/search/visual` | multipart `file` (JPEG/PNG/WebP ≤ 8 MB) + optional `?category=<taxonomy id>&limit=1..24`; any signed-in user, 10/min; photo processed in memory, never stored. Returns `items[]` (product payload + `similarity`, `palette_match`, `clip_similarity` in clip mode; free users: top hit per category full, rest `locked` teasers), `is_pro`, and `meta{mode: "clip"\|"palette", palette[], category, candidates, embedding_backend, query_image}` |
@@ -37,12 +37,19 @@ Auth: `Authorization: Bearer <access_token>` (HS256, 15 min; refresh 7 days).
 | GET/PATCH/DELETE | `/moodboards/{id}` | GET embeds referenced product payloads |
 
 ## Products (admin only)
-| GET | `/products?category=&is_verified=&page=` | paginated |
-| POST | `/products` | create; embedding recomputed; seller link checked in background |
-| POST | `/products/upload` | multipart image → storage → AI extraction → unverified draft + extraction preview |
-| PATCH | `/products/{id}` | edit features (re-embeds when semantic fields change) |
-| POST | `/products/{id}/verify` | human-in-the-loop approval |
+| GET | `/products?category=&is_verified=&page=` | paginated; each row carries ADR-016 fields `source`, `integrity_ok`, `integrity_reasons`, `integrity_checked_at`, `price_checked_at` |
+| POST | `/products` | create; embedding recomputed; integrity evaluated and stamped; seller link checked in background |
+| POST | `/products/upload` | multipart image → storage → AI extraction (p6, incl. `detected_category`) → unverified draft **in the detected category** + extraction preview; `image_phash` stored |
+| PATCH | `/products/{id}` | edit features (re-embeds when semantic fields change; re-evaluates integrity; `price_toman` edits refresh `price_checked_at`). `{"is_verified": true}` answers **409** when the row fails the integrity gate |
+| POST | `/products/{id}/verify?force=` | human-in-the-loop approval. **409** `catalog integrity failed [code,…]: …` while the truth tier fails; `force=true` verifies anyway, is audited (`product_verify … FORCED`) and stamps `admin_override`. Response: `{id, is_verified, integrity_ok, integrity_reasons}` |
 | DELETE | `/products/{id}` | |
+
+Reason codes (ADR-016, `ai/catalog_integrity.py`): truth tier —
+`image_category_mismatch`, `image_unreachable`, `material_implausible`,
+`dimensions_out_of_band`, `title_fa_invalid`, `seller_link_dead`,
+`category_unknown`; sellability tier (blocking only when `APP_ENV=production`) —
+`synthetic_row`, `duplicate_image`, `seller_link_missing`,
+`seller_link_shallow`, `price_stale`, `price_out_of_band`, `title_fa_missing`.
 
 ## Designer (B2B2C)
 | GET/POST | `/projects` | designer's client projects |
@@ -56,7 +63,7 @@ Auth: `Authorization: Bearer <access_token>` (HS256, 15 min; refresh 7 days).
 | POST | `/payment/verify` | `{authority, status}` → verifies with PSP, activates Pro 30 days |
 
 ## Admin
-| GET | `/admin/users`, `/admin/subscriptions`, `/admin/stats`, `/admin/taxonomy` |
+| GET | `/admin/users`, `/admin/subscriptions`, `/admin/stats`, `/admin/taxonomy` | `/admin/stats` adds ADR-016 `integrity_excluded_products` and `catalog_integrity{policy_version, strict, by_category{eligible, excluded, unchecked}, reason_counts}` |
 | PATCH | `/admin/users/{id}` | toggle active / change role |
 
 ## Health, readiness and metrics

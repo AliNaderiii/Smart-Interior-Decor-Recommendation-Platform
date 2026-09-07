@@ -348,6 +348,90 @@ key the card pre-selects style and materials too; the next measurement is a
 small room-photo benchmark (A5), because the product-photo accuracy (82.2 %)
 does not transfer automatically to whole rooms.
 
+## ADR-016 — Catalog-integrity gate: a product must be true before it can be recommended
+
+**Context.** A probe of the live demo on 2026-09-07 returned, for the *rug*
+category, a card titled «فرش modern» whose image was a living-room sofa,
+whose materials were `metal, leather`, and whose seller link was
+`https://www.digikala.com/`. The ranking engine was correct — the *data*
+was wrong, and nothing in the pipeline could notice. Three root causes:
+`seed_products.py` chose photos by row index (`PHOTO_IDS[i % 20]`)
+independent of category and sampled materials from the *style*; the
+extractor was never asked what object the picture shows; and
+`is_verified` was the only gate, with no rule about what a verified row
+must satisfy. For a product that is sold, a wrong recommendation is a
+defect, not a demo artefact — so correctness became a first-class,
+enforced property of every catalog row.
+
+**Decision.** A pure policy module `ai/catalog_integrity.py`
+(`INTEGRITY_POLICY_VERSION`) evaluates a row and returns reason codes in two
+tiers:
+
+* **Truth tier — always blocking** (`ALWAYS_BLOCKING`): `image_category_mismatch`
+  (the p6 `detected_category` disagrees with the row), `image_unreachable`,
+  `material_implausible` (per-category "cannot be" sets — a rug is never
+  metal), `dimensions_out_of_band`, `title_fa_invalid` (no Persian letters, or
+  an English taxonomy token not introduced by a model marker — «فرش modern» is
+  a template leak, «مبل راحتی مدل Modern» is a real listing), `seller_link_dead`,
+  `category_unknown`. A row failing this tier is *wrong*, in any environment.
+* **Sellability tier — blocking only in production** (`PRODUCTION_BLOCKING`,
+  `strict = settings.is_production`): `synthetic_row` (source
+  `synthetic-demo`/`perf`, including the curated realistic sample),
+  `duplicate_image`, `seller_link_missing`, `seller_link_shallow` (root,
+  category or search page), `price_stale` (never confirmed or > 30 days),
+  `price_out_of_band`, `title_fa_missing`. These rows are *not inventory*;
+  dev, CI and preview deployments may still recommend them (labelled), a
+  sold deployment may not.
+
+Enforcement points, all reading the same verdict persisted on the row
+(`integrity_ok`, `integrity_reasons`, `integrity_checked_at`; migration
+`0007`, plus provenance `source`, `source_product_id`, `image_phash`,
+`price_checked_at`):
+
+1. **Writes evaluate.** `POST /products`, `POST /products/upload`,
+   `PATCH /products/{id}` and both seed/import scripts stamp the verdict.
+2. **Verification refuses.** `POST /products/{id}/verify` (and `PATCH … is_verified`)
+   answer **409** with the codes while the truth tier fails; `?force=true`
+   overrides, is written to the audit log (`product_verify … FORCED`) and
+   leaves an `admin_override` marker on the row.
+3. **Runtime excludes.** Stage A of the recommender and the visual-search
+   candidate query add `integrity_ok IS NOT FALSE`. `NULL` (legacy rows before
+   `scripts/backfill_integrity.py` has run) stays eligible so a deploy never
+   goes dark; only an explicit `False` excludes. `meta.catalog_quality`
+   reports eligible/excluded per queried category so a thin result is
+   explainable, and `RECOMMENDER_CONFIG_VERSION` was bumped because the
+   filter semantics changed.
+4. **CI gates the data.** `scripts/audit_catalog.py` (exit 1 on any verified
+   row failing the enforced tier) runs on the committed sample catalogs and
+   on the seeded test database; `--strict` reports what production would
+   exclude; `--check-images` HEADs every image on an egress-enabled machine.
+5. **Synthetic data is refused in production.** `seed_products.py` exits 0
+   without writing when `APP_ENV=production` unless `--allow-synthetic`
+   (start commands must not crash-loop); even then the gate excludes the rows.
+
+The vision prompt moved to **`p6`**: one added scalar, `detected_category`
+(seven categories + `other`), plumbed through `_sanitize`, the mock provider
+(filename keywords), `extraction_raw` and `review_decision(expected_category=…)`
+(`category_mismatch`). The scoring fields are unchanged, so the p5 REAL
+benchmark remains the accuracy reference until a p6 run is recorded.
+`POST /products/upload` now drafts the row in the detected category instead
+of a hard-coded `sofa`, and stores a 64-bit dHash (`image_phash`) so two
+uploads of the same photo are caught regardless of storage key.
+
+**Consequences.** The seed catalogs were rebuilt to be category-consistent
+(per-category photo pools, plausible materials, real Persian nouns, dimension
+bands) and the curated sample lost its two cross-category photo reuses and
+one dead photo; both pass the truth tier in CI. Under `APP_ENV=production`
+the sample catalogs are *excluded by design* — a sold deployment must import a
+real seller feed (the P4-ب importer — a follow-up, not part of this ADR), and until then the API serves
+an honest empty catalog rather than a plausible-looking wrong one. The SPA
+shows provenance on the card (`Demo item` badge for synthetic rows, price
+check age for verified rows), the admin table gains an Integrity column with
+the reasons in the reviewer's language, and `GET /admin/stats` exposes the
+counts. Costs: one extra `GROUP BY` per uncached `/recommend` (sub-ms at the
+current catalog size), one 409 round-trip in the review flow, and the p6
+benchmark run still owed.
+
 ## Data model (ERD)
 
 ```

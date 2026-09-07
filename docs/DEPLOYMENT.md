@@ -101,6 +101,52 @@ docker compose exec backend alembic revision --autogenerate -m "…"
 
 The default Docker seed now loads `backend/seed_data/products_realistic_150.json`. It is realistic **sample structure**, not a live inventory feed.
 
+> **ADR-016 (catalog-integrity gate).** Under `APP_ENV=production` every row of
+> the sample catalogs is stamped `source=synthetic-demo` and **excluded from
+> recommendations** (`integrity_ok=false`, reason `synthetic_row`). A production
+> deployment therefore serves an honest empty catalog until a real seller feed
+> is imported; `seed_products.py` refuses to run there at all (exit 0, nothing
+> written) unless `--allow-synthetic`. Do not "fix" this by relabelling rows —
+> import real inventory.
+>
+> **Upgrade checklist for an existing database:**
+> ```bash
+> alembic upgrade head                                   # 0007: provenance + integrity columns (NULL = not yet evaluated)
+> python scripts/backfill_integrity.py                   # stamp a verdict on every row (idempotent)
+> python scripts/audit_catalog.py --strict               # exit 1 lists what production excludes and why
+> python scripts/backfill_integrity.py --unverify-failing   # optional: push failing rows into the admin review queue
+> ```
+> Until the backfill has run, legacy rows (`integrity_ok IS NULL`) remain
+> eligible so the deploy never goes dark. Re-run the backfill whenever
+> `INTEGRITY_POLICY_VERSION` changes. `audit_catalog.py --check-images` also
+> HEADs every image URL — run it from a machine with egress before a data
+> release.
+>
+> **Expect the legacy synthetic catalog to be excluded wholesale.** Rows written
+> by `seed_products.py` before ADR-016 carry template titles («فرش modern») and
+> category-blind materials; the backfill marks all of them `title_fa_invalid`
+> and/or `material_implausible`, and `/recommend` comes back empty with
+> `meta.catalog_quality` explaining why. That is the gate working — replace the
+> rows, do not relax the gate. For a **demo/preview** database (`APP_ENV` is
+> `development` or `test`) do it once with the corrected sample catalog:
+> ```bash
+> python scripts/load_realistic_products.py --realistic --expand-to 150 --clear --seed-demo-accounts
+> python scripts/backfill_integrity.py
+> ```
+> `--clear` deletes every product; `feedback_events`, `product_feedback` and
+> project items cascade with it (moodboard JSON keeps dangling ids). Fine for a
+> demo, never for a customer database — there, import the real feed.
+>
+> **PaaS without a shell (Render free tier and similar):** the only hook is the
+> start command, so put the upgrade in it and keep it idempotent:
+> ```
+> sh -c "alembic upgrade head && python scripts/load_realistic_products.py --realistic --if-empty --seed-demo-accounts && python scripts/backfill_integrity.py && uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2 --no-server-header --proxy-headers"
+> ```
+> Every step is a no-op on the second boot. Migration `0006` tolerates a
+> `feedback_events` table that `create_all` made before Alembic ever ran (the
+> state of a database that was only ever seeded), so the first real
+> `alembic upgrade head` on such a database succeeds instead of crash-looping.
+
 1. Validate the client's export against `datasets/products_realistic.json` and replace the committed/imported catalog through a controlled data release.
 2. Set `AI_PROVIDER=gemini` (or `openai`) and provide its key. Keep `EMBEDDING_BACKEND=hash` until CLIP vectors are generated on a networked machine:
    ```bash
@@ -149,6 +195,7 @@ cd backend && python -m pytest tests/test_csp_alignment.py -q
    ```bash
    python backend/scripts/load_realistic_products.py --realistic --expand-to 150 --clear --from-json
    python scripts/check_links.py
+   python backend/scripts/audit_catalog.py --strict --check-images   # ADR-016: must be clean for a catalog you intend to sell from
    ```
 
 Without keys, the supported offline path remains mock AI + hash embeddings + local storage + mock payment/email. See `.env.example`, `.env.example.v2`, and `docs/CLIENT_DATASETS_REQUEST.md`.

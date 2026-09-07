@@ -25,7 +25,11 @@ Versioning rules
   ``p4`` = synonym translation map + allow the 1-2 style hedge after p3's
   real sample showed models still emitting off-list style words,
   ``p5`` = up-to-3 style hedge, co-dominance wording for materials, and
-  explicit JSON-array typing after the p4 full run ended at 79.2%).
+  explicit JSON-array typing after the p4 full run ended at 79.2%,
+  ``p6`` = adds ``detected_category`` (ADR-016) so an image that shows a
+  different category than the row claims is caught by the integrity gate;
+  the scoring fields are unchanged, so the p5 benchmark artefact remains the
+  reference until a p6 REAL run is recorded).
 * Taxonomy: ``TAXONOMY_VERSION`` is read from ``seed_data/style_taxonomy.json``
   (additive change → minor bump; removing/renaming a stable ID → major bump and
   a migration note).
@@ -38,10 +42,10 @@ from __future__ import annotations
 from app.core.config import settings
 
 #: Coarse version of the AI stack as deployed by this branch.
-AI_STACK_VERSION = "2026-09-07.1"
+AI_STACK_VERSION = "2026-09-07.2"
 
 #: Version of the extraction prompt template in ``ai.feature_extractor``.
-EXTRACTION_PROMPT_VERSION = "p5"
+EXTRACTION_PROMPT_VERSION = "p6"
 
 #: Version of the *room-photo* prompt (ADR-015, ``ai.feature_extractor.ROOM_PROMPT``).
 #: Separate from the product prompt so the 50-image product benchmark stamp
@@ -51,7 +55,10 @@ ROOM_PROMPT_VERSION = "r1"
 #: Version of the recommender configuration (weights + knobs) in
 #: ``ai/recommender_config.json``. 2026-08-26.1 = Stage 1 (T-1.2): switchable,
 #: validated weight profiles ("current" baseline + normalised "client-ad").
-RECOMMENDER_CONFIG_VERSION = "2026-09-06.1"
+#: 2026-09-07.1 = ADR-016: Stage A additionally requires
+#: ``integrity_ok IS NOT FALSE`` (weights unchanged; bumped because the filter
+#: semantics — and therefore the cache identity — changed).
+RECOMMENDER_CONFIG_VERSION = "2026-09-07.1"
 
 #: Embedding model identity. ``clip-ViT-B/32`` via sentence-transformers
 #: produces 512-d unit vectors; the deterministic hash backend mimics the

@@ -12,6 +12,7 @@ import uuid
 
 import pytest
 
+from ai.model_registry import RECOMMENDER_CONFIG_VERSION
 from app.models.product import Product
 from app.services import recommender as rec
 from app.services.recommender import (
@@ -184,6 +185,13 @@ class TestFitInsideTheEngine:
         # Identical taste signals; the only difference is the footprint. A
         # narrow budget window isolates the pair from the seeded catalog so
         # both survive the MAX_RESULTS cut and can be compared directly.
+        # On a persistent database (CI PostgreSQL runs pytest more than once
+        # per job) twins from earlier runs would crowd this window and push
+        # the pair past MAX_RESULTS, so clear them first.
+        from sqlalchemy import delete
+
+        db.execute(delete(Product).where(Product.title.like("Studio Sofa %")))
+        db.commit()
         band = dict(budget_min_toman=123_000_000, budget_max_toman=124_000_000)
         fits = _product("Studio Sofa Compact", width=170, depth=85, price=123_400_000)
         huge = _product("Studio Sofa Grand", width=240, depth=180, price=123_600_000)
@@ -212,5 +220,5 @@ class TestFitInsideTheEngine:
 
     def test_meta_reports_the_bumped_config_and_fit_weight(self, db):
         res = recommend(db, _quiz(), use_cache=False)
-        assert res["meta"]["weights_version"] == "2026-09-06.1"
+        assert res["meta"]["weights_version"] == RECOMMENDER_CONFIG_VERSION
         assert res["meta"]["weights"]["fit"] == WEIGHTS["fit"]

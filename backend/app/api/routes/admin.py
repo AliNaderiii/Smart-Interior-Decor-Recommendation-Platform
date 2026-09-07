@@ -24,7 +24,7 @@ from app.models.product import MATERIALS, STYLES, Product
 from app.models.subscription import Subscription
 from app.models.user import User
 from app.schemas.common import ok
-from app.services import audit
+from app.services import audit, catalog_integrity
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -138,4 +138,12 @@ def stats(db: Session = Depends(get_db), _: User = Depends(require_admin)):
         "active_subscriptions": db.scalar(
             select(func.count(Subscription.id)).where(Subscription.is_active.is_(True))
         ),
+        # ADR-016: verified rows the integrity gate currently excludes, and
+        # the policy/mode that produced the verdicts.
+        "integrity_excluded_products": db.scalar(
+            select(func.count(Product.id)).where(
+                Product.is_verified.is_(True), Product.integrity_ok.is_(False)
+            )
+        ),
+        "catalog_integrity": catalog_integrity.summary(db),
     })

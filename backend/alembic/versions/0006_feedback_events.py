@@ -25,6 +25,16 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Idempotent on purpose. Every seed script calls ``Base.metadata.create_all``
+    # so a database that was seeded by newer code *before* this migration ran
+    # already owns ``feedback_events`` (the model defines the same columns and
+    # indexes). Without this guard the very first ``alembic upgrade head`` on
+    # such a database — e.g. a PaaS whose only hook is the start command —
+    # dies with ``DuplicateTable`` and the deploy crash-loops. Adopting the
+    # table is exactly what a hand-written ``CREATE TABLE IF NOT EXISTS`` would
+    # do; the version stamp still advances to 0006.
+    if sa.inspect(op.get_bind()).has_table("feedback_events"):
+        return
     op.create_table(
         "feedback_events",
         sa.Column("id", sa.String(32), primary_key=True),

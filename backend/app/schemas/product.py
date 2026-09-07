@@ -182,5 +182,11 @@ class ProductOut(BaseModel):
     description: str
     extraction_confidence: float
     is_verified: bool
+    # ADR-016 provenance / integrity (read-only; never accepted on write)
+    source: str = "manual"
+    price_checked_at: datetime | None = None
+    integrity_ok: bool | None = None
+    integrity_reasons: list[str] | None = None
+    integrity_checked_at: datetime | None = None
 
     model_config = {"from_attributes": True}

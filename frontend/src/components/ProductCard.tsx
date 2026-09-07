@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import type { RecommendedProduct } from "@/lib/types";
 import { useLocale, useT } from "@/i18n";
 import { safeUrl } from "@/lib/safeUrl";
+import { daysSince } from "@/lib/integrity";
 import { track } from "@/lib/events";
 import { MotionCard } from "@/components/ui";
 import { OptimizedImage } from "@/components/OptimizedImage";
@@ -192,6 +193,51 @@ function FeedbackButtons({
   );
 }
 
+/** ADR-016 provenance badge: a sample-catalog row says so on its face. In a
+ *  production deployment these rows never reach the card (the integrity gate
+ *  excludes `source=synthetic-demo`), so the badge is only ever seen on
+ *  dev/CI/preview catalogs — and there it is the honest label. */
+function ProvenanceBadge({ source }: { source?: string }) {
+  const t = useT();
+  if (source !== "synthetic-demo" && source !== "perf") return null;
+  return (
+    <span
+      data-testid="badge-demo-item"
+      className="rounded-full bg-[var(--color-ink)]/80 px-2 py-0.5 text-[10px] font-semibold text-[var(--color-surface)]"
+      title={t.recommendations.demoItemHint}
+    >
+      {t.recommendations.demoItem}
+    </span>
+  );
+}
+
+/** ADR-016 price freshness: how old the last seller price check is. Only
+ *  rendered for verified rows (a draft's price is already labelled estimated). */
+function PriceFreshness({ checkedAt, verified }: { checkedAt?: string | null; verified?: boolean }) {
+  const t = useT();
+  if (!verified) return null;
+  if (!checkedAt) {
+    return (
+      <span className="text-[10px] text-[var(--color-muted)]" title={t.recommendations.priceUnchecked}>
+        {t.recommendations.priceUnchecked}
+      </span>
+    );
+  }
+  return <PriceAge checkedAt={checkedAt} />;
+}
+
+function PriceAge({ checkedAt }: { checkedAt: string }) {
+  const t = useT();
+  // Clock read once per mount (lazy initialiser), not during render.
+  const [now] = useState(() => Date.now());
+  const days = daysSince(checkedAt, now);
+  return (
+    <span className="text-[10px] text-[var(--color-muted)]" data-testid="price-freshness">
+      {t.recommendations.priceChecked(days)}
+    </span>
+  );
+}
+
 /** Verification-honest price badge — RESEARCH_V2 §10 (Made.com).
  *  Never present an AI-extracted price as fact. Colour is paired with a text
  *  label so the signal survives colour-blindness and greyscale. */
@@ -357,6 +403,7 @@ function ProductCardInner({ product, rank, onAdd, added, feedback, onFeedback }:
         </span>
         <div className="absolute right-2 top-2 flex flex-col items-end gap-1">
           <PriceBadge verified={product.is_verified} />
+          <ProvenanceBadge source={product.source} />
           <FitBadge reason={product.explanation?.fit_reason} />
         </div>
       </div>
@@ -368,6 +415,7 @@ function ProductCardInner({ product, rank, onAdd, added, feedback, onFeedback }:
         <p className="text-base font-semibold tabular-nums text-[var(--color-ink)]">
           {money(product.price_toman)}
         </p>
+        <PriceFreshness checkedAt={product.price_checked_at} verified={product.is_verified} />
 
         {/* Colour swatches as chips, never a text list (Wayfair/Baymard). */}
         {product.colors.length > 0 && (

@@ -31,10 +31,11 @@ and never submits it; a heuristic provider can only ever add colours.
 > 2026-08-21 ([`docs/RELEASE_BASELINE.md`](docs/RELEASE_BASELINE.md)) and
 > re-audited at the Stage-1 HEAD on 2026-08-26
 > ([`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)).
-> Re-verified on 2026-09-06 in a clean sandbox (Python 3.13, Node 22.20)
-> after the Phase A work (ADR-012/013/014/015): backend
-> **743 passed / 22 skipped (765 collected)**, frontend **94 unit tests across
-> 15 files**, strict build, lint (0 errors) and test typecheck clean, and the
+> Re-verified on 2026-09-07 in a clean sandbox (Python 3.13, Node 22.20)
+> after the Phase A work (ADR-012/013/014/015) and the catalog-integrity gate
+> (ADR-016): backend
+> **804 passed / 22 skipped (826 collected)**, frontend **102 unit tests across
+> 16 files**, strict build, lint (0 errors) and test typecheck clean, and the
 > **blocking Playwright projects green locally (21/21)** with the UI locale
 > pinned to `en` by `tests/e2e/locale.ts`.
 > Verified in CI on `main` at `5e189ae` (run
@@ -84,6 +85,16 @@ real-embedding artefact and fails loudly if it is absent.
 (`backend/scripts/seed_products.py`, which generates 100 synthetic products, is
 the separate no-Docker path documented under *Local development*.)
 
+**Catalog-integrity gate (ADR-016).** Every product row carries a provenance
+`source` and an `integrity_ok` verdict from `backend/ai/catalog_integrity.py`
+(image ↔ category ↔ material ↔ dimensions ↔ Persian title ↔ seller link). Rows
+that fail are never recommended, an admin cannot verify them without an
+audited `?force=true`, and CI audits the committed catalogs
+(`scripts/audit_catalog.py`). Both demo catalogs are `source=synthetic-demo`:
+under `APP_ENV=production` they are **excluded by design** and
+`seed_products.py` refuses to write them — a sold deployment imports real
+inventory (see `docs/DEPLOYMENT.md` → V3).
+
 ### Demo accounts — development only
 
 | Role | Email | Password |
@@ -116,7 +127,7 @@ the separate no-Docker path documented under *Local development*.)
 
 Postgres parity was demonstrated on **2026-08-19 at commit `a847ad5`**, when the
 suite contained 45 tests (`docs/reports/postgres_parity.md`). The suite has since
-grown to **765 collected** (743 passed / 22 skipped, re-measured at HEAD on
+grown to **826 collected** (804 passed / 22 skipped, re-measured at HEAD on
 2026-09-07) and that Postgres run has **not** been repeated locally — the
 baseline audit environment has no Docker or PostgreSQL binary. Treat Postgres
 parity as *previously evidenced, currently unverified at HEAD*; re-run it before
@@ -170,7 +181,7 @@ policy.
 ```bash
 cd backend
 pip install -r requirements.lock.txt      # the lockfile is the contract, not requirements.txt
-pytest                                    # 743 passed, 22 skipped / 765 collected (SQLite + fakeredis + mock AI)
+pytest                                    # 804 passed, 22 skipped / 826 collected (SQLite + fakeredis + mock AI)
 ruff check app ai scripts tests           # 0 errors
 
 python scripts/verify_lock_install.py     # installed env == requirements.lock.txt
@@ -251,7 +262,7 @@ npx lighthouse http://localhost:4173/ --view   # >=80 target (npm run preview fi
 
 | Suite | Tests |
 |---|---:|
-| `backend/tests/` (full suite) | **765 collected** — 743 passed, 22 skipped |
+| `backend/tests/` (full suite) | **826 collected** — 804 passed, 22 skipped |
 | ↳ `test_recommender.py` | 30 (spec floor: ≥28) |
 | ↳ `test_security_v2.py` | 26 |
 | ↳ `test_feedback_v2.py` | 16 |
@@ -281,7 +292,7 @@ backend/
     services/        recommender (3-stage) · payment · link_checker · emailer
     models/ db/      SQLAlchemy 2.0 models · pgvector column type
   alembic/           migrations (pgvector extension + HNSW index)
-  scripts/           seed_products.py · load_realistic_products.py · evaluate_extraction.py
+  scripts/           seed_products.py · load_realistic_products.py · audit_catalog.py · backfill_integrity.py · evaluate_extraction.py
                      seed_perf_products.py · dev_postgres.py
   tests/             708 collected — test_recommender.py (30) · test_security_v2.py (26)
                      test_feedback_v2.py (16) · test_auth.py (13) · test_projects_quota.py (14)
