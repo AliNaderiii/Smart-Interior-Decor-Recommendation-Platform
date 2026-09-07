@@ -12,6 +12,7 @@ re-embedding strategy required when any of it changes.
 | Extraction provider | `mock` \| `gemini` \| `openai` | `settings.AI_PROVIDER` | config; stamped into every extraction result |
 | Extraction model | e.g. `gemini-2.5-flash-lite` | `settings.GEMINI_MODEL` / `settings.OPENAI_MODEL` | config; stamped into every extraction result |
 | Extraction prompt | `p2` | `ai/feature_extractor.py::EXTRACTION_PROMPT` | bump `EXTRACTION_PROMPT_VERSION`; re-run the 50-image benchmark |
+| Room-photo prompt (ADR-015) | `r1` | `ai/feature_extractor.py::ROOM_PROMPT` | bump `ROOM_PROMPT_VERSION`; independent of the product prompt so the 50-image product benchmark stamp is undisturbed |
 | Taxonomy | `2.1` | `seed_data/style_taxonomy.json::taxonomy_version` | additive → minor bump; removing/renaming a stable ID → major bump + migration note |
 | Embedding model | `clip-ViT-B/32` (512-d, unit-norm) | `ai/model_registry.py` + `ai/embedding_service.py` | **full catalog re-embedding** (§3) |
 | Embedding backends | `clip` (semantic, production) / `hash` (deterministic, dev+test only) | `settings.EMBEDDING_BACKEND` | policy below |

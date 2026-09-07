@@ -78,6 +78,8 @@ class Settings(BaseSettings):
     #: ADR-013 visual search: one embedding + one vector query per call, from
     #: any signed-in user (not only admins) — throttled like an upload.
     VISUAL_SEARCH_RATE_LIMIT_PER_MINUTE: int = 10
+    #: ADR-015: room-photo analysis costs one vision inference per call.
+    ROOM_ANALYSIS_RATE_LIMIT_PER_MINUTE: int = 10
     #: ADR-014 behavioural events: batches of up to 100 events per call; a
     #: normal session sends one batch per screen. 60/min per user or session.
     EVENTS_RATE_LIMIT_PER_MINUTE: int = 60

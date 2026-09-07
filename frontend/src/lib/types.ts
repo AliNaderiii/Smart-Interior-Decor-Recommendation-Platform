@@ -79,6 +79,29 @@ export interface RecommendedProduct {
 
 /** ADR-013 — one hit from POST /search/visual. Locked teasers carry only
  *  id/title/category/image_url/similarity. */
+/** ADR-015 — POST /quiz/analyze-room response. */
+export type RoomConfidenceTier = "confident" | "suggested" | "palette_only";
+
+export interface RoomAnalysisResult {
+  suggestion: { styles: string[]; materials: string[]; color_palette: string[]; patterns: string[] };
+  labels: { styles: { id: string; fa: string; en: string }[]; materials: { id: string; fa: string; en: string }[] };
+  confidence_tier: RoomConfidenceTier;
+  confidence: number;
+  palette: string[];
+  description: string;
+  review_reasons: string[];
+  meta: {
+    provider: string;
+    model: string | null;
+    prompt_version: string | null;
+    taxonomy_version: string;
+    heuristic: boolean;
+    dimensions_estimated: boolean;
+    unknown_taxonomy_values: string[];
+    query_image?: { width: number; height: number; content_type: string };
+  };
+}
+
 export interface VisualSearchItem
   extends Partial<Omit<RecommendedProduct, "id" | "title" | "category" | "image_url">> {
   id: string;

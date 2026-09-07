@@ -59,7 +59,7 @@ import httpx
 
 from ai import taxonomy as tax
 from ai.extraction_review import FALLBACK_CONFIDENCE_CAP, review_decision
-from ai.model_registry import EXTRACTION_PROMPT_VERSION
+from ai.model_registry import EXTRACTION_PROMPT_VERSION, ROOM_PROMPT_VERSION
 from app.core.config import ai_provider_problems, settings
 from app.core.url_safety import UnsafeUrl, validate_public_url
 
@@ -137,6 +137,40 @@ EXTRACTION_PROMPT = (
     '"confidence": honest 0.0-1.0 (0.5 = guessing).'
 )
 
+ROOM_PROMPT = (
+    # r1 (2026-09-07, ADR-015): a *room* photo, not a product shot. The
+    # product prompt asks "what is this piece made of"; a room needs "what
+    # style is this space, which material families are already present, and
+    # is there anything in it at all". Same JSON contract and taxonomy so the
+    # sanitiser, review gate and version stamps apply unchanged.
+    "Analyze this photo of a living room interior. Return ONLY valid JSON, no "
+    "markdown, no prose. Every field is a JSON ARRAY except confidence and "
+    'is_empty_room: {"colors": ["#HEX"], "style": ["...", "..."], '
+    '"material": ["..."], "patterns": ["..."], '
+    '"description_for_embedding": "...", "confidence": 0.0-1.0, '
+    '"is_empty_room": true/false}. '
+    "Rules: "
+    f'"style": the room\'s overall decorating style, up to 3 entries from '
+    f"{json.dumps(ALLOWED_STYLES)}, best match first. NEVER output a word "
+    "outside that list — translate FIRST: minimalist->minimal, "
+    "scandi/nordic->scandinavian, contemporary/mid-century->modern, "
+    "traditional->classic, rustic/eclectic/coastal->boho, loft/urban->industrial. "
+    f'"material": material families clearly VISIBLE on the existing furniture '
+    f"and finishes, from {json.dumps(ALLOWED_MATERIALS)}, most prominent first, "
+    "never more than 3; an empty room has []. "
+    f'"patterns": exactly ONE entry as an array, from {json.dumps(ALLOWED_PATTERNS)} '
+    '("solid" when the room is mostly plain). '
+    '"colors": 3-5 dominant hex colors of walls, floor and large pieces. '
+    '"description_for_embedding": one sentence describing the room\'s mood, '
+    "light and existing pieces (max 40 words). "
+    '"is_empty_room": true when there is no furniture. '
+    '"confidence": honest 0.0-1.0 (0.5 = guessing).'
+)
+
+#: Prompt registry — ``extract_bytes(prompt_kind=...)`` picks by name so a new
+#: kind is one entry here, not a new provider method.
+PROMPTS = {"product": EXTRACTION_PROMPT, "room": ROOM_PROMPT}
+
 _json_re = re.compile(r"\{.*\}", re.DOTALL)
 _hex_re = re.compile(r"#[0-9A-Fa-f]{6}")
 
@@ -210,6 +244,17 @@ class BaseProvider(ABC):
     @abstractmethod
     def extract(self, image_url: str) -> dict[str, Any]: ...
 
+    def extract_bytes(
+        self, data: bytes, mime: str, *, prompt: str = EXTRACTION_PROMPT, hint: str = ""
+    ) -> dict[str, Any]:
+        """Analyse in-memory image bytes (ADR-015 room photos).
+
+        Default: not supported — concrete providers override. Kept non-abstract
+        so third-party/test providers that only implement ``extract`` keep
+        working unchanged.
+        """
+        raise NotImplementedError(f"{self.name} provider cannot analyse raw bytes")
+
 
 def _fetch_image_bytes(url: str, timeout: float = 30.0) -> tuple[bytes, str]:
     """Read image bytes for the vision model.
@@ -264,6 +309,11 @@ class GeminiProvider(BaseProvider):
 
     def extract(self, image_url: str) -> dict[str, Any]:
         data, mime = _fetch_image_bytes(image_url)
+        return self.extract_bytes(data, mime)
+
+    def extract_bytes(
+        self, data: bytes, mime: str, *, prompt: str = EXTRACTION_PROMPT, hint: str = ""
+    ) -> dict[str, Any]:
         b64 = base64.b64encode(data).decode()
         url = (
             "https://generativelanguage.googleapis.com/v1beta/models/"
@@ -272,7 +322,7 @@ class GeminiProvider(BaseProvider):
         payload = {
             "contents": [{
                 "parts": [
-                    {"text": EXTRACTION_PROMPT},
+                    {"text": prompt},
                     {"inline_data": {"mime_type": mime, "data": b64}},
                 ]
             }],
@@ -336,6 +386,14 @@ class OpenAIProvider(BaseProvider):
         else:
             data, mime = _fetch_image_bytes(image_url)
             img_url = f"data:{mime};base64,{base64.b64encode(data).decode()}"
+        return self._call(img_url, EXTRACTION_PROMPT)
+
+    def extract_bytes(
+        self, data: bytes, mime: str, *, prompt: str = EXTRACTION_PROMPT, hint: str = ""
+    ) -> dict[str, Any]:
+        return self._call(f"data:{mime};base64,{base64.b64encode(data).decode()}", prompt)
+
+    def _call(self, img_url: str, prompt: str) -> dict[str, Any]:
         base = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1").rstrip("/")
         payload = {
             "model": settings.OPENAI_MODEL,
@@ -343,7 +401,7 @@ class OpenAIProvider(BaseProvider):
             "messages": [{
                 "role": "user",
                 "content": [
-                    {"type": "text", "text": EXTRACTION_PROMPT},
+                    {"type": "text", "text": prompt},
                     {"type": "image_url", "image_url": {"url": img_url}},
                 ],
             }],
@@ -414,6 +472,12 @@ class MockProvider(BaseProvider):
         "green": "#4C6444", "blue": "#3B5B7A", "beige": "#D9CBB3",
         "brown": "#6D4C33", "terracotta": "#C1633F", "cream": "#F2E8D5",
     }
+
+    def extract_bytes(
+        self, data: bytes, mime: str, *, prompt: str = EXTRACTION_PROMPT, hint: str = ""
+    ) -> dict[str, Any]:
+        # The mock never looks at pixels; the filename hint is the only signal.
+        return self.extract(hint or "room.jpg")
 
     def extract(self, image_url: str) -> dict[str, Any]:
         low = image_url.lower()
@@ -531,25 +595,56 @@ class FeatureExtractor:
         try:
             result = self.provider.extract(image_url)
         except Exception as exc:
-            logger.error(
-                "extraction failed via %s: %s", type(self.provider).__name__, exc
-            )
-            if settings.is_production:
-                result = _empty_failed_extraction(image_url, exc)
-            else:
-                result = _labelled_fallback(
-                    MockProvider().extract(image_url), error=exc
-                )
+            result = self._on_failure(image_url, exc)
         else:
-            if self._fallback_problem is not None:
-                result = _labelled_fallback(result, config_problem=self._fallback_problem)
-            else:
-                result.setdefault("provider", self.provider.name)
-                result.setdefault("model", _provider_model(self.provider.name))
-            result.setdefault("prompt_version", EXTRACTION_PROMPT_VERSION)
-            result.setdefault("taxonomy_version", tax.taxonomy_version())
-            result.setdefault("image_url", image_url)
+            result = self._stamp(result, image_url)
+        return self._gate(result, image_url)
 
+    def extract_bytes(
+        self,
+        data: bytes,
+        *,
+        mime: str = "image/jpeg",
+        image_hint: str = "upload.jpg",
+        prompt_kind: str = "product",
+    ) -> dict[str, Any]:
+        """Same contract as :meth:`extract`, for in-memory bytes (ADR-015).
+
+        ``prompt_kind`` selects from :data:`PROMPTS`; ``image_hint`` is the
+        original filename — stamped as ``image_url`` and the only signal the
+        keyword mock has. Nothing is written to disk or storage.
+        """
+        prompt = PROMPTS[prompt_kind]
+        try:
+            result = self.provider.extract_bytes(data, mime, prompt=prompt, hint=image_hint)
+        except Exception as exc:
+            result = self._on_failure(image_hint, exc)
+        else:
+            result = self._stamp(result, image_hint)
+        result["prompt_kind"] = prompt_kind
+        if prompt_kind == "room":
+            result["prompt_version"] = ROOM_PROMPT_VERSION
+        return self._gate(result, image_hint)
+
+    def _on_failure(self, image_ref: str, exc: Exception) -> dict[str, Any]:
+        logger.error("extraction failed via %s: %s", type(self.provider).__name__, exc)
+        if settings.is_production:
+            return _empty_failed_extraction(image_ref, exc)
+        return _labelled_fallback(MockProvider().extract(image_ref), error=exc)
+
+    def _stamp(self, result: dict[str, Any], image_ref: str) -> dict[str, Any]:
+        if self._fallback_problem is not None:
+            result = _labelled_fallback(result, config_problem=self._fallback_problem)
+        else:
+            result.setdefault("provider", self.provider.name)
+            result.setdefault("model", _provider_model(self.provider.name))
+        result.setdefault("prompt_version", EXTRACTION_PROMPT_VERSION)
+        result.setdefault("taxonomy_version", tax.taxonomy_version())
+        result.setdefault("image_url", image_ref)
+        return result
+
+    def _gate(self, result: dict[str, Any], image_url: str) -> dict[str, Any]:
+        """Production mock guard + review decision (shared by both entry points)."""
         # Defence in depth (Stage 04 remediation): a mock-derived payload must
         # never leave this method unflagged in production, whatever path got
         # us here. Unreachable by construction; cheap to guarantee.

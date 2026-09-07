@@ -293,6 +293,54 @@ config version that produced each list, so the A/B and offline-evaluation
 steps in the spec's §3 have something to evaluate. Nothing about ranking
 changed. One new setting (`EVENTS_RATE_LIMIT_PER_MINUTE`, 60).
 
+## ADR-015 — Room photo → pre-filled quiz, never a submitted one
+
+**Context.** The five-step quiz is the funnel's biggest leak, and every
+benchmarked competitor opens with *"upload a photo of your room"* (Havenly's
+AI beta, IKEA Kreativ's scene scanner, Wayfair Decorify) rather than a
+questionnaire. The platform already owned every expensive piece: hardened
+image upload (Stage 03), a taxonomy-clamped vision extractor with a review
+gate (ADR-006), and palette extraction (ADR-013). What was missing was the
+glue and — more importantly — an honest contract about what one photo can
+and cannot tell us.
+
+**Decision.** `POST /quiz/analyze-room` (`app/services/room_analysis.py`)
+returns a *suggestion* shaped exactly like `POST /quiz` input plus a
+`confidence_tier`; the client applies it to the quiz store
+(`applySuggestion`) and the user still walks every step and presses submit.
+
+* **Two signal sources, kept separate.** *Pixels*: `accent_colors` (hue-binned
+  saturated pieces — the yellow armchair that share-weighted median-cut
+  swallows into the oak floor) followed by `extract_palette`; deterministic,
+  always available, applied as the quiz palette as-is because a room's real
+  colours are what `color_score` should match. *Vision*: the configured
+  provider with a dedicated **room prompt** (`ROOM_PROMPT`, version `r1`,
+  stamped separately from the product benchmark prompt `p5`) through the
+  same sanitiser and review gate as product extraction.
+* **Tiers decide how much the UI dares to pre-select**, and the *server*
+  decides the tier: `confident` (real provider, ≥ 0.80, no review reasons),
+  `suggested` (real provider, below the bar or with review reasons — shown
+  with a "please review" line), `palette_only` (mock / fallback / provider
+  failure — only the pixel palette is applied; **a heuristic provider can
+  never pre-select a style for a user**, and the card shows a demo badge
+  instead of a confidence figure).
+* **Dimensions are not estimated.** A single uncalibrated photo cannot yield
+  centimetres honestly, and the fit score (ADR-012) would then rank on
+  invented numbers. `meta.dimensions_estimated` is `false` and the UI says
+  so.
+* **Nothing persisted.** Same stance as ADR-013: analysed in memory, no
+  storage write, no row, filename kept out of the audit log; rate-limited
+  like an upload (`ROOM_ANALYSIS_RATE_LIMIT_PER_MINUTE`, 10).
+* `FeatureExtractor.extract_bytes(data, prompt_kind=…)` is the new, additive
+  entry point; `extract(image_url)` and every stamp it produces are
+  unchanged (the 50-image benchmark is not disturbed).
+
+**Consequences.** On the demo (mock provider) the feature is honest and
+still useful — five real colours land in the quiz in ~100 ms. With a real
+key the card pre-selects style and materials too; the next measurement is a
+small room-photo benchmark (A5), because the product-photo accuracy (82.2 %)
+does not transfer automatically to whole rooms.
+
 ## Data model (ERD)
 
 ```

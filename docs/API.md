@@ -22,6 +22,7 @@ Auth: `Authorization: Bearer <access_token>` (HS256, 15 min; refresh 7 days).
 ## Quiz & Recommendations
 | POST | `/quiz` | validated quiz (styles⊆taxonomy, budget_max>min) → saved with embedding |
 | GET | `/quiz`, `/quiz/{id}` | own quizzes |
+| POST | `/quiz/analyze-room` | ADR-015: multipart `file` (JPEG/PNG/WebP ≤ 8 MB); any signed-in user, 10/min; analysed in memory, never stored. Returns `suggestion{styles, materials, color_palette, patterns}` (directly submittable to `POST /quiz`), `labels` (fa/en), `confidence_tier: "confident"\|"suggested"\|"palette_only"`, `confidence`, `palette[]`, `review_reasons[]`, `meta{provider, model, prompt_version (r1), taxonomy_version, heuristic, dimensions_estimated: false, unknown_taxonomy_values, query_image}` — a heuristic (mock) provider always yields `palette_only` |
 | POST | `/recommend` | body = inline quiz **or** `?quiz_id=`; 3-stage engine; Redis-cached 1 h; free users get rank-1 full + ranks 2-5 as locked teasers; each product carries `final_score` + `explanation{style_match,color_match,budget_fit,material_match,pattern_match,fit_match,fit_reason,matched_materials,summary}` — `fit_reason` is a stable code (`fit_unknown\|fit_neutral\|fit_ok\|fit_tight\|fit_too_big\|fit_too_small\|fit_too_tall`, ADR-012) |
 
 ## Visual search (ADR-013)

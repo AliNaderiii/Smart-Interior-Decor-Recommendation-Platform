@@ -43,6 +43,11 @@ AI_STACK_VERSION = "2026-09-06.1"
 #: Version of the extraction prompt template in ``ai.feature_extractor``.
 EXTRACTION_PROMPT_VERSION = "p5"
 
+#: Version of the *room-photo* prompt (ADR-015, ``ai.feature_extractor.ROOM_PROMPT``).
+#: Separate from the product prompt so the 50-image product benchmark stamp
+#: (``p5``) is not disturbed by room-prompt iterations.
+ROOM_PROMPT_VERSION = "r1"
+
 #: Version of the recommender configuration (weights + knobs) in
 #: ``ai/recommender_config.json``. 2026-08-26.1 = Stage 1 (T-1.2): switchable,
 #: validated weight profiles ("current" baseline + normalised "client-ad").

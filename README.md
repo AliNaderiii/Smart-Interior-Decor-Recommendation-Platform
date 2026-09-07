@@ -21,16 +21,20 @@ embedding space, falls back to an honest palette search when the model is not
 loaded, and never stores the photo. **Behavioural events** (ADR-014) are
 captured — impressions as the denominator, position and config version on
 every row — but nothing learns from them yet, and a test keeps it that way
-until the evidence bar in `docs/ai/feedback-events.md` §3 is met.
+until the evidence bar in `docs/ai/feedback-events.md` §3 is met. **Room
+photo → quiz** (ADR-015): one photo of the user's living room pre-fills the
+style quiz — accent and dominant colours from the pixels, style and
+materials from the vision provider with a server-decided confidence tier —
+and never submits it; a heuristic provider can only ever add colours.
 
 > **Release baseline.** The tree was first audited at commit `f97bfad` on
 > 2026-08-21 ([`docs/RELEASE_BASELINE.md`](docs/RELEASE_BASELINE.md)) and
 > re-audited at the Stage-1 HEAD on 2026-08-26
 > ([`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md)).
 > Re-verified on 2026-09-06 in a clean sandbox (Python 3.13, Node 22.20)
-> after the Phase A work (ADR-012/013/014): backend
-> **686 passed / 22 skipped (708 collected)**, frontend **86 unit tests across
-> 14 files**, strict build, lint (0 errors) and test typecheck clean, and the
+> after the Phase A work (ADR-012/013/014/015): backend
+> **713 passed / 22 skipped (735 collected)**, frontend **94 unit tests across
+> 15 files**, strict build, lint (0 errors) and test typecheck clean, and the
 > **blocking Playwright projects green locally (21/21)** with the UI locale
 > pinned to `en` by `tests/e2e/locale.ts`.
 > Verified in CI on `main` at `5e189ae` (run
@@ -109,8 +113,8 @@ the separate no-Docker path documented under *Local development*.)
 
 Postgres parity was demonstrated on **2026-08-19 at commit `a847ad5`**, when the
 suite contained 45 tests (`docs/reports/postgres_parity.md`). The suite has since
-grown to **708 collected** (686 passed / 22 skipped, re-measured at HEAD on
-2026-09-06) and that Postgres run has **not** been repeated locally — the
+grown to **735 collected** (713 passed / 22 skipped, re-measured at HEAD on
+2026-09-07) and that Postgres run has **not** been repeated locally — the
 baseline audit environment has no Docker or PostgreSQL binary. Treat Postgres
 parity as *previously evidenced, currently unverified at HEAD*; re-run it before
 release:
@@ -163,7 +167,7 @@ policy.
 ```bash
 cd backend
 pip install -r requirements.lock.txt      # the lockfile is the contract, not requirements.txt
-pytest                                    # 686 passed, 22 skipped / 708 collected (SQLite + fakeredis + mock AI)
+pytest                                    # 713 passed, 22 skipped / 735 collected (SQLite + fakeredis + mock AI)
 ruff check app ai scripts tests           # 0 errors
 
 python scripts/verify_lock_install.py     # installed env == requirements.lock.txt
@@ -182,7 +186,7 @@ CI `backend` job against Postgres 16 + pgvector.
 cd frontend
 npm ci                                    # not npm install: package-lock.json is the lock of record
 
-npm test                                  # Vitest + Testing Library — 86 tests, 14 files (Node ≥22 required)
+npm test                                  # Vitest + Testing Library — 94 tests, 15 files (Node ≥22 required)
 npm run lint                              # oxlint — 0 errors, 18 warnings (react-hooks/refs advisories)
 npm run build                             # tsc strict + vite — 0 errors
 npx tsc -p tsconfig.tests.json            # type-check the test suites too (tsconfig.app.json covers only src/)
@@ -243,7 +247,7 @@ npx lighthouse http://localhost:4173/ --view   # >=80 target (npm run preview fi
 
 | Suite | Tests |
 |---|---:|
-| `backend/tests/` (full suite) | **708 collected** — 686 passed, 22 skipped |
+| `backend/tests/` (full suite) | **735 collected** — 713 passed, 22 skipped |
 | ↳ `test_recommender.py` | 30 (spec floor: ≥28) |
 | ↳ `test_security_v2.py` | 26 |
 | ↳ `test_feedback_v2.py` | 16 |
@@ -254,9 +258,10 @@ npx lighthouse http://localhost:4173/ --view   # >=80 target (npm run preview fi
 | ↳ `test_fit_score.py` | 26 (dimensional fit, ADR-012) |
 | ↳ `test_visual_search.py` | 21 (visual search, ADR-013) |
 | ↳ `test_feedback_events.py` | 11 (behavioural events, ADR-014) |
+| ↳ `test_room_analysis.py` | 27 (room photo → quiz prefill, ADR-015) |
 | ↳ `test_perf_v2.py` | 10 |
 | ↳ `test_rate_limit.py` | 2 |
-| `frontend/tests/unit/` (Vitest) | **86** across 14 files |
+| `frontend/tests/unit/` (Vitest) | **94** across 15 files |
 | `frontend/tests/e2e/` (Playwright) | **30** across 6 files — CI only |
 
 ## Repository layout
