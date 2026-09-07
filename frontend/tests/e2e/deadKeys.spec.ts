@@ -126,6 +126,8 @@ const SKIP = [
   /upload product image/i, // OS file picker trigger covered by dedicated test
   /drop a photo here/i,    // ADR-013 visual-search dropzone: also an OS file picker trigger (unit-tested)
   /choose photo/i,
+  /choose a room photo/i,  // ADR-015 quiz room-photo card: OS file picker trigger (unit-tested, roomPhotoPrefill.test.tsx)
+  /another photo/i,        // ADR-015 same card after a result: re-opens the picker
   /^all$/i,         // initial default filter tabs
   /^همه/i,          // initial default Persian filter tabs
 ];
