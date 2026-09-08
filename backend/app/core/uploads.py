@@ -79,6 +79,31 @@ class ValidatedImage:
     width: int
     height: int
     original_filename: str
+    #: 64-bit perceptual hash (dHash, 16 hex chars) of the decoded image —
+    #: ADR-016 duplicate-image detection. Empty when hashing failed.
+    phash: str = ""
+
+
+def perceptual_hash(image) -> str:
+    """dHash: 9x8 greyscale, 64 horizontal gradient bits, hex string.
+
+    Robust to re-encoding, resizing and mild colour shifts; two uploads of the
+    same catalogue photo under different storage keys collide, two different
+    sofas do not. Pure Pillow — no extra dependency.
+    """
+    try:
+        from PIL import Image  # lazy, like the rest of this module
+
+        small = image.convert("L").resize((9, 8), Image.Resampling.LANCZOS)
+        px = list(small.getdata())
+        bits = 0
+        for row in range(8):
+            for col in range(8):
+                left, right = px[row * 9 + col], px[row * 9 + col + 1]
+                bits = (bits << 1) | (1 if left > right else 0)
+        return f"{bits:016x}"
+    except Exception:  # pragma: no cover - defensive; hashing is best-effort
+        return ""
 
 
 class UploadRejected(HTTPException):
@@ -181,6 +206,7 @@ def validate_image_upload(upload: UploadFile) -> ValidatedImage:
                 )
             fmt = image.format
             extension, content_type = ALLOWED_IMAGE_FORMATS[fmt]
+            phash = perceptual_hash(image)
             clean = _reencode(image, fmt)
     except UploadRejected:
         raise
@@ -205,6 +231,7 @@ def validate_image_upload(upload: UploadFile) -> ValidatedImage:
         width=width,
         height=height,
         original_filename=(upload.filename or "")[:255],
+        phash=phash,
     )
 
 

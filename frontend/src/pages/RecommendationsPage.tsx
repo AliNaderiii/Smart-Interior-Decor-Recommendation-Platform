@@ -153,6 +153,10 @@ export default function RecommendationsPage() {
   // every card re-rendered whenever any card was added. useCallback keeps the
   // reference stable so only the changed card re-renders.
   const weightsVersion = data?.meta?.weights_version ?? null;
+  const excludedByIntegrity = useMemo(
+    () => Object.values(data?.meta?.catalog_quality ?? {}).reduce((n, q) => n + (q?.excluded ?? 0), 0),
+    [data?.meta?.catalog_quality],
+  );
 
   const addToBoard = useCallback(
     (p: RecommendedProduct) => {
@@ -377,6 +381,13 @@ export default function RecommendationsPage() {
           <p className="mt-1 text-sm text-[var(--color-muted)]">
             {t.recommendations.subtitle}
           </p>
+          {excludedByIntegrity > 0 && (
+            /* ADR-016: say when the gate hid something rather than let a thin
+               category look like a thin catalog. */
+            <p className="mt-1 text-xs text-[var(--color-faint)]" data-testid="catalog-quality-note">
+              {t.recommendations.catalogQualityNote(excludedByIntegrity)}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <LayoutToggle mode={layout} onChange={setLayout} />

@@ -8,15 +8,16 @@ re-embedding strategy required when any of it changes.
 
 | Artefact | Version / value | Where it lives | Changes require |
 |---|---|---|---|
-| AI stack (coarse) | `2026-09-07.1` | `ai/model_registry.py::AI_STACK_VERSION` | bump when any artefact below changes |
+| AI stack (coarse) | `2026-09-07.2` | `ai/model_registry.py::AI_STACK_VERSION` | bump when any artefact below changes |
 | Extraction provider | `mock` \| `gemini` \| `openai` | `settings.AI_PROVIDER` | config; stamped into every extraction result |
 | Extraction model | e.g. `gemini-2.5-flash-lite` | `settings.GEMINI_MODEL` / `settings.OPENAI_MODEL` | config; stamped into every extraction result |
-| Extraction prompt | `p5` | `ai/feature_extractor.py::EXTRACTION_PROMPT` | bump `EXTRACTION_PROMPT_VERSION`; re-run the 50-image benchmark **and** `scripts/audit_review_gate.py` on the new artefact (the `ambiguous_style` cluster was derived from the p5 run) |
+| Extraction prompt | `p6` (adds `detected_category`; scoring fields identical to `p5`, so the p5 REAL artefact remains the accuracy reference until a p6 run is recorded) | `ai/feature_extractor.py::EXTRACTION_PROMPT` | bump `EXTRACTION_PROMPT_VERSION`; re-run the 50-image benchmark **and** `scripts/audit_review_gate.py` on the new artefact (the `ambiguous_style` cluster was derived from the p5 run) |
+| Catalog-integrity policy (ADR-016) | `2026-09-07.1` | `ai/catalog_integrity.py::INTEGRITY_POLICY_VERSION` | bump on any rule/band change; then `scripts/backfill_integrity.py` on every environment and `scripts/audit_catalog.py --strict` before a data release |
 | Room-photo prompt (ADR-015) | `r1` | `ai/feature_extractor.py::ROOM_PROMPT` | bump `ROOM_PROMPT_VERSION`; independent of the product prompt so the 50-image product benchmark stamp is undisturbed |
 | Taxonomy | `2.1` | `seed_data/style_taxonomy.json::taxonomy_version` | additive → minor bump; removing/renaming a stable ID → major bump + migration note |
 | Embedding model | `clip-ViT-B/32` (512-d, unit-norm) | `ai/model_registry.py` + `ai/embedding_service.py` | **full catalog re-embedding** (§3) |
 | Embedding backends | `clip` (semantic, production) / `hash` (deterministic, dev+test only) | `settings.EMBEDDING_BACKEND` | policy below |
-| Recommender config | `2026-09-06.1` | `ai/recommender_config.json::config_version` | re-run acceptance scenarios + harness; update `RECOMMENDER_CONFIG_VERSION` |
+| Recommender config | `2026-09-07.1` (weights unchanged from `2026-09-06.1`; bumped because Stage A now requires `integrity_ok IS NOT FALSE`) | `ai/recommender_config.json::config_version` | re-run acceptance scenarios + harness; update `RECOMMENDER_CONFIG_VERSION` |
 | Review gate | auto-accept ≥ 0.80, fallback cap 0.30, `ambiguous_style` cluster `{modern, scandinavian, minimal}` (2026-09-07) | `ai/extraction_review.py` | stored rows are re-auditable (pure function over the payload); changing the cluster requires a replay against the current REAL artefact with 0 unflagged style misses |
 
 Every extraction result stores provider/model/prompt/taxonomy/needs_review in

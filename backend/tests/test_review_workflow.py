@@ -140,7 +140,11 @@ class TestQuarantineUntilApproval:
         ).json()["data"]
         assert pid not in [item["id"] for item in verified["items"]]
 
-        result = recommender.recommend(db, QUIZ, categories=["sofa"], use_cache=False)
+        # p6 (ADR-016): the draft's category is what the extractor SAW in the
+        # image ("bookshelf" -> storage), no longer a hard-coded "sofa".
+        category = data["product"]["category"]
+        assert category == "storage"
+        result = recommender.recommend(db, QUIZ, categories=[category], use_cache=False)
         ids = {
             p["id"]
             for items in result["categories"].values()
@@ -153,9 +157,10 @@ class TestQuarantineUntilApproval:
     ):
         data = _upload(client, admin_headers, "07-industrial-iron-bookshelf.png")
         pid = data["product"]["id"]
+        category = data["product"]["category"]  # "storage" under p6, see above
 
         before = recommender.recommend(
-            db, QUIZ, categories=["sofa"], use_cache=False
+            db, QUIZ, categories=[category], use_cache=False
         )
         flat_before = {
             p["id"]
@@ -170,7 +175,7 @@ class TestQuarantineUntilApproval:
         assert resp.status_code == 200, resp.text
 
         after = recommender.recommend(
-            db, QUIZ, categories=["sofa"], use_cache=False
+            db, QUIZ, categories=[category], use_cache=False
         )
         flat_after = {
             p["id"]

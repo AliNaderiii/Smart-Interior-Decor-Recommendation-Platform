@@ -90,8 +90,15 @@ services:
     # Deterministic catalog data only; --if-empty keeps it idempotent; no
     # demo-account flag. --from-json fails loudly if the real-embedding
     # artefact is missing (never falls back to hash vectors).
+    #
+    # ADR-016: this loads the curated SAMPLE catalog (source=synthetic-demo).
+    # Under APP_ENV=production the integrity gate marks every one of these
+    # rows integrity_ok=false, so the API serves an honest empty catalog until
+    # a real seller feed is imported. Use this job for staging/preview only;
+    # the audit that follows prints what production would exclude and why.
     command: >
-      sh -c "python scripts/load_realistic_products.py --realistic --expand-to 150 --if-empty --from-json"
+      sh -c "python scripts/load_realistic_products.py --realistic --expand-to 150 --if-empty --from-json &&
+             python scripts/audit_catalog.py --strict || true"
 
   frontend:
     build:

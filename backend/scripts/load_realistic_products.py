@@ -113,8 +113,22 @@ def to_model(row: dict, embeddings: dict[str, list[float]]) -> Product:
         height_cm=int(dimensions["height"]),
         description=description,
         extraction_confidence=1.0,
-        extraction_raw={"dataset_id": row.get("id"), "seller": row.get("seller"), "source": "realistic_dataset_v3"},
+        extraction_raw={
+            "dataset_id": row.get("id"),
+            "seller": row.get("seller"),
+            "source": "realistic_dataset_v3",
+            # The dataset is hand-curated per category, so the picture IS the
+            # declared category (checked visually 2026-09-07); recorded so the
+            # integrity gate's image↔category rule has something to compare.
+            "detected_category": row["category"],
+            **({"dataset_notice": row["dataset_notice"]} if row.get("dataset_notice") else {}),
+        },
         is_verified=True,
+        # ADR-016: curated SAMPLE structure, not a live feed → synthetic tier.
+        # The production integrity gate excludes these rows; a sold deployment
+        # imports a real seller feed instead (P4-ب importer, follow-up).
+        source="synthetic-demo",
+        source_product_id=str(row.get("id") or ""),
         style_embedding=embedding,
     )
 
@@ -150,6 +164,20 @@ def load(*, if_empty: bool = False, clear: bool = False, expand_to: int | None =
             db.flush()
         products = [to_model(row, embeddings) for row in rows]
         db.add_all(products)
+        db.flush()
+        # ADR-016: stamp the integrity verdict at import time (same code path as
+        # the admin routes) so the recommender and /admin/stats agree.
+        from app.services import catalog_integrity as integrity
+
+        index = integrity.image_index(db, products)
+        for product in products:
+            integrity.refresh(product, db, known_images=index, keep_override=False)
+        excluded = sum(1 for p in products if p.integrity_ok is False)
+        if excluded:
+            logger.warning(
+                "catalog integrity (strict=%s) excluded %d/%d imported rows from recommendations",
+                integrity.strict_mode(), excluded, len(products),
+            )
         ensure_default_accounts(db)
         db.commit()
         count = db.scalar(select(func.count(Product.id))) or 0

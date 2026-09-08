@@ -109,6 +109,13 @@ class ProviderConfigurationError(RuntimeError):
 ALLOWED_STYLES = tax.styles()
 ALLOWED_MATERIALS = tax.materials()
 ALLOWED_PATTERNS = tax.patterns()
+#: p6 (ADR-016): the model also names WHAT the picture shows, from the catalog
+#: categories plus "other". The value is not a scoring field of the benchmark
+#: contract; it feeds the catalog-integrity gate (image ↔ category mismatch).
+ALLOWED_CATEGORIES = tax.categories() or [
+    "sofa", "coffee_table", "rug", "lighting", "chair", "storage", "decor",
+]
+DETECTED_CATEGORY_VALUES = [*ALLOWED_CATEGORIES, "other"]
 
 EXTRACTION_PROMPT = (
     # p5 (2026-09-01): full-50 real runs with p4 landed at 79.2%
@@ -119,11 +126,23 @@ EXTRACTION_PROMPT = (
     # human review downstream), tightens "material" to co-dominance, and
     # states JSON types explicitly after a scalar-not-list patterns answer
     # ("geometric") shredded into characters downstream.
+    # p6 (2026-09-07, ADR-016): adds a scalar ``detected_category`` — the one
+    # object the photo is OF. The live catalog audit found rows whose image
+    # showed a different category than the row claimed (a "rug" that was a
+    # sofa photo); nothing in the pipeline could see it because the model was
+    # never asked. Scoring fields (style/material) are unchanged, so the p5
+    # benchmark artefact remains the reference until a p6 REAL run is recorded.
     "Analyze this furniture image. Return ONLY valid JSON, no markdown, no prose. "
-    'Every field is a JSON ARRAY except confidence: {"colors": ["#HEX"], '
+    'Every field is a JSON ARRAY except confidence and detected_category: {"colors": ["#HEX"], '
     '"style": ["...", "..."], "material": ["..."], "patterns": ["..."], '
+    '"detected_category": "...", '
     '"description_for_embedding": "...", "confidence": 0.0-1.0}. '
     "Rules: "
+    f'"detected_category": exactly ONE string from {json.dumps(DETECTED_CATEGORY_VALUES)} — '
+    "the single product the photo is OF (the largest, centred item); a whole room "
+    'with no dominant item is "other"; a wall shelf, sideboard, TV stand or bookcase is '
+    '"storage"; an armchair is "chair"; a floor/table/pendant lamp is "lighting"; '
+    'cushions, curtains, mirrors, vases and wall art are "decor". '
     f'"style": up to 3 entries from {json.dumps(ALLOWED_STYLES)}, best match first. '
     "NEVER output a word outside that list — translate FIRST: minimalist->minimal, "
     "scandi/nordic->scandinavian, contemporary/mid-century->modern, "
@@ -226,11 +245,20 @@ def _sanitize(data: dict[str, Any]) -> dict[str, Any]:
         conf = float(data.get("confidence", 0.5))
     except (TypeError, ValueError):
         conf = 0.0
+    # detected_category is optional (pre-p6 payloads, room prompt): absent or
+    # off-list values become None — never guessed, never forced to "other".
+    raw_cat = data.get("detected_category")
+    if isinstance(raw_cat, list):
+        raw_cat = raw_cat[0] if raw_cat else None
+    detected = str(raw_cat).strip().lower() if isinstance(raw_cat, str) else None
+    if detected not in DETECTED_CATEGORY_VALUES:
+        detected = None
     return {
         "colors": colors[:4],
         "style": styles[:2],
         "material": materials[:3],
         "patterns": patterns[:1],
+        "detected_category": detected,
         "description_for_embedding": str(data.get("description_for_embedding", ""))[:500],
         "confidence": max(0.0, min(1.0, conf)),
         "unknown_taxonomy_values": unknown,
@@ -472,6 +500,30 @@ class MockProvider(BaseProvider):
         "green": "#4C6444", "blue": "#3B5B7A", "beige": "#D9CBB3",
         "brown": "#6D4C33", "terracotta": "#C1633F", "cream": "#F2E8D5",
     }
+    # p6: filename → detected_category (longest keyword wins, so
+    # "coffee-table" beats "table"→other and "armchair" beats "chair").
+    _category_hints = {
+        "sofa": "sofa", "couch": "sofa", "sectional": "sofa", "loveseat": "sofa",
+        "coffee-table": "coffee_table", "coffee_table": "coffee_table",
+        "side-table": "coffee_table", "side_table": "coffee_table",
+        "rug": "rug", "carpet": "rug", "kilim": "rug",
+        "lamp": "lighting", "chandelier": "lighting", "pendant": "lighting",
+        "sconce": "lighting", "lighting": "lighting",
+        "armchair": "chair", "chair": "chair", "stool": "chair",
+        "bookshelf": "storage", "bookcase": "storage", "shelf": "storage",
+        "sideboard": "storage", "tv-stand": "storage", "tv_stand": "storage",
+        "cabinet": "storage", "dresser": "storage", "storage": "storage",
+        "cushion": "decor", "pillow": "decor", "curtain": "decor",
+        "mirror": "decor", "vase": "decor", "wall-art": "decor", "decor": "decor",
+    }
+
+    @classmethod
+    def detect_category(cls, name: str) -> str | None:
+        low = name.lower()
+        hits = [k for k in cls._category_hints if k in low]
+        if not hits:
+            return None
+        return cls._category_hints[max(hits, key=len)]
 
     def extract_bytes(
         self, data: bytes, mime: str, *, prompt: str = EXTRACTION_PROMPT, hint: str = ""
@@ -489,6 +541,7 @@ class MockProvider(BaseProvider):
             "style": styles or ["modern"],
             "material": materials or ["wood"],
             "patterns": ["solid"],
+            "detected_category": self.detect_category(low),
             "description_for_embedding": (
                 f"a {' '.join(styles or ['modern'])} living room piece made of "
                 f"{' and '.join(materials or ['wood'])}"
@@ -504,6 +557,7 @@ def _empty_failed_extraction(image_url: str, error: Exception) -> dict[str, Any]
         "style": [],
         "material": [],
         "patterns": [],
+        "detected_category": None,
         "description_for_embedding": "",
         "confidence": 0.0,
         "unknown_taxonomy_values": [],

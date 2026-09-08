@@ -50,6 +50,25 @@ class Product(Base, UUIDPk, TimestampMixin):
 
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
 
+    # ---- Catalog provenance & integrity (ADR-016, migration 0007) ---------
+    # ``source``: who produced the row — "manual" (admin form/upload),
+    # "synthetic-demo" (seed scripts; never inventory), "perf" (load harness),
+    # or an importer id such as "feed:<seller>" / "basalam". ``source_product_id``
+    # is the seller's own id so re-imports update instead of duplicating.
+    source: Mapped[str] = mapped_column(String(32), default="manual", server_default="manual", nullable=False)
+    source_product_id: Mapped[str | None] = mapped_column(String(128), default=None)
+    # Perceptual hash of the product image (hex, 16 chars for a 64-bit dHash);
+    # the duplicate-image check keys on it when present, on the URL otherwise.
+    image_phash: Mapped[str | None] = mapped_column(String(32), default=None, index=True)
+    # When the price was last confirmed against the seller. None = never.
+    price_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+    # Result of ai.catalog_integrity.integrity_decision at the last evaluation.
+    # NULL = never evaluated (legacy rows) and is treated as eligible by the
+    # recommender until backfill_integrity.py has run; False = excluded.
+    integrity_ok: Mapped[bool | None] = mapped_column(Boolean, default=None, index=True)
+    integrity_reasons: Mapped[list | None] = mapped_column(JSON, default=None)
+    integrity_checked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), default=None)
+
     style_embedding: Mapped[list | None] = mapped_column(vector_type(), nullable=True)
 
     __table_args__ = (

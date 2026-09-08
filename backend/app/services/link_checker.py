@@ -149,6 +149,8 @@ def check_url(url: str, timeout: float = 10.0) -> bool:
 
 def check_product_link(product_id: str) -> None:
     """Background task: validate a product's seller link and persist result."""
+    from sqlalchemy.orm.exc import StaleDataError
+
     from app.db.session import SessionLocal
     from app.models.base import utcnow
     from app.models.product import Product
@@ -161,6 +163,12 @@ def check_product_link(product_id: str) -> None:
             product.seller_link_ok = res.ok
             product.link_status = res.classification
             product.link_checked_at = utcnow()
-            db.commit()
+            try:
+                db.commit()
+            except StaleDataError:
+                # The row was deleted while the HEAD request was in flight
+                # (slow or blocked egress). Nothing to record — not an error.
+                db.rollback()
+                logger.info("link check result discarded: product %s no longer exists", product_id)
     finally:
         db.close()

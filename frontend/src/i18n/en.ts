@@ -161,6 +161,13 @@ export const en: Dict = {
     layoutMasonry: "Masonry",
     verifiedPrice: "Verified price",
     estimatedPrice: "Estimated price",
+    /** ADR-016 trust badges (provenance is shown, never hidden). */
+    demoItem: "Demo item",
+    demoItemHint: "Sample catalog row — not real inventory. It never appears in a production deployment.",
+    priceChecked: (days: number) => (days === 0 ? "Price checked today" : `Price checked ${days} d ago`),
+    priceUnchecked: "Price not yet confirmed with the seller",
+    catalogQualityNote: (excluded: number) =>
+      `${excluded} product${excluded === 1 ? "" : "s"} hidden by the catalog-integrity check (wrong image, implausible data or unsellable listing).`,
     whyMatched: (title: string, pct: number) =>
       `Why we matched ${title}: ${pct} percent overall`,
     moreLike: (title: string) => `More like ${title}`,
@@ -532,6 +539,33 @@ export const en: Dict = {
 
   admin: {
     totalProducts: (n: number) => `${n} products`,
+    /** ADR-016 integrity column + verify refusal. */
+    integrityOk: "integrity ok",
+    integrityExcluded: "excluded",
+    integrityUnchecked: "unchecked",
+    integrityOverride: "admin override",
+    integrityColumn: "Integrity",
+    verifyRefused: "Verification refused: the row fails the catalog-integrity check.",
+    verifyForceConfirm: (reasons: string) =>
+      `This product fails the integrity check:\n\n${reasons}\n\nVerify anyway? The override is audited and stays visible on the row.`,
+    verifyForced: "Verified with an audited override.",
+    integrityReasons: {
+      image_category_mismatch: "the image shows a different category than declared",
+      image_unreachable: "image URL is not reachable",
+      material_implausible: "a listed material is implausible for this category",
+      dimensions_out_of_band: "dimensions are outside the plausible band",
+      title_fa_invalid: "Persian title is not Persian or contains template tokens",
+      seller_link_dead: "seller link is dead or unsafe",
+      category_unknown: "category is not in the taxonomy",
+      synthetic_row: "demo / benchmark row, not inventory",
+      duplicate_image: "another product uses the same image",
+      seller_link_missing: "no seller link",
+      seller_link_shallow: "seller link is a home / category / search page",
+      price_stale: "price never checked or older than 30 days",
+      price_out_of_band: "price is outside the plausible band",
+      title_fa_missing: "no Persian title",
+      admin_override: "verified by an admin despite failing checks (audited)",
+    } as Record<string, string>,
   },
 
   share: {

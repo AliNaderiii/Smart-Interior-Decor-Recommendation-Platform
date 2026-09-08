@@ -35,8 +35,8 @@ results, recommendation payloads and every evidence artifact):
 
 | Artefact | Version |
 |---|---|
-| AI stack | `2026-09-07.1` (was `2026-08-21.1` at first issue; bumped for fit score, weight profiles, room prompt and the `ambiguous_style` gate rule) |
-| Extraction prompt | `p5` (was `p2`; p3 strict vocabulary → p4 synonym map + 1-2 style hedge → p5 up-to-3 hedge, material co-dominance, typed arrays — CHANGELOG) |
+| AI stack | `2026-09-07.2` (was `2026-08-21.1` at first issue; bumped for fit score, weight profiles, room prompt, the `ambiguous_style` gate rule and — `.2` — the p6 `detected_category` field + catalog-integrity gate, ADR-016) |
+| Extraction prompt | `p6` (was `p2`; p3 strict vocabulary → p4 synonym map + 1-2 style hedge → p5 up-to-3 hedge, material co-dominance, typed arrays → p6 adds the scalar `detected_category` for the integrity gate; **the 82.2 % figure below is the p5 REAL run** — p6 changes no scoring field, and a p6 REAL run is a listed follow-up) |
 | Taxonomy | `2.1` (additive: +patterns, +categories, +unknown-value policy; style IDs unchanged from 2.0) |
 | Embedding model | `clip-ViT-B/32`, 512-d, unit-norm (hash fallback labelled `DETERMINISTIC FALLBACK — NOT a semantic model`) |
 | Recommender config | `2026-09-06.1` (`ai/recommender_config.json`, six components incl. `fit` — ADR-012; weights source: heuristic, **not learned**) |
@@ -166,7 +166,18 @@ Three findings, each with a consequence that is now in the code:
    (`extraction_report.mock.json` instead) — the CI mock step would otherwise
    clobber this evidence on any checkout that runs it with a writable tree.
 
-**Recommended `p6` (not applied — needs a paid run to measure):** ask for
+**`p6` as shipped (2026-09-07, ADR-016) is narrower than the recommendation
+below:** it adds exactly one scalar, `detected_category` (the product the
+photo is OF, from the seven catalog categories + `other`), because the live
+catalog audit found rows whose *image* showed a different category than the
+row claimed and nothing in the pipeline could see it. The scoring fields and
+all style/material wording are byte-identical to p5, so the 82.2 % REAL figure
+stays the reference; a p6 REAL run is still required before the artefact is
+re-stamped (`scripts/evaluate_extraction.py --provider gemini`, < $0.01).
+`review_decision(expected_category=…)` adds `category_mismatch` only when a
+row's claim is known — the benchmark replay passes no claim and is unaffected.
+
+**Still recommended for `p7` (not applied — needs a paid run to measure):** ask for
 *one* committed style plus an optional `secondary_style` field that the
 sanitiser stores separately (ranking may use it; the contract term and the
 catalogue's primary style may not); add textile-specific cues for

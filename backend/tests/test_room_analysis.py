@@ -107,10 +107,10 @@ class TestExtractBytes:
         assert out["provider"] == "gemini"
         assert out["needs_review"] is False
 
-    def test_product_kind_keeps_the_benchmark_prompt_version(self, real_vision):
+    def test_product_kind_uses_the_current_product_prompt_version(self, real_vision):
         real_vision(GOOD_ROOM)
         out = fe.FeatureExtractor().extract_bytes(b"\xff\xd8xx", prompt_kind="product")
-        assert out["prompt_version"] == fe.EXTRACTION_PROMPT_VERSION == "p5"
+        assert out["prompt_version"] == fe.EXTRACTION_PROMPT_VERSION == "p6"
 
     def test_unknown_prompt_kind_is_a_programming_error(self, real_vision):
         real_vision(GOOD_ROOM)

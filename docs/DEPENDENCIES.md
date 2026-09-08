@@ -69,6 +69,15 @@ python -m venv $env:TEMP\lockvenv
 & "$env:TEMP\lockvenv\Scripts\pip.exe" freeze > requirements.lock.txt
 ```
 
+> **Windows note.** `uvicorn[standard]` pulls in `uvloop`, which ships no
+> Windows wheel. The lockfile therefore carries
+> `uvloop==0.22.1; sys_platform != "win32"` — keep that marker when you
+> regenerate (a plain `pip freeze` drops it), otherwise
+> `pip install -r requirements.lock.txt` fails on every Windows dev box.
+> `scripts/verify_lock_install.py` and `pip-audit` both understand markers.
+> Installing the locked set on Windows is otherwise unchanged:
+> `python -m venv .venv; .\.venv\Scripts\Activate.ps1; pip install -r requirements.lock.txt`.
+
 Then **verify and audit before committing**:
 
 ```bash

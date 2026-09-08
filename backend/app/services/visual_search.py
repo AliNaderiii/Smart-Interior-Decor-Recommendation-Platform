@@ -146,7 +146,11 @@ def _candidates(
 ) -> list[tuple[Product, float | None]]:
     """Verified living-room products (optionally one category) with, on the
     CLIP + PostgreSQL path, the HNSW-ordered cosine similarity attached."""
-    where = [Product.room_type == "living_room", Product.is_verified.is_(True)]
+    where = [
+        Product.room_type == "living_room",
+        Product.is_verified.is_(True),
+        Product.integrity_ok.isnot(False),  # ADR-016 catalog-integrity gate
+    ]
     if category:
         where.append(Product.category == category)
     if query.embedding is not None and _session_is_postgres(db):

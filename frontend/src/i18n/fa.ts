@@ -167,6 +167,13 @@ export const fa = {
     layoutMasonry: "آجری",
     verifiedPrice: "قیمت تأییدشده",
     estimatedPrice: "قیمت تخمینی",
+    /** ADR-016 نشان‌های اعتماد (منشأ داده همیشه نمایش داده می‌شود). */
+    demoItem: "نمونهٔ نمایشی",
+    demoItemHint: "ردیف کاتالوگ نمونه — موجودی واقعی نیست و هرگز در استقرار تولید نمایش داده نمی‌شود.",
+    priceChecked: (days: number) => (days === 0 ? "قیمت امروز بررسی شده" : `قیمت ${days} روز پیش بررسی شده`),
+    priceUnchecked: "قیمت هنوز با فروشنده تأیید نشده است",
+    catalogQualityNote: (excluded: number) =>
+      `${excluded} محصول به‌دلیل رد شدن در بررسی صحت کاتالوگ (تصویر اشتباه، دادهٔ غیرمنطقی یا آگهی غیرقابل‌خرید) پنهان شده است.`,
     whyMatched: (title: string, pct: number) =>
       `چرا ${title} پیشنهاد شد: ${pct} درصد تطابق کلی`,
     moreLike: (title: string) => `بیشتر شبیه ${title}`,
@@ -539,6 +546,33 @@ export const fa = {
 
   admin: {
     totalProducts: (n: number) => `${n} محصول`,
+    /** ADR-016 ستون صحت + رد تأیید. */
+    integrityOk: "صحت تأیید شد",
+    integrityExcluded: "حذف از پیشنهادها",
+    integrityUnchecked: "بررسی‌نشده",
+    integrityOverride: "تأیید دستی ادمین",
+    integrityColumn: "صحت",
+    verifyRefused: "تأیید رد شد: این ردیف در بررسی صحت کاتالوگ مردود است.",
+    verifyForceConfirm: (reasons: string) =>
+      `این محصول در بررسی صحت مردود است:\n\n${reasons}\n\nبا این حال تأیید شود؟ این تصمیم در لاگ ممیزی ثبت می‌شود و روی ردیف قابل مشاهده می‌ماند.`,
+    verifyForced: "با ثبت در لاگ ممیزی تأیید شد.",
+    integrityReasons: {
+      image_category_mismatch: "تصویر با دسته‌بندی ثبت‌شده هم‌خوانی ندارد",
+      image_unreachable: "آدرس تصویر در دسترس نیست",
+      material_implausible: "متریال ثبت‌شده برای این دسته منطقی نیست",
+      dimensions_out_of_band: "ابعاد خارج از بازهٔ منطقی است",
+      title_fa_invalid: "عنوان فارسی، فارسی نیست یا واژهٔ قالب انگلیسی دارد",
+      seller_link_dead: "لینک فروشنده مرده یا ناامن است",
+      category_unknown: "دسته‌بندی در تاکسونومی وجود ندارد",
+      synthetic_row: "ردیف نمونه/آزمایشی است، نه موجودی واقعی",
+      duplicate_image: "محصول دیگری همین تصویر را دارد",
+      seller_link_missing: "لینک فروشنده ندارد",
+      seller_link_shallow: "لینک فروشنده به صفحهٔ اصلی/دسته/جست‌وجو اشاره می‌کند",
+      price_stale: "قیمت بررسی نشده یا قدیمی‌تر از ۳۰ روز است",
+      price_out_of_band: "قیمت خارج از بازهٔ منطقی است",
+      title_fa_missing: "عنوان فارسی ندارد",
+      admin_override: "ادمین با وجود خطاها تأیید کرده است (ثبت در لاگ)",
+    } as Record<string, string>,
   },
 
   share: {
