@@ -55,6 +55,17 @@ class Settings(BaseSettings):
     #: exists in the database (restored dump, pre-fix deployment, manual seed).
     REFUSE_DEMO_ACCOUNTS_IN_PRODUCTION: bool = True
 
+    # ---- Container entrypoint (ADR-017) ----
+    #: What ``scripts/entrypoint.py`` does to the catalog on boot, for hosts
+    #: whose only hook is the image command (Render free tier and similar):
+    #: ``off`` (default) · ``if-empty`` (load the 150-row sample catalog when
+    #: the table is empty) · ``replace@<label>`` (delete every product and
+    #: reload the sample catalog, once per label per database — the label is
+    #: recorded in ``bootstrap_runs``). Both loading modes are sample data
+    #: (``source=synthetic-demo``), so production refuses to boot with anything
+    #: but ``off``; a sold deployment imports real inventory (ADR-016).
+    CATALOG_BOOTSTRAP: str = "off"
+
     # ---- Cookie auth (V2 — OWASP A02) ----
     #: When true, /auth/* also sets HttpOnly access+refresh cookies and the
     #: API accepts them. Body tokens are retained for Bearer/CLI clients.
@@ -307,6 +318,16 @@ class Settings(BaseSettings):
             problems.append(
                 "SEED_DEMO_ACCOUNTS is true — demo/default accounts must never "
                 "be created in production (see docs/security/DEMO_ACCOUNTS.md)"
+            )
+        # ADR-017: the entrypoint's catalog bootstrap only knows the synthetic
+        # sample catalog, which the strict integrity gate excludes anyway
+        # (ADR-016). Asking for it in production is a misconfiguration, not a
+        # request — refuse at boot so nobody mistakes a demo catalog for stock.
+        if self.CATALOG_BOOTSTRAP.strip() not in ("", "off", "none", "0", "false"):
+            problems.append(
+                f"CATALOG_BOOTSTRAP={self.CATALOG_BOOTSTRAP!r} loads the synthetic "
+                "sample catalog; production must import real inventory instead "
+                "(docs/DEPLOYMENT.md, V3)"
             )
         # T-40: an https SPA cannot be served from an http origin, and a
         # non-https FRONTEND_ORIGIN would end up in the CORS allowlist.

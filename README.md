@@ -84,6 +84,11 @@ loaded deliberately via the one-shot bootstrap job
 real-embedding artefact and fails loudly if it is absent.
 (`backend/scripts/seed_products.py`, which generates 100 synthetic products, is
 the separate no-Docker path documented under *Local development*.)
+Outside Compose — a PaaS that only runs the image command — the Dockerfile's
+default `CMD`, `backend/scripts/entrypoint.py`, migrates, applies
+`CATALOG_BOOTSTRAP` (`off` · `if-empty` · `replace@<label>`, once per label),
+seeds the gated demo accounts, backfills integrity and then serves (ADR-017;
+`docs/DEPLOYMENT.md` → "PaaS without a shell").
 
 **Catalog-integrity gate (ADR-016).** Every product row carries a provenance
 `source` and an `integrity_ok` verdict from `backend/ai/catalog_integrity.py`
@@ -292,7 +297,7 @@ backend/
     services/        recommender (3-stage) · payment · link_checker · emailer
     models/ db/      SQLAlchemy 2.0 models · pgvector column type
   alembic/           migrations (pgvector extension + HNSW index)
-  scripts/           seed_products.py · load_realistic_products.py · audit_catalog.py · backfill_integrity.py · evaluate_extraction.py
+  scripts/           entrypoint.py (image CMD, ADR-017) · seed_products.py · load_realistic_products.py · audit_catalog.py · backfill_integrity.py · evaluate_extraction.py
                      seed_perf_products.py · dev_postgres.py
   tests/             708 collected — test_recommender.py (30) · test_security_v2.py (26)
                      test_feedback_v2.py (16) · test_auth.py (13) · test_projects_quota.py (14)

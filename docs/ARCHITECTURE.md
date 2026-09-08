@@ -432,6 +432,64 @@ counts. Costs: one extra `GROUP BY` per uncached `/recommend` (sub-ms at the
 current catalog size), one 409 round-trip in the review flow, and the p6
 benchmark run still owed.
 
+## ADR-017 — The image prepares its own database: a self-bootstrapping entrypoint
+
+**Context.** After ADR-016 merged, the live demo on Render kept answering
+`POST /recommend` with 500 and the demo login with 401: the code expected
+migration `0007`, the database was at `0005`, and the catalog was the
+pre-ADR-016 synthetic set that the gate rightly excludes wholesale. The
+documented fix — run `alembic upgrade head`, reseed, backfill — assumed an
+operator hook that the hosting plan does not have: no shell, no pre-deploy
+command, and a start command the free tier does not let you edit. The only
+thing that runs on such a host is the image's `CMD`. A deploy that needs a
+human to finish it is not a deploy.
+
+**Decision.** `backend/Dockerfile` runs `python scripts/entrypoint.py`, an
+idempotent five-step boot that owes nothing to the platform:
+
+1. `Settings.validate_runtime()` before touching the database.
+2. `alembic upgrade head` in-process, under a PostgreSQL advisory lock so
+   replicas do not race, followed by an assertion that the database *is* at
+   head — the server never starts on a schema it was not written for.
+3. Catalog bootstrap selected by `CATALOG_BOOTSTRAP`: `off` (default),
+   `if-empty` (load the sample catalog only into an empty table) or
+   `replace@<label>` — delete everything and reload, **once per label per
+   database**. The label is claimed as a unique row in the new
+   `bootstrap_runs` table (migration `0008`) *before* the first delete, so a
+   restart, a rollback or a second replica cannot wipe the catalog twice; a
+   failed load releases the claim so the next boot retries. Cached
+   recommendations (`rec:*`) are flushed after a replacement.
+4. Demo accounts through the existing `demo_seed` gate (never in production).
+5. The integrity backfill (`price_stale` moves with time; re-evaluating per
+   boot is the point).
+
+Then it `exec`s uvicorn with `${PORT}` and `${WEB_CONCURRENCY}` honoured.
+Both loading modes are refused under `APP_ENV=production` twice: by
+`validate_runtime` (the process does not boot) and by the step itself. The
+sample catalog is `source=synthetic-demo`; ADR-016 already excludes it in
+production, and a sold deployment imports real inventory.
+
+**Alternatives rejected.** *A start-command override* — unavailable on the
+plan, and an out-of-repo command is invisible to review and CI. *An env-var
+"clear once" flag with no record* — the operator must remember to remove it
+before the next deploy, and forgetting means wiping the catalog on every
+boot; a database row remembers on their behalf. *Auto-detecting a purely
+synthetic legacy catalog and clearing it* — deleting data because it looks
+deletable is the kind of cleverness a data pipeline should not have; the
+operator names the replacement, the database records it. *Recording the
+marker in `audit_logs`* — that table is pruned on a retention window, and a
+once-only marker that expires is not a marker.
+
+**Consequences.** Compose files are untouched (each still sets an explicit
+`command:`; production stays migrations + server with the catalog loaded by
+the `catalog-bootstrap` profile job), so `tests/test_production_seeding.py`
+holds unchanged. The Render deploy becomes dashboard-only: set
+`CATALOG_BOOTSTRAP=replace@<date>` once, then `if-empty`. `tests/test_entrypoint.py`
+covers the grammar, the once-per-label lock, the failure release, the
+production refusal, the image wiring and a subprocess boot on SQLite.
+Costs: one extra table, one more boot-time step (~2 s for 150 rows), and a
+deploy log that now says what it did.
+
 ## Data model (ERD)
 
 ```
@@ -441,6 +499,7 @@ users 1──* moodboards (items JSONB: {product_id,x,y,w,h}; shopping_list JSON
 users(designer) 1──* projects 1──* style_quizzes
 products (colors/styles/materials/patterns JSON, style_embedding vector(512),
           is_verified, seller_link_ok, extraction_confidence)
+bootstrap_runs (label UNIQUE, action, detail, created_at — ADR-017 once-only record)
 ```
 
 GDPR: `DELETE /users/me` hard-deletes the user row and every dependent row
