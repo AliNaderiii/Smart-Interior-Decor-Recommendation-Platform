@@ -104,7 +104,10 @@ The boot guard will already have stopped the process. Then:
 
 1. **Assume the admin account was used.** `Admin123!` is public; treat this as
    a credential compromise, not a hygiene issue.
-2. Delete or rename the three users.
+2. Delete or rename the three users — from another administrator's session
+   via `DELETE /admin/users/{id}` (portal **Delete** button) or in bulk with
+   `python scripts/purge_accounts.py --api … --match '*@smartdecor.dev' --protect '' --include-admins --yes`
+   (dry-run without `--yes`).
 3. Rotate `SECRET_KEY` (invalidates every issued JWT), `FERNET_KEY`, S3
    credentials, and the payment provider keys.
 4. Review `audit_logs` for `login`, `role_change`, `product_verify` and

@@ -24,13 +24,8 @@ production database. ``GET /users/me/export`` returns the full inventory.
 """
 from __future__ import annotations
 
-import hashlib
-import hmac
-import ipaddress
-import logging
-
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy import delete, select, update
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -42,45 +37,21 @@ from app.models.audit_log import AuditLog
 from app.models.feedback import ProductFeedback
 from app.models.feedback_event import FeedbackEvent
 from app.models.moodboard import Moodboard
-from app.models.project import Project, ShareLink
+from app.models.project import Project
 from app.models.quiz import StyleQuiz
-from app.models.subscription import Payment, Subscription
+from app.models.subscription import Payment
 from app.models.user import User
 from app.schemas.common import ok
 from app.services import audit
-
-logger = logging.getLogger(__name__)
+from app.services.erasure import erase_account, pseudonym_for, truncate_ip
 
 router = APIRouter(prefix="/users", tags=["users"])
 
-
-def pseudonym_for(user_id: str) -> str:
-    """Stable, keyed, non-reversible stand-in for a deleted user id.
-
-    Keyed with ``SECRET_KEY`` rather than a plain hash: a bare SHA-256 of a
-    32-character hex id is trivially reversible by anyone holding the id list
-    (rainbow table over the id space), which would defeat the point.
-    """
-    digest = hmac.new(
-        settings.SECRET_KEY.encode(), f"erased:{user_id}".encode(), hashlib.sha256
-    ).hexdigest()[:25]
-    # Exactly 32 characters: `audit_logs.user_id` is String(32) and widening it
-    # would need a migration on a table another stage owns. 100 bits of digest
-    # is far beyond what a collision would need to matter here.
-    return f"erased-{digest}"
-
-
-def _truncate_ip(value: str) -> str:
-    """Keep the /24 (or /48 for IPv6) so abuse patterns stay visible."""
-    if not value:
-        return ""
-    try:
-        ip = ipaddress.ip_address(value)
-    except ValueError:
-        return ""
-    if isinstance(ip, ipaddress.IPv4Address):
-        return str(ipaddress.ip_network(f"{ip}/24", strict=False).network_address)
-    return str(ipaddress.ip_network(f"{ip}/48", strict=False).network_address)
+#: Kept under their historical names: `tests/test_gdpr.py` and the Stage 03
+#: security report reference them here. The implementation lives in
+#: `app/services/erasure.py`, shared with the administrator's erasure route.
+_truncate_ip = truncate_ip
+__all__ = ["router", "pseudonym_for", "_truncate_ip"]
 
 
 @router.get("/me/export")
@@ -191,77 +162,15 @@ def gdpr_delete_me(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """GDPR right-to-erasure: hard-delete the user and ALL owned data."""
-    uid = user.id
-    pseudonym = pseudonym_for(uid)
+    """GDPR right-to-erasure: hard-delete the user and ALL owned data.
 
-    db.execute(delete(ProductFeedback).where(ProductFeedback.user_id == uid))
-    # ADR-014: behavioural rows are aggregate analytics data with no PII; sever
-    # the link to the person (user_id -> NULL, the FK is a user id so it cannot
-    # hold the pseudonym) rather than deleting the funnel history.
-    db.execute(
-        update(FeedbackEvent).where(FeedbackEvent.user_id == uid).values(user_id=None)
-    )
-    db.execute(delete(ShareLink).where(ShareLink.created_by == uid))
-    db.execute(delete(Payment).where(Payment.user_id == uid))
-    db.execute(delete(Subscription).where(Subscription.user_id == uid))
-    db.execute(delete(Moodboard).where(Moodboard.user_id == uid))
-    db.execute(delete(StyleQuiz).where(StyleQuiz.user_id == uid))
-    db.execute(delete(Project).where(Project.designer_id == uid))
-
-    # Pseudonymise rather than delete: keeps the security trail, severs the
-    # link to a person. Rows are re-read and rewritten one by one because the
-    # IP truncation is not expressible in SQL portably.
-    rows = db.scalars(select(AuditLog).where(AuditLog.user_id == uid)).all()
-    for row in rows:
-        row.ip = _truncate_ip(row.ip)
-        row.user_agent = ""
-    db.flush()
-    db.execute(
-        update(AuditLog).where(AuditLog.user_id == uid).values(user_id=pseudonym)
-    )
-
-    # G-03: the erasure is itself a security event. Written *after* the
-    # pseudonymisation pass and already carrying the pseudonym, so this record
-    # never contains the erased identity — writing it first and relying on the
-    # bulk update to catch it would depend on flush ordering, and the session
-    # is configured with `autoflush=False`.
-    db.add(AuditLog(
-        user_id=pseudonym,
-        action=actions.ACTION_USER_DELETE,
-        detail="GDPR Art.17 erasure requested by the data subject",
-        ip=_truncate_ip(audit.client_ip(request)),
-        user_agent="",
-    ))
-
-    db.delete(db.get(User, uid))
-    db.commit()
-
-    # Stage 3 (S3-F002): GDPR Art. 17 right-to-erasure must purge cached
-    # personal recommendations and rate-limit counters from Redis.
-    try:
-        from app.core.redis_client import get_redis
-
-        redis = get_redis()
-        # Recommendation cache keys
-        for key in list(redis.scan_iter(f"rec:{uid}:*")):
-            redis.delete(key)
-        # Export rate-limit key and recommendation throttle buckets
-        redis.delete(f"export:{uid}")
-        redis.delete(f"rl:rec:{uid}")
-        redis.delete(f"rl:export:{uid}")
-        for key in list(redis.scan_iter(f"rl:*{uid}*")):
-            redis.delete(key)
-    except Exception as exc:
-        logger.warning(
-            "Failed to purge Redis cache/rate-limit keys for erased user %s: %s",
-            pseudonym,
-            exc,
-        )
-
+    The cascade, the audit-trail pseudonymisation and the Redis purge live in
+    `app/services/erasure.py`, shared with `DELETE /admin/users/{id}`.
+    """
+    receipt = erase_account(db, user, request=request, actor_id=None)
     return ok({
         "message": "All your data has been permanently deleted.",
-        "audit_pseudonym": pseudonym,
+        "audit_pseudonym": receipt.pseudonym,
         "retained": {
             "security_events": "pseudonymised, purged after 180 days",
         },
