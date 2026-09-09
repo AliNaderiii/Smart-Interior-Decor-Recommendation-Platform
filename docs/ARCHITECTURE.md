@@ -560,6 +560,21 @@ import — a strict deployment excludes rows without a deep seller link or
 with a price older than 30 days, which is why item 3 of P4-ب (periodic
 price/link recheck) follows this ADR.
 
+*Addendum (2026-09-09, first live run).* The importer's first run against
+the hosted database died before contacting anything: `DATABASE_URL` still
+held the guide's `<placeholder>`, and `app.db.session` builds the engine at
+import time, so the operator saw a SQLAlchemy traceback instead of a
+sentence. Two small decisions followed. (1) `Settings` normalises
+driver-less `postgresql://` / `postgres://` — the form the Render and Heroku
+dashboards print — to `postgresql+psycopg://`, because psycopg 3 is the only
+PostgreSQL driver the project ships and to SQLAlchemy a bare `postgresql://`
+means psycopg2. (2) `app/db/preflight.py` is a mandatory first step of every
+writing CLI (`import_catalog.py file|basalam`, and `--check-db` on its own):
+placeholder/unparsable URL, missing driver, unreachable host, or a schema
+behind this checkout's Alembic head each stop the run with exit 2, one line
+naming the problem and one naming the fix, the password always rendered as
+`***`. `tests/test_db_preflight.py` (30 tests) pins both.
+
 ## Data model (ERD)
 
 ```

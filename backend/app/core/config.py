@@ -9,6 +9,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import ClassVar, Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -97,7 +98,17 @@ class Settings(BaseSettings):
     EXPORT_RATE_LIMIT_PER_HOUR: int = 5
 
     # ---- Database ----
+    #: SQLAlchemy URL. Driver-less ``postgresql://`` and ``postgres://`` — the
+    #: form Render, Heroku and most dashboards print — are accepted and routed
+    #: to psycopg 3, the only PostgreSQL driver this project ships
+    #: (:func:`normalise_database_url`). Operator scripts run
+    #: ``app.db.preflight`` before touching the target.
     DATABASE_URL: str = "sqlite:///./decor.sqlite3"
+
+    @field_validator("DATABASE_URL", mode="after")
+    @classmethod
+    def _normalise_database_url(cls, value: str) -> str:
+        return normalise_database_url(value)
 
     # ---- Redis ----
     REDIS_URL: str = ""  # empty -> fakeredis (dev/test only)
@@ -367,6 +378,26 @@ class Settings(BaseSettings):
             raise RuntimeError(
                 "Insecure production configuration:\n  - " + "\n  - ".join(problems)
             )
+
+
+def normalise_database_url(url: str) -> str:
+    """Route driver-less PostgreSQL URLs to psycopg 3.
+
+    To SQLAlchemy ``postgresql://`` means *psycopg2* and ``postgres://`` is
+    not a dialect at all — yet both are exactly what the Render and Heroku
+    dashboards hand out (P4-B·2b: the first live import attempt failed on
+    this). psycopg 3 is the only PostgreSQL driver in ``requirements.txt``,
+    so the rewrite is unambiguous. Explicit drivers and every other scheme
+    pass through; surrounding whitespace (a pasted newline) is dropped. No
+    other validation happens here — ``app.db.preflight`` produces the
+    operator-facing diagnostics.
+    """
+    stripped = (url or "").strip()
+    lowered = stripped.lower()
+    for prefix in ("postgresql://", "postgres://"):
+        if lowered.startswith(prefix):
+            return "postgresql+psycopg://" + stripped[len(prefix):]
+    return stripped
 
 
 #: Authoritative AI-provider → API-key-field mapping. A key for a different

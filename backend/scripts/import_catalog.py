@@ -15,6 +15,14 @@ Usage (dry-run is the default — nothing is written until ``--yes``)::
     # what would happen, row by row
     python scripts/import_catalog.py file --path feed.csv --seller nilper --report out.json
 
+    # is DATABASE_URL the database I think it is? (no rows read or written)
+    python scripts/import_catalog.py --check-db
+
+Before anything else the target database is checked (``app.db.preflight``):
+a placeholder or unparsable ``DATABASE_URL``, a missing driver, an unreachable
+host or a schema behind this code all stop the run with a one-line reason and
+the fix — before Basalam is contacted and before a single row is read.
+
 Every accepted row goes through: normalise → SSRF-guarded image download →
 upload-grade validation + perceptual hash → vision ``detected_category`` →
 embedding → integrity stamp. Rows are **not** verified unless ``--verify`` is
@@ -33,6 +41,7 @@ import logging
 import os
 import sys
 from pathlib import Path
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
@@ -50,6 +59,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--template", action="store_true",
                         help="print the CSV template to stdout and exit")
+    parser.add_argument("--check-db", action="store_true",
+                        help="validate DATABASE_URL, connect once, print the target and exit")
     sub = parser.add_subparsers(dest="adapter")
 
     def common(p: argparse.ArgumentParser) -> None:
@@ -137,6 +148,50 @@ def _print_summary(report: pipeline.ImportReport) -> None:
             shown += 1
 
 
+def check_database() -> int:
+    """Preflight the configured database; print where the rows would go.
+
+    Runs *before* ``app.db.session`` is imported (that module builds the engine
+    at import time and would turn a pasted placeholder into a traceback).
+    Returns ``EXIT_USAGE`` with the operator sentence on stderr when the
+    target must not be used.
+    """
+    from app.core.config import settings
+    from app.db.preflight import DatabaseProblem, check_database_url, probe
+
+    try:
+        target = check_database_url(settings.DATABASE_URL)
+        revision = probe(settings.DATABASE_URL, require_schema=True)
+    except DatabaseProblem as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    print(f"database: {target.display} ({target.dialect}/{target.driver}, "
+          f"alembic {revision or 'create_all'}, APP_ENV={settings.APP_ENV})")
+    print(f"vision:   {_vision_summary(settings)}")
+    return EXIT_OK
+
+
+def _vision_summary(settings: Any) -> str:
+    """One line the operator can read before spending inference: provider, model, key *state*.
+
+    The key itself is never printed; a value that still carries a guide
+    placeholder (``<…>`` or Persian text) is called out, because with a bad
+    key every row would come back ``provider_error`` — honest, but a wasted run.
+    """
+    provider = settings.AI_PROVIDER
+    if provider == "mock":
+        return "mock (filename heuristic — rows can be imported but never auto-verified)"
+    key = settings.GEMINI_API_KEY if provider == "gemini" else settings.OPENAI_API_KEY
+    model = settings.GEMINI_MODEL if provider == "gemini" else settings.OPENAI_MODEL
+    if not key:
+        state = "key MISSING (rows would be flagged provider_error)"
+    elif "<" in key or ">" in key or any("\u0600" <= ch <= "\u06ff" for ch in key):
+        state = "key looks like a guide PLACEHOLDER — replace it"
+    else:
+        state = "key set"
+    return f"{provider} model={model} {state}"
+
+
 def run_file(args: argparse.Namespace) -> int:
     try:
         source = seller_source(args.seller)
@@ -146,6 +201,8 @@ def run_file(args: argparse.Namespace) -> int:
     if not args.path.exists():
         print(f"error: {args.path} does not exist", file=sys.stderr)
         return EXIT_USAGE
+    if (code := check_database()) != EXIT_OK:
+        return code
     from app.db.session import SessionLocal
 
     try:
@@ -190,6 +247,9 @@ def run_basalam(args: argparse.Namespace) -> int:
                   f"{sorted(basalam_adapter.CATEGORY_QUERIES)}", file=sys.stderr)
             return EXIT_USAGE
         queries = {c: basalam_adapter.CATEGORY_QUERIES[c] for c in args.category}
+
+    if (code := check_database()) != EXIT_OK:
+        return code
 
     dumped = {"done": False}
 
@@ -244,11 +304,14 @@ def _finish(report: pipeline.ImportReport, args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    logging.getLogger("alembic").setLevel(logging.WARNING)  # the preflight reads the revision only
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.template:
         sys.stdout.write(file_adapter.template_csv())
         return EXIT_OK
+    if args.check_db:
+        return check_database()
     if args.adapter == "file":
         return run_file(args)
     if args.adapter == "basalam":

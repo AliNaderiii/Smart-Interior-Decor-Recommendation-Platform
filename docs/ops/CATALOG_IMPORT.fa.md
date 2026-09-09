@@ -41,7 +41,16 @@ cd C:\Users\alina\Smart-Interior-Decor-Recommendation-Platform\backend
 $env:PYTHONUTF8="1"
 ```
 
-* `DATABASE_URL` به دیتابیس هدف اشاره کند (لوکال برای تمرین؛ برای Render از همان `DATABASE_URL` سرویس استفاده کنید — از **Dashboard → Environment** کپی کنید و در همان پنجره‌ی PowerShell `$env:DATABASE_URL="..."` بگذارید).
+* `DATABASE_URL` به دیتابیس هدف اشاره کند. برای Render **External Database URL** را بردارید (Dashboard → سرویس Postgres → Connect → External؛ با `postgresql://…render.com/…` شروع می‌شود — Internal URL فقط داخل شبکه‌ی Render کار می‌کند) و در همان پنجره‌ی PowerShell `$env:DATABASE_URL="…"` بگذارید. شکل بدون درایور (`postgresql://` یا `postgres://`) قبول است و خودکار به psycopg 3 می‌رود. برای تمرین لوکال: `sqlite:///./import_rehearsal.sqlite3` و بعد `alembic upgrade head`.
+* **قبل از هر چیز** هدف را چک کنید — بدون خواندن یا نوشتن حتی یک ردیف:
+
+  ```powershell
+  python scripts\import_catalog.py --check-db
+  # database: postgresql+psycopg://…@dpg-….render.com/decor (postgresql/psycopg, alembic 0008, APP_ENV=development)
+  # vision:   gemini model=gemini-3.5-flash-lite key set
+  ```
+
+  اگر مقدار جای‌گذار راهنما (`<…>`) هنوز در متغیر باشد، URL نامعتبر باشد، درایور نصب نباشد، میزبان در دسترس نباشد یا اسکیما از کد عقب باشد، ابزار با کد خروج `2` و یک جمله‌ی «مشکل + راه‌حل» می‌ایستد؛ همین پیش‌پرواز پیش از تماس با باسلام و پیش از خواندن فایل، در خود `file`/`basalam` هم اجرا می‌شود. رمز عبور هرگز چاپ نمی‌شود.
 * مدل بینایی: `AI_PROVIDER=gemini` + `GEMINI_API_KEY` (یا openai). با `AI_PROVIDER=mock` ردیف‌ها وارد می‌شوند ولی هیچ‌کدام قابل تأیید خودکار نیستند و در تولید اصلاً بوت نمی‌شود.
 * عکس‌ها: اگر `STORAGE_BACKEND=s3` تنظیم است، عکس‌ها روی فضای خودتان کپی می‌شوند (`rehost`)؛ در غیر این صورت آدرس فروشنده نگه داشته می‌شود (`link`) — روی Render رایگان دیسک بین دیپلوی‌ها پاک می‌شود، پس بدون S3 از `rehost` استفاده نکنید.
 
@@ -125,4 +134,4 @@ python scripts\import_catalog.py basalam --vendor 78910 --yes
 
 ## ۷. کدهای خروج
 
-`0` انجام شد (یا اجرای آزمایشی) · `1` هیچ ردیفی قابل ورود نبود / درگاه پاسخ نداد · `2` خطای استفاده (مسیر/اسلاگ/دسته‌ی نامعتبر).
+`0` انجام شد (یا اجرای آزمایشی) · `1` هیچ ردیفی قابل ورود نبود / درگاه پاسخ نداد · `2` خطای استفاده (مسیر/اسلاگ/دسته‌ی نامعتبر، یا `DATABASE_URL` ناقابل‌استفاده — پیام «fix:» را دنبال کنید).
