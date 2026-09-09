@@ -1,0 +1,90 @@
+{
+  "_note": "Recorded-shape fixture for the Basalam Open API search endpoint (POST /v1/products/search). Field names follow the official basalam/python-sdk models (ProductItemResponse, ImageResponse, PublicVendorResponse, CategoryProductResponse); values are synthetic test data, not real listings. The envelope is the single-key wrapper the SDK unwraps.",
+  "openapi_raw_data": [
+    {
+      "id": 24223620,
+      "title": "مبل راحتی مدل اسکارلت سه نفره",
+      "price": 34000000,
+      "primary_price": 36000000,
+      "photo": {
+        "id": 1,
+        "original": "https://statics.example-basalam.test/p/scarlet-sofa.jpg",
+        "lg": "https://statics.example-basalam.test/p/scarlet-sofa_lg.jpg",
+        "md": "https://statics.example-basalam.test/p/scarlet-sofa_md.jpg",
+        "sm": "https://statics.example-basalam.test/p/scarlet-sofa_sm.jpg",
+        "xs": "https://statics.example-basalam.test/p/scarlet-sofa_xs.jpg"
+      },
+      "status": {"name": "در دسترس", "value": 2976},
+      "vendor": {"id": 501, "identifier": "mobl-ara", "title": "مبل آرا", "city": {"name": "رباط‌کریم"}},
+      "category": {"id": 1201, "title": "مبل راحتی", "parent": {"id": 1200, "title": "مبلمان منزل"}},
+      "inventory": 4,
+      "is_available": true,
+      "summary": "مبل سه نفره با پارچه مخمل و پایه چوب راش",
+      "attribute_groups": [
+        {"title": "ابعاد", "attributes": [
+          {"title": "طول", "value": "۲۲۰", "unit": "سانتی‌متر"},
+          {"title": "عرض", "value": "90", "unit": "سانتی‌متر"},
+          {"title": "ارتفاع", "value": "0.85", "unit": "متر"}
+        ]},
+        {"title": "مشخصات", "attributes": [
+          {"title": "جنس", "value": "پارچه مخمل، چوب راش"}
+        ]}
+      ],
+      "packaging_dimensions": {"height": 100, "width": 110, "length": 240},
+      "sales_count": 12,
+      "rating": 4.8
+    },
+    {
+      "id": 25410382,
+      "title": "فرش دستباف تبریز ۶ متری لاکی",
+      "price": 185000000,
+      "photo": {"id": 2, "original": "https://statics.example-basalam.test/p/tabriz-rug.jpg"},
+      "status": {"name": "در دسترس", "value": 2976},
+      "vendor": {"id": 502, "identifier": "farsh-tabriz", "title": "فرش تبریز"},
+      "category": {"id": 1301, "title": "فرش دستباف", "parent": {"id": 1300, "title": "فرش"}},
+      "inventory": 1,
+      "is_available": true,
+      "attribute_groups": [
+        {"title": "مشخصات", "attributes": [
+          {"title": "ابعاد", "value": "300 در 200", "unit": "سانتی‌متر"},
+          {"title": "جنس", "value": "پشم و ابریشم"}
+        ]}
+      ],
+      "packaging_dimensions": {"height": 30, "width": 30, "length": 210}
+    },
+    {
+      "id": 26000001,
+      "title": "کوسن مخمل سبز ۴۵×۴۵",
+      "price": 450000,
+      "photo": {"id": 3, "original": "https://statics.example-basalam.test/p/green-cushion.jpg"},
+      "status": {"name": "ناموجود", "value": 3790},
+      "vendor": {"id": 503, "identifier": "decor-home", "title": "دکور هوم"},
+      "category": {"id": 1401, "title": "کوسن", "parent": {"id": 1400, "title": "دکوراتیو"}},
+      "inventory": 0,
+      "is_available": false
+    },
+    {
+      "id": 26000002,
+      "title": "لوستر فلزی مشکی شش شعله",
+      "price": 7800000,
+      "photo": {"id": 4, "original": "https://statics.example-basalam.test/p/black-chandelier.jpg"},
+      "status": {"name": "در دسترس", "value": 2976},
+      "vendor": {"id": 504, "identifier": "noor-light", "title": "نور لایت"},
+      "category": {"id": 1501, "title": "لوستر و چراغ آویز", "parent": {"id": 1500, "title": "روشنایی"}},
+      "inventory": 9,
+      "is_available": true,
+      "url": "https://basalam.com/noor-light/product/26000002"
+    },
+    {
+      "id": 26000003,
+      "title": "کیف چرم دست‌دوز",
+      "price": 2200000,
+      "photo": {"id": 5, "original": "https://statics.example-basalam.test/p/leather-bag.jpg"},
+      "status": {"name": "در دسترس", "value": 2976},
+      "vendor": {"id": 505, "identifier": "charm-kar", "title": "چرم کار"},
+      "category": {"id": 1601, "title": "کیف چرم", "parent": {"id": 1600, "title": "کیف و کفش"}},
+      "inventory": 3,
+      "is_available": true
+    }
+  ]
+}
