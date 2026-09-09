@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import type { RecommendedProduct } from "@/lib/types";
 import { useLocale, useT } from "@/i18n";
 import { safeUrl } from "@/lib/safeUrl";
+import { sellerLabel } from "@/lib/sellerLabel";
 import { daysSince } from "@/lib/integrity";
 import { track } from "@/lib/events";
 import { MotionCard } from "@/components/ui";
@@ -463,7 +464,7 @@ function ProductCardInner({ product, rank, onAdd, added, feedback, onFeedback }:
             onClick={() => track({ product_id: product.id, event_type: "purchase_click", page_context: "recommend", position: rank + 1 })}
             className="rounded-lg border border-[var(--color-line)] px-2 py-1.5 text-center text-[11px] font-semibold text-[var(--color-muted)] hover:border-[var(--color-accent)] hover:text-[var(--color-ink)]"
           >
-            {product.seller_link.includes("digikala.com") ? "خرید از دیجی‌کالا" : product.seller_link.includes("torob.com") ? "مشاهده در ترب" : "مشاهده فروشنده"} ↗
+            {sellerLabel(product.seller_link, locale)} ↗
           </a>
         )}
       </div>

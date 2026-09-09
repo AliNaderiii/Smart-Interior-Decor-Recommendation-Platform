@@ -490,6 +490,76 @@ production refusal, the image wiring and a subprocess boot on SQLite.
 Costs: one extra table, one more boot-time step (~2 s for 150 rows), and a
 deploy log that now says what it did.
 
+## ADR-018 — Real inventory enters only through the seller-feed importer
+
+**Context.** ADR-016 made the recommender refuse untrue rows and ADR-017 made
+the demo catalog reproducible, but the only *real* write paths were the admin
+upload (one picture at a time) and a curated 150-row sample that the
+production gate correctly excludes. A sold deployment needs hundreds of
+rows per category from several sellers, each with the seller's own photo, a
+dated price and a deep link — and it needs them re-importable when prices
+move. Hot-linking seller CDNs, trusting seller categories, or filling blanks
+with plausible values would each reintroduce the "rug with a sofa photo"
+class of failure through a new door.
+
+**Decision.** One package, `app/services/catalog_import`, is the single
+write path for feed rows; `scripts/import_catalog.py` is its CLI (dry-run by
+default, like every destructive tool in the repo).
+
+* **Contract before adapter.** Every source ends in `contract.normalize_row`
+  → `FeedRow`. The normaliser is strict about structure (positive integer
+  price, absolute http(s) image URL, category mapped onto the taxonomy via
+  the seller's *declared* label) and silent about truth. Unknown tags are
+  dropped and reported; a blank dimension stays `0` (= unknown); an
+  unmappable category is a rejection code, never a guess.
+* **Adapters yield, they do not write.** `adapters/file` (CSV/JSON with a
+  documented template, Persian headers accepted) and `adapters/basalam`
+  (official Open API: public `POST /v1/products/search`; token-gated
+  `GET /v1/products/{id}` and `/v1/vendors/{id}/products`). Basalam's
+  response envelope is undocumented, so the parser tolerates every shape
+  seen in the wild and `--dump-raw` records the real one; `price` (not
+  `primary_price`) is the price; `packaging_dimensions` are a box, used only
+  on explicit opt-in and stamped as such.
+* **Bytes, not links.** Each image is downloaded through the SSRF-guarded
+  fetcher, validated exactly like an admin upload (magic bytes, bomb guard,
+  re-encode), perceptually hashed, and — when S3 is configured — re-hosted
+  on the platform's storage (`image_mode=rehost`; `link` keeps the seller
+  URL but still fingerprints). The hash feeds `duplicate_image`; the bytes
+  feed the vision provider, whose `detected_category` is what lets the
+  ADR-016 gate catch a seller-declared category the picture contradicts.
+* **Idempotent by identity.** Rows are upserted on
+  `(source, source_product_id)`; an unchanged picture is neither
+  re-downloaded nor re-inferred; an unchanged row is reported `unchanged`.
+  A feed row that turns unavailable un-verifies its product.
+* **Verification is never implied.** Imported rows land in the admin review
+  queue. `--verify` marks a row verified only when the gate is clean, the
+  vision provider did not flag review, and `detected_category` equals the
+  declared category. In production the vision provider is real or the boot
+  is refused; the keyword mock cannot verify anything there (Stage 04).
+* **Report, not log lines.** Every run returns an `ImportReport` (per-row
+  action, rejection codes, integrity verdict, mismatch count) and writes one
+  `catalog_import` audit row with counts only.
+
+**Alternatives rejected.** *Import straight into `is_verified=True`* — the
+150-row sample proved that "curated" is not "true". *Hot-link seller
+images* — fragile, CSP-hostile, and no fingerprint. *Map categories from
+titles with keywords* — the picture, not the prose, is the evidence; title
+heuristics are exactly how the synthetic seed lied. *Trust
+`packaging_dimensions`* — a rolled rug ships in a 30×30×210 box. *Scrape
+Digikala/Torob* — no public API, legal and stability risk; the affiliate
+programme (links + prices) can be a later adapter behind the same contract.
+
+**Consequences.** `tests/test_catalog_import.py` (42 tests, no network:
+fixture transport, in-memory images, mock vision) covers the contract, both
+adapters, the image step, the pipeline invariants above and the CLI. The
+card's "buy from" label is host-derived (`lib/sellerLabel.ts`) so Basalam
+vendors and feed sellers are named correctly. Costs: one more audit action,
+one CSV template in `seed_data/`, and an operator guide
+(`docs/ops/CATALOG_IMPORT.fa.md`). Production-tier codes still apply after
+import — a strict deployment excludes rows without a deep seller link or
+with a price older than 30 days, which is why item 3 of P4-ب (periodic
+price/link recheck) follows this ADR.
+
 ## Data model (ERD)
 
 ```

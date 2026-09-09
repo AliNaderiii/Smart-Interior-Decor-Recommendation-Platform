@@ -31,6 +31,8 @@ ACTION_PRODUCT_VERIFY = "product_verify"
 ACTION_GDPR_EXPORT = "gdpr_export"
 ACTION_PRODUCT_UPLOAD = "product_upload"
 ACTION_UPLOAD_REJECTED = "upload_rejected"
+#: P4-ب-2: one row per seller-feed import run (counts only, never row data).
+ACTION_CATALOG_IMPORT = "catalog_import"
 
 
 class AuditLog(Base, UUIDPk, TimestampMixin):
