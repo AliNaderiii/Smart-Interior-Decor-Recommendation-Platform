@@ -137,14 +137,52 @@ The default Docker seed now loads `backend/seed_data/products_realistic_150.json
 > project items cascade with it (moodboard JSON keeps dangling ids). Fine for a
 > demo, never for a customer database — there, import the real feed.
 >
-> **PaaS without a shell (Render free tier and similar):** the only hook is the
-> start command, so put the upgrade in it and keep it idempotent:
+> **PaaS without a shell (Render free tier and similar) — ADR-017.** There
+> is no console, no pre-deploy hook and, on the free plan, no editable start
+> command. So the image prepares itself: `backend/Dockerfile` runs
+> `python scripts/entrypoint.py`, which on **every** boot
+>
+> 1. validates the configuration (`Settings.validate_runtime`),
+> 2. runs `alembic upgrade head` (serialised across replicas with a
+>    PostgreSQL advisory lock) and refuses to serve unless the database is at
+>    head,
+> 3. applies `CATALOG_BOOTSTRAP` — `off` (default) · `if-empty` (load the
+>    150-row sample catalog only when the table is empty) ·
+>    `replace@<label>` (delete every product, reload the sample catalog,
+>    **once per label per database** — the label is recorded in
+>    `bootstrap_runs`, so redeploys and restarts never wipe twice; pick a new
+>    label to do it again),
+> 4. creates the demo accounts when `SEED_DEMO_ACCOUNTS=true` (never in
+>    production — same gate as always),
+> 5. runs the integrity backfill,
+>
+> and then `exec`s `uvicorn … --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-2}`.
+>
+> **Upgrading a legacy demo database (pre-ADR-016 synthetic rows) from the
+> dashboard only:**
+>
+> | step | Environment | what the next boot does |
+> |---|---|---|
+> | 1 | `APP_ENV=development`, `SEED_DEMO_ACCOUNTS=true`, `CATALOG_BOOTSTRAP=replace@2026-09-08` | migrates to head, deletes the legacy rows, loads the corrected sample catalog, creates the demo logins, backfills |
+> | 2 | change to `CATALOG_BOOTSTRAP=if-empty` | steady state: nothing is deleted again; an accidentally emptied table is repopulated |
+>
+> Leaving `replace@2026-09-08` in place is safe (the label is spent), but
+> `if-empty` states the intent. `APP_ENV=production` refuses any value but
+> `off` at boot: the sample catalog is `source=synthetic-demo` and a sold
+> deployment imports real inventory. The deploy log shows one `[boot n/5]`
+> line per step; `bootstrap_runs` keeps what each replacement deleted.
+>
+> Rehearse against a copy first:
 > ```
-> sh -c "alembic upgrade head && python scripts/load_realistic_products.py --realistic --if-empty --seed-demo-accounts && python scripts/backfill_integrity.py && uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2 --no-server-header --proxy-headers"
+> DATABASE_URL=<copy> APP_ENV=development python scripts/entrypoint.py --catalog replace@rehearsal --no-server
 > ```
-> Every step is a no-op on the second boot. Migration `0006` tolerates a
-> `feedback_events` table that `create_all` made before Alembic ever ran (the
-> state of a database that was only ever seeded), so the first real
+> Compose deployments are unaffected: every compose file still sets an
+> explicit `command:` (production = migrations + server, catalog via the
+> `catalog-bootstrap` profile job).
+>
+> Migration `0006` tolerates a `feedback_events` table that `create_all` made
+> before Alembic ever ran (the state of a database that was only ever seeded),
+> and `0008` does the same for `bootstrap_runs`, so the first real
 > `alembic upgrade head` on such a database succeeds instead of crash-looping.
 
 1. Validate the client's export against `datasets/products_realistic.json` and replace the committed/imported catalog through a controlled data release.

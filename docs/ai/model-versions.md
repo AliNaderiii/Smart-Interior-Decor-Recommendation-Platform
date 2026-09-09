@@ -108,7 +108,10 @@ into every boot; because `seed_data/embeddings_real.json` must be generated on
 an egress-enabled machine (and is never committed), every deployment without
 the artefact crash-looped on the seeder's deliberate loud failure.
 
-**Current startup path (production):** `alembic upgrade head` → uvicorn.
+**Current startup path (production):** `alembic upgrade head` → uvicorn
+(Compose `command:`; outside Compose the image `CMD`, `scripts/entrypoint.py`,
+does the same with `CATALOG_BOOTSTRAP=off` — the only value production
+accepts — see ADR-017).
 Before serving, the production lifespan also validates the embedding runtime
 (§2) — so a fresh production deployment now has a fully deterministic
 outcome:

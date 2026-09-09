@@ -1,5 +1,6 @@
 from app.models.audit_log import AuditLog
 from app.models.base import Base
+from app.models.bootstrap_run import BootstrapRun
 from app.models.feedback import ProductFeedback
 from app.models.feedback_event import FeedbackEvent
 from app.models.moodboard import Moodboard
@@ -12,6 +13,7 @@ from app.models.user import User
 __all__ = [
     "Base",
     "AuditLog",
+    "BootstrapRun",
     "ProductFeedback",
     "FeedbackEvent",
     "User",

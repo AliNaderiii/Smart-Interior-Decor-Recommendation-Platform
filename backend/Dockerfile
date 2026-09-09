@@ -28,4 +28,13 @@ RUN useradd --create-home --shell /usr/sbin/nologin appuser \
 USER appuser
 
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--no-server-header", "--proxy-headers"]
+# ADR-017: the image is self-preparing. scripts/entrypoint.py validates the
+# configuration, runs `alembic upgrade head`, applies CATALOG_BOOTSTRAP
+# (off | if-empty | replace@<label>; production accepts only off), seeds the
+# gated demo accounts, backfills the integrity verdicts and then execs
+#   uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}
+#           --workers ${WEB_CONCURRENCY:-2} --no-server-header --proxy-headers
+# Every step is idempotent, so a PaaS whose only hook is this command (no
+# shell, no pre-deploy job) still deploys a migrated, populated, consistent
+# database. Compose files keep their explicit `command:` overrides.
+CMD ["python", "scripts/entrypoint.py"]

@@ -22,6 +22,32 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Added — self-bootstrapping container entrypoint for shell-less hosts (ADR-017, 2026-09-08)
+
+After ADR-016 the live demo on Render answered `/recommend` with 500 and the
+demo login with 401: the database was at migration `0005` with the legacy
+synthetic catalog, and the hosting plan offers no shell, no pre-deploy hook
+and no editable start command to run the documented upgrade. The image now
+prepares its own database.
+
+- **`backend/scripts/entrypoint.py`** is the Dockerfile `CMD`: validate the
+  configuration → `alembic upgrade head` (PostgreSQL advisory lock, asserts
+  head) → catalog bootstrap → gated demo accounts → integrity backfill →
+  `exec uvicorn … --port ${PORT:-8000} --workers ${WEB_CONCURRENCY:-2}`.
+  Every step is idempotent; `--no-server` runs the steps and exits; anything
+  after `--` replaces the server command. Exit 2 on a configuration error,
+  1 when a step fails (never serve from a half-prepared database).
+- **`CATALOG_BOOTSTRAP`** setting: `off` (default) · `if-empty` · `replace@<label>`.
+  A replacement runs **once per label per database**; the label is claimed in
+  the new **`bootstrap_runs`** table (migration `0008`, idempotent like
+  `0006`) before anything is deleted and released if the load fails.
+  `APP_ENV=production` refuses every value but `off` at boot (`validate_runtime`)
+  and again inside the step — the sample catalog is synthetic (ADR-016).
+- Compose files unchanged (explicit `command:` everywhere); Render upgrade
+  is now dashboard-only — `docs/DEPLOYMENT.md` → "PaaS without a shell".
+- Tests: `tests/test_entrypoint.py` (41) — grammar, once-per-label lock,
+  failure release, production refusal, image wiring, subprocess boot on SQLite.
+
 ### Added — Catalog-integrity gate: a product must be true before it can be recommended (ADR-016, 2026-09-07)
 
 Root cause fixed: a live probe returned, for *rug*, a card titled «فرش modern»
