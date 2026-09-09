@@ -65,6 +65,7 @@ Reason codes (ADR-016, `ai/catalog_integrity.py`): truth tier —
 ## Admin
 | GET | `/admin/users`, `/admin/subscriptions`, `/admin/stats`, `/admin/taxonomy` | `/admin/stats` adds ADR-016 `integrity_excluded_products` and `catalog_integrity{policy_version, strict, by_category{eligible, excluded, unchecked}, reason_counts}` |
 | PATCH | `/admin/users/{id}` | toggle active / change role |
+| DELETE | `/admin/users/{id}?reason=` | administrative erasure: same cascade + audit-trail pseudonymisation as `DELETE /users/me` (`app/services/erasure.py`); `404` unknown, `409` self-deletion or last active admin; returns `{id, audit_pseudonym, email_pseudonym, audit_rows_pseudonymised, redis_keys_purged}` — never the e-mail |
 
 ## Health, readiness and metrics
 

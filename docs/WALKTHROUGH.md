@@ -60,8 +60,9 @@ Prep: `docker-compose up --build` (or dev mode per README). Seeded accounts:
     color/style/material chips and a **confidence %**.
 18. Click **Edit** → show the human-in-the-loop JSON editor → fix price →
     **Save** → **Verify**. The product is now eligible for recommendations.
-19. `/admin/users` — disable/enable a user; `/admin/subscriptions` — see the
-    demo user's Pro plan from step 7.
+19. `/admin/users` — disable/enable a user, or **Delete** one (confirm →
+    full erasure, audited under your name; your own row has no Delete);
+    `/admin/subscriptions` — see the demo user's Pro plan from step 7.
 
 ## Closing points (30 s)
 - 43 automated tests green, incl. **30/30 recommender** + p95 latency test.

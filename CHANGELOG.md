@@ -22,6 +22,39 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Added — administrative account erasure `DELETE /admin/users/{id}` (P4-B·1, 2026-09-09)
+
+Until now the only way to remove an account was the owner's own
+`DELETE /users/me`, which needs the owner's password. Throwaway accounts from
+load tests and live probes therefore accumulated in the demo database
+(35 of 40 users) with no lawful way to purge them from the portal.
+
+* **Backend.** The Stage 03 erasure cascade moved out of the route into
+  `app/services/erasure.py` (`erase_account`, `pseudonym_for`, `truncate_ip`)
+  and is now the single implementation behind both `DELETE /users/me` and the
+  new `DELETE /admin/users/{user_id}?reason=`. The admin route refuses
+  self-deletion and the removal of the last active administrator with `409`
+  (same guards as `PATCH /admin/users/{id}`), returns `404` for unknown ids,
+  and writes **two** `user_delete` audit rows: one under the erased account's
+  pseudonym (identical to self-service) and one under the actor naming the
+  target only by pseudonym and keyed e-mail digest (`p***@example.com#a1b2c3d4`).
+  Neither the audit trail nor the response carries the erased e-mail. Redis
+  recommendation caches and rate-limit buckets for the id are purged; a Redis
+  outage is logged and reported (`redis_keys_purged: null`), never blocks the
+  erasure. Tokens of the erased user die with the row.
+  `tests/test_admin_user_delete.py` (17 tests) + `DELETE` added to the RBAC
+  matrix in `tests/test_idor_rbac.py`.
+* **Operator CLI.** `backend/scripts/purge_accounts.py` — bulk erasure
+  through the same endpoint (glob on e-mail, `*@smartdecor.dev` protected
+  by default, administrators skipped unless `--include-admins`, password
+  prompted never passed, **dry-run unless `--yes`**). Used to remove the
+  35 probe accounts from the live demo.
+* **Frontend.** `/admin/users` gains a **Delete** control per row (native
+  confirm with the exact consequences, hidden on the administrator's own row),
+  verbatim surfacing of the backend's `409`/`404` sentence, a success toast
+  with the audit pseudonym, and an e-mail/name filter box. Pure helpers in
+  `src/lib/adminUsers.ts`; `tests/unit/adminUsersDelete.test.tsx` (6 tests).
+
 ### Added — self-bootstrapping container entrypoint for shell-less hosts (ADR-017, 2026-09-08)
 
 After ADR-016 the live demo on Render answered `/recommend` with 500 and the

@@ -144,6 +144,7 @@ def test_hostile_identifiers_never_500(client, make_user, path, ident):
 
 ADMIN_ONLY = [
     ("GET", "/api/v1/admin/users"),
+    ("DELETE", "/api/v1/admin/users/" + "0" * 32),
     ("GET", "/api/v1/admin/subscriptions"),
     ("GET", "/api/v1/admin/stats"),
     ("GET", "/api/v1/products"),

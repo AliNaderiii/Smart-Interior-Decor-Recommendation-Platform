@@ -84,6 +84,7 @@ docker compose exec backend alembic revision --autogenerate -m "…"
 | pgvector missing | `docker compose exec postgres psql -U decor -c "CREATE EXTENSION IF NOT EXISTS vector"` then re-run migrations |
 | dead seller links | `python scripts/check_links.py` (sets `seller_link_ok`, UI shows red dot) |
 | rotate JWT secret | change `SECRET_KEY`, restart backend — all sessions invalidated by design |
+| remove accounts (spam wave, probe/test users, batch of erasure requests) | portal `/admin/users` → **Delete** (one at a time) or `python scripts/purge_accounts.py --api https://<host>/api/v1 --match '<glob>'` — prints the plan; add `--yes` to apply. Goes through `DELETE /admin/users/{id}` (audited under the acting admin, `*@smartdecor.dev` protected by default) |
 
 ## 7. Security posture (acceptance criteria mapping)
 
