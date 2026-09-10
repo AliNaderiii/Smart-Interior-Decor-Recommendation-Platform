@@ -22,6 +22,43 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Fixed — operator CLIs refuse a bad `DATABASE_URL` with a sentence, not a traceback (P4-B·2b, 2026-09-09)
+
+The first live run of the seller-feed importer (ADR-018, merged in #29)
+crashed on `import app.db.session` with
+`sqlalchemy.exc.ArgumentError: Could not parse SQLAlchemy URL` — the guide's
+`<placeholder>` was still in `DATABASE_URL`. Nothing was written and Basalam
+was never contacted, but the failure was a stack trace instead of an
+instruction, and the next attempt would have hit a second wall: Render's
+dashboard prints `postgresql://…`, which SQLAlchemy routes to psycopg2, a
+driver this project does not ship.
+
+* **`app/core/config.py`.** `Settings.DATABASE_URL` is normalised: driver-less
+  `postgresql://` / `postgres://` become `postgresql+psycopg://` (psycopg 3 is
+  the only PostgreSQL driver in `requirements.txt`); explicit drivers, SQLite
+  and everything else pass through unchanged, surrounding whitespace is dropped.
+  `normalise_database_url()` is the single rule.
+* **`app/db/preflight.py`** (new). `check_database_url()` — offline: empty,
+  guide placeholder (`<…>`, `…`, Persian text), unparsable, foreign dialect,
+  missing driver, PostgreSQL without host; `probe()` — one `SELECT 1`, the
+  Alembic revision, and with `require_schema=True` a refusal when the database
+  is behind this checkout's head or was never migrated. Every refusal is a
+  `DatabaseProblem` with *problem* + *fix*; the URL is rendered with the
+  password as `***` and a pasted value is never echoed (it may sit next to a
+  real secret). Hostnames without a domain (`postgres`, Render's *Internal*
+  URL) get the specific hint: use the External Database URL.
+* **`scripts/import_catalog.py`.** The preflight runs first in `file` and
+  `basalam` — before the feed is read and before the gateway is contacted —
+  and `--check-db` runs it alone and prints the target
+  (`database: postgresql+psycopg://…render.com/decor (postgresql/psycopg, alembic 0008, APP_ENV=development)`,
+  credentials rendered as `***`).
+  Exit code `2`, consistent with the other usage errors. A second line
+  reports the vision provider, model and the *state* of its key (set /
+  missing / still a guide placeholder) — never the key.
+* Docs: ADR-018 addendum, `docs/ops/CATALOG_IMPORT.fa.md` §3 (External URL,
+  `--check-db` first), `.env.example`. `tests/test_db_preflight.py` (30 tests,
+  no PostgreSQL connection opened).
+
 ### Added — administrative account erasure `DELETE /admin/users/{id}` (P4-B·1, 2026-09-09)
 
 Until now the only way to remove an account was the owner's own
