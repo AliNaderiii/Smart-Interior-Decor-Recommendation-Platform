@@ -1,11 +1,11 @@
 {
-  "_note": "Recorded-shape fixture for the Basalam Open API search endpoint (POST /v1/products/search). Field names follow the official basalam/python-sdk models (ProductItemResponse, ImageResponse, PublicVendorResponse, CategoryProductResponse); values are synthetic test data, not real listings. The envelope is the single-key wrapper the SDK unwraps.",
+  "_note": "Recorded-shape fixture for the Basalam Open API search endpoint (POST /v1/products/search). Field names follow the official basalam/python-sdk models (ProductItemResponse, ImageResponse, PublicVendorResponse, CategoryProductResponse); values are synthetic test data, not real listings; money is in RIAL like the live gateway (340000000 = 34,000,000 toman). This dialect is what the token-gated GET /v1/products/{id} and /v1/vendors/{id}/products return; the public search answers in the shape of basalam_search_live_shape.json. The envelope is the single-key wrapper the SDK unwraps.",
   "openapi_raw_data": [
     {
       "id": 24223620,
       "title": "مبل راحتی مدل اسکارلت سه نفره",
-      "price": 34000000,
-      "primary_price": 36000000,
+      "price": 340000000,
+      "primary_price": 360000000,
       "photo": {
         "id": 1,
         "original": "https://statics.example-basalam.test/p/scarlet-sofa.jpg",
@@ -37,7 +37,7 @@
     {
       "id": 25410382,
       "title": "فرش دستباف تبریز ۶ متری لاکی",
-      "price": 185000000,
+      "price": 1850000000,
       "photo": {"id": 2, "original": "https://statics.example-basalam.test/p/tabriz-rug.jpg"},
       "status": {"name": "در دسترس", "value": 2976},
       "vendor": {"id": 502, "identifier": "farsh-tabriz", "title": "فرش تبریز"},
@@ -55,7 +55,7 @@
     {
       "id": 26000001,
       "title": "کوسن مخمل سبز ۴۵×۴۵",
-      "price": 450000,
+      "price": 4500000,
       "photo": {"id": 3, "original": "https://statics.example-basalam.test/p/green-cushion.jpg"},
       "status": {"name": "ناموجود", "value": 3790},
       "vendor": {"id": 503, "identifier": "decor-home", "title": "دکور هوم"},
@@ -66,7 +66,7 @@
     {
       "id": 26000002,
       "title": "لوستر فلزی مشکی شش شعله",
-      "price": 7800000,
+      "price": 78000000,
       "photo": {"id": 4, "original": "https://statics.example-basalam.test/p/black-chandelier.jpg"},
       "status": {"name": "در دسترس", "value": 2976},
       "vendor": {"id": 504, "identifier": "noor-light", "title": "نور لایت"},
@@ -78,7 +78,7 @@
     {
       "id": 26000003,
       "title": "کیف چرم دست‌دوز",
-      "price": 2200000,
+      "price": 22000000,
       "photo": {"id": 5, "original": "https://statics.example-basalam.test/p/leather-bag.jpg"},
       "status": {"name": "در دسترس", "value": 2976},
       "vendor": {"id": 505, "identifier": "charm-kar", "title": "چرم کار"},

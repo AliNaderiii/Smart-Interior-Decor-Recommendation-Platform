@@ -18,6 +18,9 @@ Usage (dry-run is the default — nothing is written until ``--yes``)::
     # is DATABASE_URL the database I think it is? (no rows read or written)
     python scripts/import_catalog.py --check-db
 
+    # what did Basalam actually send? (reads a --dump-raw file; no database, no network)
+    python scripts/import_catalog.py --inspect-raw basalam-raw.json
+
 Before anything else the target database is checked (``app.db.preflight``):
 a placeholder or unparsable ``DATABASE_URL``, a missing driver, an unreachable
 host or a schema behind this code all stop the run with a one-line reason and
@@ -61,6 +64,9 @@ def build_parser() -> argparse.ArgumentParser:
                         help="print the CSV template to stdout and exit")
     parser.add_argument("--check-db", action="store_true",
                         help="validate DATABASE_URL, connect once, print the target and exit")
+    parser.add_argument("--inspect-raw", type=Path, default=None, metavar="FILE",
+                        help="print how the adapter reads the items in a --dump-raw file, then exit "
+                             "(offline: no database, no gateway)")
     sub = parser.add_subparsers(dest="adapter")
 
     def common(p: argparse.ArgumentParser) -> None:
@@ -102,6 +108,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="fall back to packaging_dimensions when no product dimensions exist (box ≠ product)")
     b.add_argument("--dump-raw", type=Path, default=None,
                    help="write the first raw search response here (to confirm the envelope shape)")
+    b.add_argument("--price-unit", choices=basalam_adapter.PRICE_UNITS, default=basalam_adapter.PRICE_UNIT,
+                   help="unit of the gateway's price fields (verified: rial, i.e. 10× the toman shown on "
+                        "basalam.com); override only if the gateway changes")
     b.add_argument("--token", default=None, help="personal access token (or env BASALAM_TOKEN)")
     b.add_argument("--base-url", default=basalam_adapter.BASE_URL)
     common(b)
@@ -145,6 +154,8 @@ def _print_summary(report: pipeline.ImportReport) -> None:
     for r in report.rows:
         if r.action in ("rejected", "skipped") and shown < 15:
             print(f"   - {r.action:8} {r.source_product_id or '?':>14}  {','.join(r.codes)}  {r.title_fa[:50]}")
+            for note in r.warnings[:2]:
+                print(f"       ↳ {note[:200]}")
             shown += 1
 
 
@@ -190,6 +201,69 @@ def _vision_summary(settings: Any) -> str:
     else:
         state = "key set"
     return f"{provider} model={model} {state}"
+
+
+def inspect_raw(path: Path, *, price_unit: str = basalam_adapter.PRICE_UNIT, limit: int = 5) -> int:
+    """Offline diagnosis of a ``--dump-raw`` file: envelope, item keys, and what the adapter makes of them.
+
+    Prints, for the first ``limit`` items, the fields that decide acceptance
+    (title, price as read + as toman, photo URL or the raw photo value,
+    category label, availability, seller link) followed by the normaliser's
+    verdict — the same code path the import uses, without a database.
+    """
+    from app.services.catalog_import.contract import RowRejected, map_category, normalize_row
+
+    if not path.exists():
+        print(f"error: {path} does not exist", file=sys.stderr)
+        return EXIT_USAGE
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except ValueError as exc:
+        print(f"error: {path} is not JSON ({exc})", file=sys.stderr)
+        return EXIT_USAGE
+    query = payload.get("query") if isinstance(payload, dict) else None
+    response = payload.get("response", payload) if isinstance(payload, dict) and "response" in payload else payload
+    items = basalam_adapter.find_product_list(response)
+    print(f"file: {path}")
+    if query:
+        print(f"query: {query}")
+    if isinstance(response, dict):
+        print(f"envelope keys: {', '.join(list(response)[:12])}")
+    print(f"items found: {len(items)}")
+    if not items:
+        print("   (no product list recognised — send this file to the maintainer)")
+        return EXIT_FAILED
+    first = basalam_adapter._unwrap(items[0])
+    print(f"item keys: {', '.join(list(first)[:40])}")
+    # the search term decides the fallback category exactly as iter_search does
+    target = next((cat for cat, terms in basalam_adapter.CATEGORY_QUERIES.items() if query in terms), None)
+    if query and target is None:
+        print(f"(query {query!r} is not one of the built-in terms — declared labels must map on their own)")
+    ok = 0
+    for raw_item in items[:limit]:
+        row = basalam_adapter.item_to_row(raw_item, target_category=target, price_unit=price_unit)
+        row["category"] = basalam_adapter._pick_category(row, map_category)
+        print(f"\n-- item {row['source_product_id'] or '?'}: {str(row['title_fa'])[:70]}")
+        print(f"   price: {row.get('price')!r} {row['currency']}  category: {row.get('feed_category')!r} → "
+              f"{row['category'] or '<unmapped>'}  available: {row['available']}  "
+              f"has_variation: {row['has_variation']}")
+        print(f"   image_url: {row['image_url'] or '<none>'}")
+        if row.get("image_raw"):
+            print(f"   image_raw: {row['image_raw']}")
+        print(f"   seller_link: {row['seller_link'] or '<none>'}")
+        try:
+            feed = normalize_row(row, source=basalam_adapter.SOURCE)
+        except RowRejected as exc:
+            print(f"   verdict: REJECTED {','.join(exc.codes)}")
+            for note in exc.details:
+                print(f"     ↳ {note}")
+        else:
+            ok += 1
+            print(f"   verdict: ok → {feed.price_toman:,} toman, category={feed.category}"
+                  + (f", warnings={feed.warnings}" if feed.warnings else ""))
+    print(f"\n{ok}/{min(limit, len(items))} inspected items pass the normaliser "
+          "(the image download, vision check and integrity gate run only at import time)")
+    return EXIT_OK
 
 
 def run_file(args: argparse.Namespace) -> int:
@@ -266,13 +340,15 @@ def run_basalam(args: argparse.Namespace) -> int:
         with basalam_adapter.BasalamClient(token=token, base_url=args.base_url) as client:
             if args.vendor:
                 rows_iter = basalam_adapter.iter_vendor(
-                    client, args.vendor, use_packaging_dimensions=args.use_packaging_dimensions, on_raw=on_raw,
+                    client, args.vendor, use_packaging_dimensions=args.use_packaging_dimensions,
+                    price_unit=args.price_unit, on_raw=on_raw,
                 )
             else:
                 rows_iter = basalam_adapter.iter_search(
                     client, queries=queries, rows=args.rows, max_per_query=args.max_per_query,
                     vendor_identifier=args.vendor_identifier, details=args.details,
-                    use_packaging_dimensions=args.use_packaging_dimensions, on_raw=on_raw,
+                    use_packaging_dimensions=args.use_packaging_dimensions, price_unit=args.price_unit,
+                    on_raw=on_raw,
                 )
             rows = list(rows_iter)
     except basalam_adapter.BasalamError as exc:
@@ -312,6 +388,8 @@ def main(argv: list[str] | None = None) -> int:
         return EXIT_OK
     if args.check_db:
         return check_database()
+    if args.inspect_raw is not None:
+        return inspect_raw(args.inspect_raw)
     if args.adapter == "file":
         return run_file(args)
     if args.adapter == "basalam":

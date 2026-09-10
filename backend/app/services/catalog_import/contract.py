@@ -54,6 +54,8 @@ _CATEGORY_ALIASES: dict[str, str] = {
     "میز جلومبلی": "coffee_table", "میز جلو مبلی": "coffee_table", "میز عسلی": "coffee_table",
     "جلومبلی": "coffee_table", "عسلی": "coffee_table",
     "rug": "rug", "carpet": "rug", "فرش": "rug", "قالی": "rug", "قالیچه": "rug", "گلیم": "rug",
+    # Basalam's own leaf titles (search hits carry ``categoryTitle``)
+    "فرش دستباف": "rug", "فرش دستبافت": "rug", "فرش ماشینی": "rug", "فرش مدرن": "rug", "قالی دستباف": "rug",
     "lighting": "lighting", "lamp": "lighting", "chandelier": "lighting", "روشنایی": "lighting",
     "لوستر": "lighting", "آباژور": "lighting", "چراغ": "lighting", "چراغ ایستاده": "lighting",
     "چراغ رومیزی": "lighting", "چراغ آویز": "lighting",
@@ -61,20 +63,28 @@ _CATEGORY_ALIASES: dict[str, str] = {
     "مبل تک نفره": "chair", "مبل تک‌نفره": "chair",
     "storage": "storage", "cabinet": "storage", "shelf": "storage", "bookcase": "storage",
     "sideboard": "storage", "tv stand": "storage", "بوفه": "storage", "ویترین": "storage",
-    "شلف": "storage", "قفسه": "storage", "کتابخانه": "storage", "کمد": "storage",
+    "شلف": "storage", "قفسه": "storage", "کتابخانه": "storage", "کمد": "storage", "شلف و استند": "storage",
     "میز تلویزیون": "storage", "کنسول": "storage", "دراور": "storage",
     "decor": "decor", "decoration": "decor", "دکور": "decor", "دکوری": "decor", "دکوراتیو": "decor",
-    "کوسن": "decor", "تابلو": "decor", "آینه": "decor", "گلدان": "decor", "شمعدان": "decor",
+    "کوسن": "decor", "بالش و کوسن": "decor", "تابلو": "decor", "آینه": "decor", "گلدان": "decor", "شمعدان": "decor",
     "مجسمه": "decor", "ساعت دیواری": "decor", "لوازم دکوری": "decor",
 }
 
 
 class RowRejected(ValueError):
-    """The row cannot become a product; ``codes`` says why (stable identifiers)."""
+    """The row cannot become a product; ``codes`` says why (stable identifiers).
 
-    def __init__(self, codes: list[str]):
+    ``details`` are short, human-readable notes — *what* was seen for each
+    failing field (``image_url=<missing> image_raw=photo={'MEDIUM': …}``) —
+    so a report full of ``image_url_invalid`` explains itself without the
+    raw dump. ``title_fa`` is carried so the report can still name the row.
+    """
+
+    def __init__(self, codes: list[str], details: list[str] | None = None, title_fa: str = ""):
         super().__init__(", ".join(codes))
         self.codes = codes
+        self.details = list(details or [])
+        self.title_fa = title_fa
 
 
 @dataclass
@@ -293,6 +303,23 @@ def _url(value: Any, *, field_name: str, allow_local: bool = False) -> str | Non
         return None
 
 
+def _url_problem(value: Any, *, field_name: str) -> str:
+    """Why :func:`_url` said no, in one short phrase (for rejection details)."""
+    text = str(value or "").strip()
+    if not text:
+        return "missing"
+    try:
+        validate_public_url(text, resolve=False, field=field_name)
+    except UnsafeUrl as exc:
+        return str(exc)[:120]
+    return "ok"
+
+
+def _short(value: Any, limit: int = 160) -> str:
+    text = repr(value) if not isinstance(value, str) else value
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
 def normalize_row(
     raw: Mapping[str, Any],
     *,
@@ -315,6 +342,7 @@ def normalize_row(
     """
     codes: list[str] = []
     warnings: list[str] = []
+    details: list[str] = []
     if not source or len(source) > SOURCE_MAX_LEN:
         raise RowRejected(["source_invalid"])
 
@@ -332,6 +360,7 @@ def normalize_row(
         category = default_category
     if category is None:
         codes.append("category_unmapped")
+        details.append(f"category={_short(raw.get('category'), 60)!s}")
 
     price = to_int(raw.get("price_toman"), allow_zero=False)
     if price is None:
@@ -344,11 +373,19 @@ def normalize_row(
             price = base
     if price is None or price > MAX_PRICE_TOMAN:
         codes.append("price_invalid")
+        details.append(f"price_toman={_short(raw.get('price_toman'), 40)} price={_short(raw.get('price'), 40)} "
+                       f"currency={raw.get('currency') or 'toman'}")
 
-    image_url = _url(raw.get("image_url") or raw.get("image"), field_name="image_url",
-                     allow_local=allow_local_images)
+    image_value = raw.get("image_url") or raw.get("image")
+    image_url = _url(image_value, field_name="image_url", allow_local=allow_local_images)
     if image_url is None:
         codes.append("image_url_invalid")
+        note = f"image_url={_url_problem(image_value, field_name='image_url')}"
+        if not str(image_value or "").strip() and raw.get("image_raw"):
+            note += f" image_raw={_short(raw.get('image_raw'))}"
+        elif str(image_value or "").strip():
+            note += f" value={_short(image_value, 120)}"
+        details.append(note)
 
     seller_link = ""
     raw_link = raw.get("seller_link") or raw.get("url") or raw.get("product_url")
@@ -384,7 +421,7 @@ def normalize_row(
     room_type = str(raw.get("room_type") or "living_room").strip() or "living_room"
 
     if codes:
-        raise RowRejected(codes)
+        raise RowRejected(codes, details, title_fa=title_fa)
     assert category is not None and price is not None and image_url is not None
 
     return FeedRow(

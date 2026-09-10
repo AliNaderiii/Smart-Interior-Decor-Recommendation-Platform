@@ -97,13 +97,23 @@ python scripts\import_catalog.py file --path ... --seller nilper --yes --verify
 
 ## ۵. مسیر ب — باسلام (Open API رسمی)
 
-جست‌وجوی عمومی توکن نمی‌خواهد. ابتدا شکل واقعی پاسخ را ثبت کنید (از سندباکس من به `openapi.basalam.com` دسترسی نبود؛ این قدم روی سیستم شما انجام می‌شود):
+جست‌وجوی عمومی توکن نمی‌خواهد. شکل واقعی پاسخ جست‌وجو (۱۴۰۵/۰۶/۱۹) ثبت و در `tests/fixtures/basalam_search_live_shape.json` نگه داشته شده: پوشش `{"meta", "facets", "products": [...]}` و هر نتیجه با کلیدهای `name`، `photo: {"MEDIUM", "SMALL"}`، `primaryPrice`، `IsAvailable`، `categoryTitle`، `vendor.name`. **قیمت‌های درگاه به ریال است** (۱۰ برابر عددی که در basalam.com می‌بینید؛ برای نمونه `price: 297000000` = ۲۹٬۷۰۰٬۰۰۰ تومان). آداپتور این را می‌داند و به تومان تبدیل می‌کند (`price_converted_from_rial` در هشدارهای ردیف ثبت می‌شود).
+
+اجرای آزمایشی همیشه با ثبت پاسخ خام:
 
 ```powershell
-python scripts\import_catalog.py basalam --category rug --max-per-query 20 --dump-raw basalam-raw.json --report basalam-dry.json
+python scripts\import_catalog.py basalam --category rug --max-per-query 20 --image-mode link --dump-raw basalam-raw.json --report basalam-dry.json
 ```
 
-* اگر پیام `Basalam returned no products` دیدید، فایل `basalam-raw.json` را برای من بفرستید — پارسر برای هر پوششی که دیده‌ایم آماده است ولی شکل رسمی مستند نشده.
+* اگر ردیف‌ها رد شدند، گزارش می‌گوید **چه چیزی دیده شده** — هر ردیف رد‌شده یک خط `↳` دارد (مثلاً `image_url=missing image_raw=photo={'MEDIUM': None}` یا `price_toman=None price=0 currency=rial`). همان اطلاعات در `basalam-dry.json` زیر `rows[].warnings` است.
+* بدون پایگاه داده و بدون شبکه می‌توانید ببینید آداپتور فایل خام را چطور می‌خواند:
+
+```powershell
+python scripts\import_catalog.py --inspect-raw basalam-raw.json
+```
+
+  خروجی برای پنج قلم اول: قیمت خوانده‌شده و تومانِ حاصل، آدرس عکس (یا مقدار خام اگر پیدا نشد)، برچسب دسته‌ی فروشنده و نگاشت آن، در دسترس‌بودن، لینک فروشنده و حکم نرمال‌ساز. اگر `items found: 0` دیدید یا حکم‌ها غیرمنتظره بود، فایل را برای من بفرستید.
+* اگر روزی باسلام واحد قیمت را عوض کرد: `--price-unit toman` (واحد روی هر ردیف ثبت می‌شود).
 * بعد از این‌که اجرای آزمایشی معقول بود:
 
 ```powershell
@@ -120,7 +130,8 @@ python scripts\import_catalog.py basalam --vendor 78910 --yes
 ```
 
 نکته‌های صداقت داده در این آداپتور:
-* قیمت = `price` (آنچه خریدار می‌پردازد)، نه `primary_price`.
+* قیمت = `price` (آنچه خریدار می‌پردازد)، نه `primary_price`/`primaryPrice` (قیمت پیش از تخفیف)؛ ریال → تومان یک‌بار و با ثبت هشدار. برای محصولِ دارای تنوع (`has_variation`) این قیمت ارزان‌ترین گونه است — پرچم روی ردیف می‌ماند تا در صف بازبینی دیده شود.
+* عکس فقط از ظرف‌های خودِ محصول (`photo`/`photos`/`mainPhoto`/`images`) خوانده می‌شود؛ `vendor.photo` آواتار غرفه است و هرگز عکس محصول نمی‌شود.
 * دسته = برچسب خود فروشنده اگر روی تاکسونومی بنشیند، وگرنه دسته‌ی جست‌وجو — و در هر دو حالت مدل بینایی باید تأیید کند (`image_category_mismatch` در غیر این صورت).
 * ابعاد فقط از ویژگی‌های صریح محصول (طول/عرض/ارتفاع/ابعاد). `packaging_dimensions` جعبه است نه محصول؛ فقط با `--use-packaging-dimensions` و با ثبت منشأ.
 * فروشندگان باسلام عکس کارخانه را به اشتراک می‌گذارند؛ عکس تکراری در همان اجرا ردیف دوم نمی‌سازد (`duplicate_image`).

@@ -277,7 +277,10 @@ def import_rows(
                 category_aliases=category_aliases, default_category=default_category,
             )
         except RowRejected as exc:
-            report.rows.append(RowResult(source_product_id=spid, action="rejected", codes=exc.codes))
+            # ``details`` say what was seen (missing photo, rial price out of
+            # band …) so the report explains a rejection without the raw dump.
+            report.rows.append(RowResult(source_product_id=spid, action="rejected", codes=exc.codes,
+                                         title_fa=exc.title_fa, warnings=exc.details))
             continue
 
         result = RowResult(source_product_id=row.source_product_id, title_fa=row.title_fa,

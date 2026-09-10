@@ -549,7 +549,7 @@ heuristics are exactly how the synthetic seed lied. *Trust
 Digikala/Torob* — no public API, legal and stability risk; the affiliate
 programme (links + prices) can be a later adapter behind the same contract.
 
-**Consequences.** `tests/test_catalog_import.py` (42 tests, no network:
+**Consequences.** `tests/test_catalog_import.py` (42 tests at merge, 50 after the 2026-09-10 addendum; no network:
 fixture transport, in-memory images, mock vision) covers the contract, both
 adapters, the image step, the pipeline invariants above and the CLI. The
 card's "buy from" label is host-derived (`lib/sellerLabel.ts`) so Basalam
@@ -574,6 +574,36 @@ placeholder/unparsable URL, missing driver, unreachable host, or a schema
 behind this checkout's Alembic head each stop the run with exit 2, one line
 naming the problem and one naming the fix, the password always rendered as
 `***`. `tests/test_db_preflight.py` (30 tests) pins both.
+
+*Addendum (2026-09-10, first contact with the gateway).* The first dry-run
+that reached Basalam fetched 60 candidates and rejected all 60 as
+`image_url_invalid` — a correct refusal (no picture, no product) that the
+report could not explain, because a rejection carried only its code. Two
+facts and two decisions. Facts: the public `POST /v1/products/search` does
+**not** answer in the SDK's `ProductItemResponse` dialect but in the search
+engine's own (`name`, `photo: {MEDIUM, SMALL}`, `primaryPrice`,
+`IsAvailable`, `categoryTitle`, `vendor.name`, envelope
+`{meta, facets, products}`), and **every money field of the gateway is in
+rial** — product 28107984 is `price: 297000000` on the API and 29٬700٬000
+toman on its public page; the same ×10 holds for every product checked.
+Decisions: (1) the adapter reads both dialects (case-insensitive photo size
+keys, `mainPhoto`/`images`/`media`, protocol-relative URLs, the product's
+own containers only — never the vendor avatar) and declares
+`currency = "rial"` so the *contract's* single conversion rule applies and
+is recorded on the row (`price_converted_from_rial`); `--price-unit` exists
+as an audited operator override, not as a guess. (2) `RowRejected` carries
+*details* — what was seen for each failing field — and the pipeline keeps
+them on the `RowResult`, so `image_url_invalid` now reads
+`image_url=missing image_raw=photo={'MEDIUM': None, 'SMALL': ''}` in the
+report and on the console; `--inspect-raw <dump>` replays a `--dump-raw`
+file through the adapter and normaliser offline. Recorded shape:
+`tests/fixtures/basalam_search_live_shape.json`; `tests/test_catalog_import.py`
+grows to 50. Had the rial/toman mismatch gone unnoticed, every imported price
+would have been ten times the truth — the price band of the ADR-016 gate
+would have caught many rows as `price_out_of_band`, but not the expensive
+rugs whose ×10 still sits inside the band. The lesson is recorded here
+because it generalises: a marketplace's *unit* is a fact to verify against
+its own storefront, not a field to trust.
 
 ## Data model (ERD)
 

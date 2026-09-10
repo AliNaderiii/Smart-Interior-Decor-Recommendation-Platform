@@ -22,6 +22,45 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Fixed — Basalam importer reads the gateway's real search dialect and rial prices (P4-B·2c, 2026-09-10)
+
+The first dry-run that reached `openapi.basalam.com` fetched 60 candidates
+and rejected every one as `image_url_invalid`. Nothing wrong was written —
+the refusal was right — but the report could not say *why*, and the cause
+was that the public search endpoint answers in the search engine's own
+dialect, not the SDK's `ProductItemResponse` the adapter had been written
+against. Verified against the live engine and public product pages:
+
+* **`backend/app/services/catalog_import/adapters/basalam.py`.** Hits carry `name` (not `title`), `photo:
+  {MEDIUM, SMALL}` (upper-case size keys), `primaryPrice`, `IsAvailable` /
+  `IsSaleable` / `canAddToCart`, `categoryTitle` + `new_categoryId`,
+  `vendor.name`, `status {id, title}`; the envelope is `{meta, facets,
+  products}`. The photo parser is now case-insensitive, accepts
+  `mainPhoto`/`images`/`media`, lists of strings or dicts, nested `{url}`,
+  and protocol-relative `//host/…`; it reads only the *product's* containers
+  (`vendor.photo` is the shop avatar). Availability and category read both
+  dialects. **All gateway prices are rial** (product 28107984: API
+  `297000000`, storefront 29٬700٬000 toman) — the adapter declares
+  `currency="rial"` and the contract's existing rule converts once and
+  records `price_converted_from_rial`; `--price-unit toman` is an explicit,
+  stamped override. `has_variation` is kept on the row (price = cheapest
+  variant). Basalam's leaf titles (`فرش دستباف`, `فرش ماشینی`, `شلف و
+  استند`, `بالش و کوسن`, …) are category aliases.
+* **`backend/app/services/catalog_import/contract.py` / `pipeline.py`.** `RowRejected` carries `details` (what
+  was seen: `image_url=missing image_raw=photo={'MEDIUM': None}`,
+  `price_toman=None price=0 currency=rial`, `category=کیف`) and the row's
+  title; the pipeline stores them on the `RowResult`, so the JSON report and
+  the console (`↳` lines under each rejection) explain themselves.
+* **`scripts/import_catalog.py --inspect-raw <file>`.** Replays a
+  `--dump-raw` file through the adapter and the normaliser offline (no
+  database, no gateway): envelope keys, item keys, and per item the price as
+  read + as toman, the photo URL or the raw photo value, the seller's label
+  and its mapping, availability, seller link and the verdict.
+* Fixture `tests/fixtures/basalam_search_live_shape.json` (recorded shape,
+  synthetic values); the SDK-dialect fixture now uses rial like the gateway.
+  `tests/test_catalog_import.py` 42 → 50. Docs: ADR-018 addendum,
+  `docs/ops/CATALOG_IMPORT.fa.md` §5.
+
 ### Fixed — operator CLIs refuse a bad `DATABASE_URL` with a sentence, not a traceback (P4-B·2b, 2026-09-09)
 
 The first live run of the seller-feed importer (ADR-018, merged in #29)

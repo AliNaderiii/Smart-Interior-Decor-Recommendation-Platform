@@ -1,0 +1,123 @@
+{
+  "_note": "Shape fixture for the real POST /v1/products/search answer (recorded 2026-09-10 from the search engine behind the gateway; the SDK dialect in basalam_search_sample.json is what the token-gated GET /v1/products/{id} returns). Envelope: meta/facets/products. Hits use `name`, `photo: {MEDIUM, SMALL}`, `primaryPrice`, `IsAvailable`, `categoryTitle`, `vendor.name`, and prices in RIAL (10× the toman shown on basalam.com). Values below are synthetic test data.",
+  "correction": null,
+  "meta": {"took": 32, "count": 10000, "algorithm": "search_algorithm_v2:simple"},
+  "facets": {"query_category": {"dominant": {"id": 299, "slug": "handmade-carpet", "level": 3}}},
+  "products": [
+    {
+      "_score": 100346.53,
+      "id": 28107984,
+      "name": "فرش دستباف یک متری طرح شکارگاه کد 4040653",
+      "price": 297000000.0,
+      "primaryPrice": 297000000,
+      "photo": {
+        "MEDIUM": "https://statics.example-basalam.test/public-137/users/law1/10-11/hunting-rug.jpg_512X512X70.jpg",
+        "SMALL": "https://statics.example-basalam.test/public-137/users/law1/10-11/hunting-rug.jpg_256X256X70.jpg"
+      },
+      "photos": [],
+      "video": null,
+      "status": {"id": 2976, "title": "در دسترس"},
+      "stock": 1,
+      "weight": 6000,
+      "has_variation": false,
+      "IsAvailable": true,
+      "IsSaleable": true,
+      "canAddToCart": true,
+      "isFreeShipping": true,
+      "categoryId": 0,
+      "new_categoryId": 299,
+      "categoryTitle": "فرش دستباف",
+      "rating": {"average": 5.0, "count": 1, "signals": 1},
+      "sales_count": 1,
+      "sales_count_week": 1,
+      "tags": [{"id": 100, "title": "ارسال رایگان"}],
+      "ads": {},
+      "vendor": {
+        "id": 1011,
+        "identifier": "gerehcarpetir",
+        "name": "فرش دستبافت گره",
+        "username": "فرش گره (Gereh carpet)",
+        "statusId": 2987,
+        "status": {"id": 2987, "title": "فعال"},
+        "photo": {
+          "LARGE": "https://statics.example-basalam.test/public-10/users/law1/07-23/vendor-avatar.jpg_300X300X70.jpg",
+          "EXTRA_SMALL": "https://statics.example-basalam.test/public-10/users/law1/07-23/vendor-avatar.jpg_50X50X70.jpg"
+        },
+        "owner": {"city": "اصفهان", "id": 5835, "hashId": "law1"}
+      }
+    },
+    {
+      "_score": 100233.17,
+      "id": 41448876,
+      "name": "فرش مدرن طرح پتینه GM-12001 (ارسال رایگان)",
+      "price": 4665600.0,
+      "primaryPrice": 5184000,
+      "photo": {
+        "MEDIUM": "//statics.example-basalam.test/public-197/users/w28q82/05-23/patina-rug.jpg_512X512X70.jpg",
+        "SMALL": "//statics.example-basalam.test/public-197/users/w28q82/05-23/patina-rug.jpg_256X256X70.jpg"
+      },
+      "photos": [],
+      "status": {"id": 2976, "title": "در دسترس"},
+      "stock": 740,
+      "has_variation": true,
+      "IsAvailable": true,
+      "IsSaleable": true,
+      "canAddToCart": true,
+      "new_categoryId": 300,
+      "categoryTitle": "فرش ماشینی",
+      "rating": {"average": 4.8, "count": 37, "signals": 37},
+      "sales_count": 54,
+      "vendor": {"id": 1337929, "identifier": "davinchistore", "name": "فرشینه گلوری", "owner": {"city": "تهران"}}
+    },
+    {
+      "_score": 80180.0,
+      "id": 42115964,
+      "name": "گلیم دستباف قشقایی دو متری",
+      "price": 280000000,
+      "primaryPrice": 280000000,
+      "photo": null,
+      "photos": [],
+      "mainPhoto": {"url": "https://statics.example-basalam.test/public-183/users/YK1qy/04-16/kilim.jpg_512X512X70.jpg"},
+      "status": {"id": 2976, "title": "در دسترس"},
+      "stock": 1,
+      "IsAvailable": true,
+      "IsSaleable": true,
+      "categoryTitle": "گلیم",
+      "vendor": {"id": 209242, "identifier": "rezatorkamani", "name": "فرش رضا ترکمنی"}
+    },
+    {
+      "_score": 80179.87,
+      "id": 44587637,
+      "name": "فرش دستباف نایین ۶ متری",
+      "price": 1837700000.0,
+      "primaryPrice": 1837700000,
+      "photo": {"MEDIUM": null, "SMALL": ""},
+      "photos": [],
+      "status": {"id": 2976, "title": "در دسترس"},
+      "stock": 2,
+      "IsAvailable": true,
+      "IsSaleable": true,
+      "categoryTitle": "فرش دستباف",
+      "vendor": {"id": 77, "identifier": "naeen-carpet", "name": "فرش نایین"}
+    },
+    {
+      "_score": 70000.0,
+      "id": 13441005,
+      "name": "فرش دستباف جفت 6متری طرح تبریز",
+      "price": 1520000000.0,
+      "primaryPrice": 1520000000,
+      "photo": {
+        "MEDIUM": "https://statics.example-basalam.test/public-66/users/L3o3qJ/03-03/tabriz-pair.jpg_512X512X70.jpg",
+        "SMALL": "https://statics.example-basalam.test/public-66/users/L3o3qJ/03-03/tabriz-pair.jpg_256X256X70.jpg"
+      },
+      "photos": [],
+      "status": {"id": 2976, "title": "در دسترس"},
+      "stock": 0,
+      "IsAvailable": false,
+      "IsSaleable": true,
+      "canAddToCart": false,
+      "categoryTitle": "فرش دستباف",
+      "vendor": {"id": 720531, "identifier": "dastbaf_sarbaz", "name": "تولیدی فرش دستباف سرباز (کاشمر)"}
+    }
+  ]
+}
