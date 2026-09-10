@@ -173,6 +173,21 @@ class TestContract:
             "price_invalid", "image_url_invalid",
         }
 
+    def test_rejection_carries_what_was_seen(self):
+        """The report must explain *why* without the raw dump (P4-ب-2c: 60× image_url_invalid told nothing)."""
+        with pytest.raises(contract.RowRejected) as exc:
+            contract.normalize_row(_row(image_url="", image_raw="photo={'MEDIUM': None}"), source=SOURCE)
+        assert exc.value.codes == ["image_url_invalid"]
+        assert exc.value.details == ["image_url=missing image_raw=photo={'MEDIUM': None}"]
+        assert exc.value.title_fa == "مبل راحتی سه‌نفره مدل آرتا"
+
+        with pytest.raises(contract.RowRejected) as exc:
+            contract.normalize_row(_row(image_url="//cdn.x.ir/a.jpg", price_toman="0", category="کیف"), source=SOURCE)
+        assert set(exc.value.codes) == {"image_url_invalid", "price_invalid", "category_unmapped"}
+        joined = " | ".join(exc.value.details)
+        assert "category=کیف" in joined and "price_toman=0" in joined
+        assert "image_url=" in joined and "value=//cdn.x.ir/a.jpg" in joined
+
     def test_normalize_never_guesses_values(self):
         """Unknown tags are dropped and reported; a rial price is converted and reported."""
         row = contract.normalize_row(
@@ -255,7 +270,9 @@ class TestFileAdapter:
 
 # ------------------------------------------------------------ basalam adapter
 
-def _basalam_transport(fixture: dict, *, calls: list | None = None, status: int = 200):
+def _basalam_transport(fixture: dict, *, calls: list | None = None, status: int = 200,
+                       key: str = "openapi_raw_data"):
+    """Fake gateway: ``fixture[key]`` is the product list (SDK dialect by default, ``products`` = live)."""
     def handler(request: httpx.Request) -> httpx.Response:
         if calls is not None:
             calls.append((request.method, request.url.path, request.headers.get("authorization"),
@@ -264,10 +281,10 @@ def _basalam_transport(fixture: dict, *, calls: list | None = None, status: int 
             return httpx.Response(status, json={"message": "nope"})
         if request.url.path == "/v1/products/search":
             body = json.loads(request.content)
-            return httpx.Response(200, json=fixture if body.get("start", 0) == 0 else {"openapi_raw_data": []})
+            return httpx.Response(200, json=fixture if body.get("start", 0) == 0 else {**fixture, key: []})
         if request.url.path.startswith("/v1/products/"):
             pid = request.url.path.rsplit("/", 1)[-1]
-            item = next(i for i in fixture["openapi_raw_data"] if str(i["id"]) == pid)
+            item = next(i for i in fixture[key] if str(i["id"]) == pid)
             return httpx.Response(200, json={**item, "description": "توضیح کامل"})
         return httpx.Response(404)
     return httpx.MockTransport(handler)
@@ -290,7 +307,8 @@ class TestBasalamAdapter:
     def test_item_to_row_maps_fields_honestly(self, fixture):
         sofa = basalam.item_to_row(fixture["openapi_raw_data"][0], target_category="sofa")
         assert sofa["source_product_id"] == "24223620"
-        assert sofa["price_toman"] == 34_000_000            # price, never primary_price
+        assert (sofa["price"], sofa["currency"]) == (340_000_000, "rial")  # price, never primary_price; rial
+        assert contract.normalize_row(sofa, source=basalam.SOURCE).price_toman == 34_000_000
         assert sofa["image_url"].endswith("scarlet-sofa_lg.jpg")
         assert sofa["seller_link"] == "https://basalam.com/mobl-ara/product/24223620"
         assert sofa["seller_name"] == "مبل آرا"
@@ -362,6 +380,86 @@ class TestBasalamAdapter:
 
         assert set(basalam.CATEGORY_QUERIES) == set(tax.categories())
 
+    # ---- the live search dialect (P4-ب-2c: first live run rejected 60/60 as image_url_invalid)
+
+    @pytest.fixture()
+    def live(self):
+        return json.loads((FIXTURES / "basalam_search_live_shape.json").read_text(encoding="utf-8"))
+
+    def test_live_envelope_and_upper_case_photo_keys(self, live):
+        items = basalam.find_product_list(live)
+        assert [i["id"] for i in items] == [28107984, 41448876, 42115964, 44587637, 13441005]
+
+        rug = basalam.item_to_row(items[0], target_category="rug")
+        assert rug["source_product_id"] == "28107984"
+        assert rug["title_fa"].startswith("فرش دستباف یک متری")               # `name`, not `title`
+        assert rug["image_url"].endswith("hunting-rug.jpg_512X512X70.jpg")   # photo.MEDIUM
+        assert "vendor-avatar" not in rug["image_url"]                       # vendor.photo is never the product
+        assert rug["seller_link"] == "https://basalam.com/gerehcarpetir/product/28107984"
+        assert rug["seller_name"] == "فرش دستبافت گره"                        # vendor.name
+        assert rug["category"] == rug["feed_category"] == "فرش دستباف"       # categoryTitle
+        assert contract.map_category(rug["feed_category"]) == "rug"          # Basalam leaf title is a known alias
+        assert rug["basalam_category_id"] == 299                             # new_categoryId
+        assert rug["available"] is True and rug["has_variation"] is False
+        assert "image_raw" not in rug
+
+    def test_live_prices_are_rial_and_become_toman(self, live):
+        items = basalam.find_product_list(live)
+        rug = basalam.item_to_row(items[0], target_category="rug")
+        assert (rug["price"], rug["currency"]) == (297_000_000, "rial")     # never primaryPrice
+        assert "price_toman" not in rug                                       # the contract converts, once
+        feed = contract.normalize_row(rug, source=basalam.SOURCE)
+        assert feed.price_toman == 29_700_000                                 # what basalam.com shows
+        assert "price_converted_from_rial" in feed.warnings
+
+        # discounted product: price (what the buyer pays) < primaryPrice
+        patina = basalam.item_to_row(items[1], target_category="rug")
+        assert patina["price"] == 4_665_600
+        assert contract.normalize_row(patina, source=basalam.SOURCE).price_toman == 466_560
+
+        # operator override, stamped on the row
+        assert basalam.item_to_row(items[0], price_unit="toman")["currency"] == "toman"
+        with pytest.raises(ValueError, match="price_unit"):
+            basalam.item_to_row(items[0], price_unit="dollar")
+
+    def test_photo_shapes_seen_in_the_wild(self, live):
+        items = basalam.find_product_list(live)
+        # protocol-relative → https
+        assert basalam.item_to_row(items[1])["image_url"].startswith("https://statics.example-basalam.test/")
+        # mainPhoto {url}
+        assert basalam.item_to_row(items[2])["image_url"].endswith("kilim.jpg_512X512X70.jpg")
+        # nothing usable → empty URL + the raw value for the report
+        empty = basalam.item_to_row(items[3])
+        assert empty["image_url"] == ""
+        assert "photo={'MEDIUM': None, 'SMALL': ''}" in empty["image_raw"]
+        # size preference and case-insensitivity
+        assert basalam._photo_url({"photo": {"small": "https://x.test/s.jpg", "LARGE": "https://x.test/l.jpg"}}) \
+            == "https://x.test/l.jpg"
+        assert basalam._photo_url({"photo": {"Original": "https://x.test/o.jpg", "md": "https://x.test/m.jpg"}}) \
+            == "https://x.test/o.jpg"
+        assert basalam._photo_url({"images": ["//x.test/a.jpg", "https://x.test/b.jpg"]}) == "https://x.test/a.jpg"
+        assert basalam._photo_url({"photos": [{"lg": "https://x.test/p.jpg"}]}) == "https://x.test/p.jpg"
+        assert basalam._photo_url({"photo": {"WEIRD": "https://x.test/w.jpg"}}) == "https://x.test/w.jpg"
+        assert basalam._photo_url({"photo": "ftp://x.test/w.jpg"}) == ""
+        assert basalam._photo_url({"vendor_photo": {"LARGE": "https://x.test/avatar.jpg"}}) == ""
+        assert basalam._photo_url({}) == ""
+
+    def test_live_availability_flags(self, live):
+        items = basalam.find_product_list(live)
+        assert basalam.item_to_row(items[4])["available"] is False          # IsAvailable false, stock 0
+        assert basalam._available({"IsAvailable": True, "canAddToCart": False}) is False
+        assert basalam._available({"status": {"id": 3790, "title": "ناموجود"}}) is False
+        assert basalam._available({"status": {"id": 2976, "title": "در دسترس"}, "stock": 3}) is True
+
+    def test_live_shape_through_iter_search(self, live):
+        with basalam.BasalamClient(transport=_basalam_transport(live, key="products"),
+                                   pause_seconds=0) as client:
+            rows = list(basalam.iter_search(client, queries={"rug": ["فرش دستباف"]}, rows=48))
+        by_id = {r["source_product_id"]: r for r in rows}
+        assert set(by_id) == {"28107984", "41448876", "42115964", "44587637", "13441005"}
+        assert all(r["category"] == "rug" for r in rows)                     # فرش دستباف/فرش ماشینی/گلیم all map
+        assert by_id["28107984"]["query"] == "فرش دستباف"
+
 
 # --------------------------------------------------------------- image step
 
@@ -379,6 +477,17 @@ class TestImages:
         with pytest.raises(images.ImageUnavailable) as exc:
             images.acquire("https://cdn.x.ir/a.png", store=False)
         assert exc.value.code == "image_invalid"
+
+    def test_cdn_octet_stream_is_sniffed_without_a_warning(self, monkeypatch, caplog):
+        """Basalam's CDN declares ``binary/octet-stream`` for every picture; the
+        first live run printed the upload-mismatch warning 60 times. The sniff
+        decides the format — the warning is for a person mislabelling an upload."""
+        monkeypatch.setattr(images, "_fetch_image_bytes",
+                            lambda url, timeout=30.0: (_png((90, 60, 30)), "binary/octet-stream"))
+        with caplog.at_level("WARNING", logger="app.core.uploads"):
+            got = images.acquire("https://statics.basalam.com/public-1/users/x/01-01/a.jpg_512X512X70.jpg", store=False)
+        assert got.content_type.startswith("image/") and got.phash
+        assert "does not match sniffed format" not in caplog.text
 
     def test_acquire_refuses_unsafe_urls_before_any_fetch(self):
         """The real SSRF guard runs (no monkeypatch): metadata/loopback hosts never get a request."""
@@ -399,6 +508,14 @@ class TestImages:
 # ------------------------------------------------------------------ pipeline
 
 class TestPipeline:
+    def test_rejected_rows_report_title_and_reason(self, db, fetcher):
+        report = _import(db, [_row(source_product_id="NOPIC-1", image_url="", image_raw="photo=None")], fetcher=fetcher)
+        rejected = report.rows[0]
+        assert (rejected.action, rejected.codes) == ("rejected", ["image_url_invalid"])
+        assert rejected.title_fa == "مبل راحتی سه‌نفره مدل آرتا"
+        assert rejected.warnings == ["image_url=missing image_raw=photo=None"]
+        assert report.to_dict()["rows"][0]["warnings"] == rejected.warnings
+
     def test_dry_run_writes_nothing_but_reports_everything(self, db, fetcher, monkeypatch):
         monkeypatch.setattr(pipeline, "persist", lambda img: pytest.fail("dry run must not store images"))
         rows = [_row(source_product_id="DRY-1")]
@@ -545,6 +662,49 @@ class TestPipeline:
         assert p.extraction_raw["provider_error"].startswith("RuntimeError")
         assert p.styles == ["modern", "minimal"]  # seller tags kept; nothing invented
 
+    def test_on_row_reports_each_row_with_review_reasons(self, db, fetcher):
+        """The operator console is fed per row (progress on a 60-row live run)
+        and each result says *why* the vision gate wants a human."""
+        seen: list[pipeline.RowResult] = []
+        rows = [_row(source_product_id="PR-1"),
+                _row(source_product_id="PR-bad", image_url=""),
+                _row(source_product_id="PR-2", image_url="https://cdn.example-seller.ir/p/sofa-second.png")]
+        report = _import(db, rows, fetcher=fetcher, on_row=seen.append)
+        assert [r.source_product_id for r in seen] == ["PR-1", "PR-bad", "PR-2"]
+        assert seen[1].action == "rejected" and seen[1].codes == ["image_url_invalid"]
+        first = report.rows[0]
+        assert first.needs_review is not None
+        if first.needs_review:
+            assert first.review_reasons  # never "needs review" without a reason
+        assert set(report.summary()["review_reasons"]) <= {
+            "low_confidence", "missing_style", "missing_material", "provider_error", "fallback_provider",
+            "unknown_taxonomy_values", "ambiguous_style", "category_mismatch",
+        }
+
+    def test_on_row_failure_never_aborts_the_import(self, db, fetcher):
+        def boom(_r):
+            raise RuntimeError("printer died")
+
+        report = _import(db, [_row(source_product_id="PR-3")], fetcher=fetcher, on_row=boom)
+        assert report.summary()["created"] == 1
+
+    def test_provider_error_text_is_redacted_before_it_is_stored(self, db, fetcher):
+        """An httpx error message embeds the request URL; a key in it must not
+        reach ``extraction_raw`` or the JSON report."""
+        class Leaky:
+            def extract_bytes(self, *a, **k):
+                raise RuntimeError("POST https://generativelanguage.googleapis.com/x:generateContent?key=AQ.SECRET-VALUE")
+
+        report = pipeline.import_rows(
+            db, [_row(source_product_id="PR-leak")], source=SOURCE,
+            options=pipeline.ImportOptions(dry_run=False, image_mode="rehost"),
+            extractor=Leaky(), fetch_image=fetcher, check_link=lambda u: FakeLink(),
+        )
+        p = db.scalar(select(Product).where(Product.source_product_id == "PR-leak"))
+        assert "SECRET-VALUE" not in p.extraction_raw["provider_error"]
+        assert "[REDACTED]" in p.extraction_raw["provider_error"]
+        assert report.rows[0].review_reasons == ["provider_error"]
+
     def test_recommender_excludes_mismatched_import_but_can_see_verified_one(self, db, fetcher):
         from app.services.recommender import _catalog_quality as catalog_quality
 
@@ -570,6 +730,41 @@ class TestCli:
         out = capsys.readouterr().out
         assert out.startswith("source_product_id,title_fa,") and "NLP-1042" in out
 
+    def test_cli_console_is_redacted_and_quiet_by_default(self, monkeypatch):
+        """Regression for the 2026-09-10 live run: every ``httpx`` request line was
+        printed raw, one carried the Gemini key in ``?key=``. The CLI now installs
+        the record-factory redactor before any handler exists and demotes
+        per-request chatter unless ``--verbose``."""
+        import logging
+
+        from app.core import log_redaction
+        from scripts import import_catalog
+
+        # Restore *exactly* what we found: app.main layers a request-id factory on
+        # top of the redactor, and other tests depend on it staying in place.
+        saved_factory = logging.getLogRecordFactory()
+        saved_state = (log_redaction._INSTALLED, log_redaction._PREVIOUS_FACTORY)
+        monkeypatch.setattr(log_redaction, "_INSTALLED", False)
+        root = logging.getLogger()
+        saved_level, saved_handlers = root.level, list(root.handlers)
+        try:
+            root.handlers.clear()
+            import_catalog._configure_logging(verbose=False)
+            import_catalog._configure_logging(verbose=False)  # idempotent: no double wrapping
+            assert logging.getLogger("httpx").level == logging.WARNING
+            record = logging.getLogger("httpx").makeRecord(
+                "httpx", logging.INFO, __file__, 1,
+                'HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/m:generateContent?key=AQ.LEAKED-KEY "200"',
+                (), None)
+            assert "LEAKED-KEY" not in record.getMessage() and "[REDACTED]" in record.getMessage()
+        finally:
+            root.handlers[:] = saved_handlers
+            root.setLevel(saved_level)
+            for name in ("httpx", "httpcore", "app.core.uploads", "PIL", "alembic"):
+                logging.getLogger(name).setLevel(logging.NOTSET)
+            logging.setLogRecordFactory(saved_factory)
+            log_redaction._INSTALLED, log_redaction._PREVIOUS_FACTORY = saved_state
+
     def test_file_dry_run_end_to_end(self, tmp_path, monkeypatch, fetcher, capsys):
         from scripts import import_catalog
 
@@ -585,8 +780,11 @@ class TestCli:
         out = capsys.readouterr().out
         assert code == 0, out
         assert "DRY-RUN (nothing written)" in out and "created=1" in out
+        assert "[1/1]   NLP-1042  created" in out                 # one progress line per row
+        assert "note: nothing is recommendable yet" in out        # no --verify → said out loud
         data = json.loads(report.read_text(encoding="utf-8"))
         assert data["summary"]["dry_run"] is True and data["rows"][0]["source_product_id"] == "NLP-1042"
+        assert "review_reasons" in data["summary"] and "review_reasons" in data["rows"][0]
         from app.db.session import SessionLocal
 
         with SessionLocal() as s:
@@ -602,6 +800,26 @@ class TestCli:
         assert import_catalog.main(["basalam", "--category", "shoes"]) == 2
         assert import_catalog.main(["basalam", "--query", "nonsense"]) == 2
         assert import_catalog.main([]) == 2
+
+    def test_inspect_raw_explains_a_dump_offline(self, tmp_path, capsys):
+        from scripts import import_catalog
+
+        live = json.loads((FIXTURES / "basalam_search_live_shape.json").read_text(encoding="utf-8"))
+        dump = tmp_path / "basalam-raw.json"
+        dump.write_text(json.dumps({"query": "فرش دستباف", "response": live}, ensure_ascii=False), encoding="utf-8")
+        assert import_catalog.main(["--inspect-raw", str(dump)]) == 0
+        out = capsys.readouterr().out
+        assert "query: فرش دستباف" in out and "items found: 5" in out
+        assert "envelope keys: _note, correction, meta, facets, products" in out
+        assert "price: 297000000 rial  category: 'فرش دستباف' → rug" in out
+        assert "verdict: ok → 29,700,000 toman, category=rug" in out
+        assert "image_raw: photo={'MEDIUM': None, 'SMALL': ''}" in out
+        assert "verdict: REJECTED image_url_invalid" in out
+        assert "4/5 inspected items pass the normaliser" in out
+
+        assert import_catalog.main(["--inspect-raw", str(tmp_path / "missing.json")]) == 2
+        (tmp_path / "empty.json").write_text('{"response": {"products": []}}', encoding="utf-8")
+        assert import_catalog.main(["--inspect-raw", str(tmp_path / "empty.json")]) == 1
 
     def test_basalam_cli_uses_fixture_transport(self, monkeypatch, fetcher, capsys, tmp_path):
         from scripts import import_catalog

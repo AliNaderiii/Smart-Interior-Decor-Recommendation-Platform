@@ -1,41 +1,71 @@
 """Basalam Open API → importer rows (official gateway ``openapi.basalam.com``).
 
-What is known for certain (verified 2026-09-09 against the official
-``basalam/python-sdk`` and ``developers.basalam.com/docs/quick-start``):
+Two dialects, both verified (2026-09-09 against ``basalam/python-sdk`` and
+``developers.basalam.com/docs/quick-start``; 2026-09-10 against the live
+search engine the gateway fronts, cross-checked with public product pages):
 
 * ``POST /v1/products/search`` — JSON body ``{"q", "rows", "start",
-  "filters": {"minPrice", "maxPrice", "slug", "vendorIdentifier", …}}``. The
-  SDK sends it **without** a token (``require_auth=False``).
-* ``GET /v1/products/{id}`` and ``GET /v1/vendors/{id}/products?page&per_page``
-  need a bearer token (personal access token from the developer panel).
-* Product objects (``ProductItemResponse`` / ``ProductResponseSchema``): ``id``,
-  ``title``, ``price`` (toman), ``primary_price`` (pre-discount), ``photo``
-  ``{original, xs, sm, md, lg}``, ``photos[]``, ``vendor {id, identifier,
-  title, city}``, ``category {id, title, parent}``, ``status {name, value}``,
-  ``inventory``, ``is_available``, ``summary``/``description``,
-  ``attribute_groups[].attributes[] {title, value, unit}``,
-  ``packaging_dimensions {height, width, length}``, ``url``.
-* Public product page: ``https://basalam.com/<vendor identifier>/product/<id>``
-  (observed on the live category listing).
+  "filters": {"minPrice", "maxPrice", "slug", "vendorIdentifier", …}}``,
+  **no token**. The response is the search engine's own envelope
+  ``{"meta": …, "facets": …, "products": [hit, …]}`` and each *hit* speaks
+  the search dialect, **not** the SDK models::
 
-What is **not** documented: the exact envelope of the search response. The
-parser therefore accepts every shape seen in the wild (a bare list, a
-single-key wrapper such as ``{"openapi_raw_data": [...]}``, ``{"data": [...]}``,
-``{"data": {"products": [...]}}``, ``{"hits": {"hits": [{"_source": {...}}]}}``)
-and ``scripts/import_catalog.py basalam --dump-raw`` writes the first raw
-response to disk so the shape can be confirmed on a machine that reaches
-the gateway (this sandbox cannot).
+      {"id": 28107984, "name": "فرش دستباف یک متری …",
+       "price": 297000000.0, "primaryPrice": 297000000,
+       "photo": {"MEDIUM": "https://statics.basalam.com/…jpg_512X512X70.jpg",
+                 "SMALL": "…_256X256X70.jpg"}, "photos": [],
+       "status": {"id": 2976, "title": "در دسترس"}, "stock": 1,
+       "IsAvailable": true, "IsSaleable": true, "canAddToCart": true,
+       "vendor": {"id": 1011, "identifier": "gerehcarpetir",
+                  "name": "فرش دستبافت گره", "photo": {"LARGE": …},
+                  "owner": {"city": "اصفهان"}},
+       "categoryTitle": "فرش دستباف", "new_categoryId": 299,
+       "rating": {"average": 5.0, "count": 1}, "sales_count": 1,
+       "weight": 6000, "has_variation": false, "tags": [...], "ads": {}}
+
+* ``GET /v1/products/{id}`` and ``GET /v1/vendors/{id}/products?page&per_page``
+  need a bearer token and answer in the SDK dialect: ``title``, ``photo
+  {original, xs, sm, md, lg}``, ``photos[]``, ``vendor {id, identifier,
+  title, city}``, ``category {id, title, parent}``, ``status {name,
+  value}``, ``inventory``, ``is_available``, ``summary``/``description``,
+  ``attribute_groups[].attributes[] {title, value, unit}`` or
+  ``attributes[] {key, value}``, ``packaging_dimensions``, ``url``.
+
+* **Money is rial in both dialects.** Product 28107984 is listed at
+  ``price: 297000000`` and its page sells it for 29٬700٬000 تومان; the same
+  ×10 holds for every product checked (also ``primaryPrice`` and the
+  ``freeShippingToIran`` thresholds). The adapter therefore declares
+  ``currency = "rial"`` (:data:`PRICE_UNIT`) and lets the contract apply its
+  single conversion rule (``price // 10`` + ``price_converted_from_rial``);
+  ``--price-unit toman`` exists only as an operator override should the
+  gateway ever change the unit, and the unit is stamped on the row.
+
+* Public product page: ``https://basalam.com/<vendor identifier>/product/<id>``
+  (verified live).
+
+Photo parsing is deliberately shape-tolerant: size keys are matched
+case-insensitively (``LARGE``/``lg``/``original``/``MEDIUM``/…), containers
+``photo``/``main_photo``/``mainPhoto``/``image``/``photos``/``images``/``media``
+may hold a string, a dict or a list of either, and a protocol-relative
+``//host/…`` becomes ``https://``. Only the *product's own* containers are
+read — ``vendor.photo`` / ``vendor_photo`` are the shop's avatar, never the
+product picture. When nothing usable is found the raw value travels with
+the row (``image_raw``) so the rejection in the report says *what* was seen.
 
 Honesty rules specific to this adapter:
 
-* the **category** is the seller's own category label when it maps onto the
-  taxonomy, otherwise the query's target category — and in both cases the
-  vision check has to agree before a row can be verified;
+* the **category** is the seller's own label (``categoryTitle`` or the
+  ``category`` chain) when it maps onto the taxonomy, otherwise the query's
+  target category — and in both cases the vision check has to agree before
+  a row can be verified;
 * **dimensions** come only from explicit product attributes (طول/عرض/ارتفاع/
   ابعاد). ``packaging_dimensions`` describe the box, not the product, and are
   used only when the operator opts in (``use_packaging_dimensions``), with
   the provenance recorded on the row;
-* **price** is ``price`` (what the buyer pays), never ``primary_price``.
+* **price** is ``price`` (what the buyer pays), never ``primary_price`` /
+  ``primaryPrice`` (the pre-discount figure), and for a product with
+  variations it is the lowest variant's price — ``has_variation`` is kept
+  on the row so the review queue can see it.
 """
 from __future__ import annotations
 
@@ -55,6 +85,9 @@ logger = logging.getLogger(__name__)
 BASE_URL = "https://openapi.basalam.com"
 SOURCE = "basalam"
 PRODUCT_URL = "https://basalam.com/{vendor}/product/{id}"
+#: Unit of every money field the gateway returns (see module docstring).
+PRICE_UNIT = "rial"
+PRICE_UNITS = ("rial", "toman")
 USER_AGENT = "SmartDecor-CatalogImporter/1.0 (+https://github.com/AliNaderiii/Smart-Interior-Decor-Recommendation-Platform)"
 
 #: Search queries per taxonomy category — Persian retail vocabulary, most
@@ -71,6 +104,15 @@ CATEGORY_QUERIES: dict[str, list[str]] = {
 
 #: Basalam status enum (from the SDK): 2976 published; the rest are not sellable.
 _UNSELLABLE_STATUS = {3790, 4184, 3568}
+#: Keys that hold the *product's* picture(s); ``vendor.photo`` / ``vendor_photo``
+#: are the shop avatar and are deliberately absent.
+_PHOTO_CONTAINERS = ("photo", "main_photo", "mainPhoto", "image", "photos", "images", "media")
+#: Size keys, largest bounded rendition first, compared case-insensitively.
+_PHOTO_SIZE_ORDER = ("large", "lg", "original", "medium", "md", "small", "sm",
+                     "extra_small", "xs", "url", "src", "link", "path")
+#: Flags that, when explicitly ``false``, mean "cannot be bought right now".
+_AVAILABILITY_FLAGS = ("is_available", "IsAvailable", "isAvailable", "is_saleable", "IsSaleable",
+                       "isSaleable", "can_add_to_cart", "canAddToCart", "published")
 
 _MATERIAL_ALIASES: dict[str, str] = {
     "چوب": "wood", "چوبی": "wood", "ام دی اف": "wood", "mdf": "wood", "راش": "wood", "گردو": "wood",
@@ -200,24 +242,58 @@ def _unwrap(item: Mapping[str, Any]) -> Mapping[str, Any]:
     return src if isinstance(src, Mapping) else item
 
 
-def _photo_url(item: Mapping[str, Any]) -> str:
-    candidates: list[Any] = [item.get("photo"), item.get("main_photo"), item.get("image")]
-    photos = item.get("photos")
-    if isinstance(photos, list) and photos:
-        candidates.append(photos[0])
-    for photo in candidates:
-        if isinstance(photo, str) and photo.startswith(("http://", "https://")):
-            return photo
-        if isinstance(photo, Mapping):
-            for size in ("lg", "original", "md", "sm"):
-                url = photo.get(size)
-                if isinstance(url, str) and url.startswith(("http://", "https://")):
+def _as_url(value: Any) -> str:
+    """A usable absolute http(s) URL or ``""`` (``//host/…`` → ``https://host/…``)."""
+    if not isinstance(value, str):
+        return ""
+    text = value.strip()
+    if text.startswith("//"):
+        text = "https:" + text
+    return text if text.startswith(("http://", "https://")) else ""
+
+
+def _url_from_photo(photo: Any, depth: int = 0) -> str:
+    """First usable URL inside a photo value of any shape seen in the wild."""
+    if isinstance(photo, str):
+        return _as_url(photo)
+    if isinstance(photo, list):
+        for entry in photo[:5]:
+            url = _url_from_photo(entry, depth)
+            if url:
+                return url
+        return ""
+    if isinstance(photo, Mapping) and depth < 2:
+        by_key = {str(k).strip().lower(): v for k, v in photo.items()}
+        for size in _PHOTO_SIZE_ORDER:
+            if size in by_key:
+                url = _url_from_photo(by_key[size], depth + 1)
+                if url:
+                    return url
+        for value in photo.values():  # unknown size label — still the product's picture
+            if isinstance(value, str):
+                url = _as_url(value)
+                if url:
                     return url
     return ""
 
 
+def _photo_url(item: Mapping[str, Any]) -> str:
+    for key in _PHOTO_CONTAINERS:
+        url = _url_from_photo(item.get(key))
+        if url:
+            return url
+    return ""
+
+
+def _photo_raw(item: Mapping[str, Any], limit: int = 160) -> str:
+    """Compact description of what the photo containers held (for the report)."""
+    parts = [f"{key}={item[key]!r}" for key in _PHOTO_CONTAINERS if key in item]
+    text = " ".join(parts) if parts else "no photo container in item (keys: " + ", ".join(list(item)[:12]) + ")"
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
 def _price(item: Mapping[str, Any]) -> int | None:
-    for key in ("price", "primary_price"):
+    for key in ("price", "primary_price", "primaryPrice"):
         raw = item.get(key)
         if isinstance(raw, Mapping):
             raw = raw.get("value", raw.get("amount"))
@@ -228,20 +304,18 @@ def _price(item: Mapping[str, Any]) -> int | None:
 
 
 def _available(item: Mapping[str, Any]) -> bool:
-    if item.get("is_available") is False or item.get("is_saleable") is False:
+    if any(item.get(flag) is False for flag in _AVAILABILITY_FLAGS):
         return False
     inventory = item.get("inventory", item.get("stock"))
     if inventory is not None and to_int(inventory) == 0:
         return False
     status = item.get("status")
     if isinstance(status, Mapping):
-        value = to_int(status.get("value"))
+        value = to_int(status.get("value", status.get("id")))
         if value in _UNSELLABLE_STATUS:
             return False
-        if str(status.get("name") or "").strip() in ("ناموجود", "غیرفعال"):
+        if str(status.get("name") or status.get("title") or "").strip() in ("ناموجود", "غیرفعال"):
             return False
-    if item.get("published") is False or item.get("can_add_to_cart") is False:
-        return False
     return True
 
 
@@ -268,7 +342,15 @@ def _category_label(item: Mapping[str, Any]) -> str:
         return str(cat.get("title") or cat.get("name") or "")
     if isinstance(cat, str):
         return cat
-    return ""
+    # search dialect: the seller's leaf category arrives as a flat title
+    return str(item.get("categoryTitle") or item.get("category_title") or "").strip()
+
+
+def _category_id(item: Mapping[str, Any]) -> Any:
+    cat = item.get("category")
+    if isinstance(cat, Mapping) and cat.get("id") is not None:
+        return cat.get("id")
+    return item.get("new_categoryId") or item.get("categoryId") or None
 
 
 def _category_chain(item: Mapping[str, Any]) -> list[str]:
@@ -363,32 +445,43 @@ def materials_from_attributes(item: Mapping[str, Any]) -> list[str]:
 
 
 def item_to_row(raw_item: Mapping[str, Any], *, target_category: str | None = None,
-                use_packaging_dimensions: bool = False) -> dict[str, Any]:
-    """One Basalam product object → the mapping ``normalize_row`` reads."""
+                use_packaging_dimensions: bool = False, price_unit: str = PRICE_UNIT) -> dict[str, Any]:
+    """One Basalam product object (either dialect) → the mapping ``normalize_row`` reads.
+
+    ``price_unit`` is stamped on the row as ``currency``; the contract converts
+    rial to toman (``price // 10``) and records ``price_converted_from_rial``.
+    """
+    if price_unit not in PRICE_UNITS:
+        raise ValueError(f"price_unit must be one of {PRICE_UNITS}, got {price_unit!r}")
     item = _unwrap(raw_item)
     product_id = str(item.get("id") or item.get("product_id") or "").strip()
     vendor_identifier, vendor_title = _vendor(item)
     chain = _category_chain(item)
+    label = chain[0] if chain else _category_label(item)
+    image_url = _photo_url(item)
     row: dict[str, Any] = {
         "source_product_id": product_id,
         "title_fa": item.get("title") or item.get("name") or "",
-        "category": chain[0] if chain else _category_label(item),
-        "feed_category": chain[0] if chain else _category_label(item),
+        "category": label,
+        "feed_category": label,
         "category_chain": chain,
         "target_category": target_category,
-        "price_toman": _price(item),
-        "currency": "toman",
-        "image_url": _photo_url(item),
+        "price": _price(item),
+        "currency": price_unit,
+        "image_url": image_url,
         "seller_link": _seller_link(item, vendor_identifier, product_id),
         "seller_name": vendor_title,
         "vendor_identifier": vendor_identifier,
         "description": item.get("summary") or item.get("description") or "",
         "available": _available(item),
         "materials": materials_from_attributes(item),
-        "basalam_category_id": (item.get("category") or {}).get("id") if isinstance(item.get("category"), Mapping) else None,
+        "basalam_category_id": _category_id(item),
         "sales_count": item.get("sales_count"),
         "rating": item.get("rating"),
+        "has_variation": bool(item.get("has_variation")),
     }
+    if not image_url:
+        row["image_raw"] = _photo_raw(item)
     dims = dimensions_from_attributes(item)
     if dims:
         row.update(dims)
@@ -415,7 +508,7 @@ def _pick_category(row: dict[str, Any], map_category: Callable[[Any], str | None
 def iter_search(client: BasalamClient, *, queries: Mapping[str, list[str]] | None = None,
                 rows: int = 48, max_per_query: int = 200, max_pages: int = 20,
                 vendor_identifier: str | None = None, details: bool = False,
-                use_packaging_dimensions: bool = False,
+                use_packaging_dimensions: bool = False, price_unit: str = PRICE_UNIT,
                 on_raw: Callable[[str, Any], None] | None = None) -> Iterator[dict[str, Any]]:
     """Yield importer rows for every (category, query) pair, de-duplicated by product id.
 
@@ -455,7 +548,7 @@ def iter_search(client: BasalamClient, *, queries: Mapping[str, list[str]] | Non
                         except BasalamError as exc:
                             logger.warning("basalam detail fetch failed for %s: %s", product_id, exc)
                     row = item_to_row(item, target_category=category,
-                                      use_packaging_dimensions=use_packaging_dimensions)
+                                      use_packaging_dimensions=use_packaging_dimensions, price_unit=price_unit)
                     row["category"] = _pick_category(row, map_category)
                     row["query"] = term
                     yield row
@@ -466,6 +559,7 @@ def iter_search(client: BasalamClient, *, queries: Mapping[str, list[str]] | Non
 
 def iter_vendor(client: BasalamClient, vendor_id: int | str, *, per_page: int = 50, max_pages: int = 40,
                 default_category: str | None = None, use_packaging_dimensions: bool = False,
+                price_unit: str = PRICE_UNIT,
                 on_raw: Callable[[str, Any], None] | None = None) -> Iterator[dict[str, Any]]:
     """Yield every product of one vendor (token with ``vendor.product.read``)."""
     from app.services.catalog_import.contract import map_category
@@ -485,7 +579,7 @@ def iter_vendor(client: BasalamClient, vendor_id: int | str, *, per_page: int = 
                 continue
             seen.add(product_id)
             row = item_to_row(item, target_category=default_category,
-                              use_packaging_dimensions=use_packaging_dimensions)
+                              use_packaging_dimensions=use_packaging_dimensions, price_unit=price_unit)
             row["category"] = _pick_category(row, map_category)
             yield row
         if len(items) < per_page:

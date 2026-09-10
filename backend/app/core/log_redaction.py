@@ -47,7 +47,7 @@ _QUERY_SECRET_RE = re.compile(
     r"authority|signature|sig|key)\s*[=:]\s*[\"']?([^\s\"'&,;)]{4,})"
 )
 _HEADER_SECRET_RE = re.compile(
-    r"(?i)\b(authorization|cookie|set-cookie|x-csrf-token)\b\s*[:=]\s*[^\s,;]{4,}"
+    r"(?i)\b(authorization|cookie|set-cookie|x-csrf-token|x-goog-api-key|x-api-key)\b\s*[:=]\s*[^\s,;]{4,}"
 )
 _EMAIL_RE = re.compile(r"\b([A-Za-z0-9._%+\-]+)@([A-Za-z0-9.\-]+\.[A-Za-z]{2,})\b")
 _PAN_RE = re.compile(r"\b(?:\d[ -]?){13,19}\b")
@@ -137,12 +137,18 @@ def install_log_redaction() -> None:
     global _INSTALLED, _PREVIOUS_FACTORY
     if _INSTALLED:
         return
-    _PREVIOUS_FACTORY = logging.getLogRecordFactory()
+    previous = logging.getLogRecordFactory()
+    if getattr(previous, "_redacting", False):  # already ours (e.g. state reset without restoring)
+        _INSTALLED = True
+        return
+    _PREVIOUS_FACTORY = previous
 
     def factory(*args, **kwargs):
-        record = _PREVIOUS_FACTORY(*args, **kwargs)
+        record = previous(*args, **kwargs)
         _redact_record(record)
         return record
+
+    factory._redacting = True  # type: ignore[attr-defined]
 
     logging.setLogRecordFactory(factory)
 

@@ -18,6 +18,9 @@ Usage (dry-run is the default — nothing is written until ``--yes``)::
     # is DATABASE_URL the database I think it is? (no rows read or written)
     python scripts/import_catalog.py --check-db
 
+    # what did Basalam actually send? (reads a --dump-raw file; no database, no network)
+    python scripts/import_catalog.py --inspect-raw basalam-raw.json
+
 Before anything else the target database is checked (``app.db.preflight``):
 a placeholder or unparsable ``DATABASE_URL``, a missing driver, an unreachable
 host or a schema behind this code all stop the run with a one-line reason and
@@ -61,6 +64,11 @@ def build_parser() -> argparse.ArgumentParser:
                         help="print the CSV template to stdout and exit")
     parser.add_argument("--check-db", action="store_true",
                         help="validate DATABASE_URL, connect once, print the target and exit")
+    parser.add_argument("--inspect-raw", type=Path, default=None, metavar="FILE",
+                        help="print how the adapter reads the items in a --dump-raw file, then exit "
+                             "(offline: no database, no gateway)")
+    parser.add_argument("--verbose", action="store_true",
+                        help="show every HTTP request and library warning (default: one line per row)")
     sub = parser.add_subparsers(dest="adapter")
 
     def common(p: argparse.ArgumentParser) -> None:
@@ -102,6 +110,9 @@ def build_parser() -> argparse.ArgumentParser:
                    help="fall back to packaging_dimensions when no product dimensions exist (box ≠ product)")
     b.add_argument("--dump-raw", type=Path, default=None,
                    help="write the first raw search response here (to confirm the envelope shape)")
+    b.add_argument("--price-unit", choices=basalam_adapter.PRICE_UNITS, default=basalam_adapter.PRICE_UNIT,
+                   help="unit of the gateway's price fields (verified: rial, i.e. 10× the toman shown on "
+                        "basalam.com); override only if the gateway changes")
     b.add_argument("--token", default=None, help="personal access token (or env BASALAM_TOKEN)")
     b.add_argument("--base-url", default=basalam_adapter.BASE_URL)
     common(b)
@@ -122,6 +133,42 @@ def _options(args: argparse.Namespace) -> pipeline.ImportOptions:
     )
 
 
+def _row_verdict(r: pipeline.RowResult) -> str:
+    """One word an operator can scan: what happened to the row and whether it can be recommended."""
+    if r.action in ("rejected", "skipped"):
+        return f"{r.action} {','.join(r.codes)}"
+    state = "verified" if r.verified else ("review" if r.needs_review else "unverified")
+    if r.integrity_ok is False:
+        state += " EXCLUDED"
+    return f"{r.action} {state}"
+
+
+def _row_notes(r: pipeline.RowResult) -> list[str]:
+    notes: list[str] = []
+    if r.integrity_reasons:
+        notes.append("integrity: " + ",".join(r.integrity_reasons))
+    if r.needs_review and r.review_reasons:
+        notes.append("review: " + ",".join(r.review_reasons))
+    if r.detected_category and r.category and r.detected_category != r.category:
+        notes.append(f"vision saw {r.detected_category!r}, feed says {r.category!r}")
+    notes.extend(w for w in r.warnings if w != "price_converted_from_rial")
+    return notes
+
+
+class _Progress:
+    """``on_row`` printer: one line per finished row, with the reasons that matter."""
+
+    def __init__(self, total: int | None = None):
+        self.total, self.done = total, 0
+
+    def __call__(self, r: pipeline.RowResult) -> None:
+        self.done += 1
+        counter = f"[{self.done}/{self.total}]" if self.total else f"[{self.done}]"
+        print(f"{counter} {r.source_product_id or '?':>10}  {_row_verdict(r):<32} {r.title_fa[:48]}", flush=True)
+        for note in _row_notes(r)[:3]:
+            print(f"      ↳ {note[:200]}", flush=True)
+
+
 def _print_summary(report: pipeline.ImportReport) -> None:
     s = report.summary()
     mode = "DRY-RUN (nothing written)" if s["dry_run"] else "WRITTEN"
@@ -136,15 +183,24 @@ def _print_summary(report: pipeline.ImportReport) -> None:
         print("   by category: " + ", ".join(f"{k}={v}" for k, v in s["by_category"].items()))
     if s["integrity_reasons"]:
         print("   integrity reasons: " + ", ".join(f"{k}×{v}" for k, v in s["integrity_reasons"].items()))
+    if s.get("review_reasons"):
+        print("   review reasons: " + ", ".join(f"{k}×{v}" for k, v in s["review_reasons"].items()))
     if s["rejection_codes"]:
         print("   rejections/skips: " + ", ".join(f"{k}×{v}" for k, v in s["rejection_codes"].items()))
     if s["external_image_origins"]:
         print("   !! pictures are served from seller origins (image_mode=link): add to IMAGE_EXTRA_ORIGINS → "
               + ",".join(s["external_image_origins"]))
+    if s["verified"] == 0 and s["eligible"] and not any(r.verified for r in report.accepted):
+        print("   note: nothing is recommendable yet — rows land in the admin review queue unless --verify is given "
+              "(then clean rows whose picture matches the category are verified automatically)")
     shown = 0
     for r in report.rows:
-        if r.action in ("rejected", "skipped") and shown < 15:
-            print(f"   - {r.action:8} {r.source_product_id or '?':>14}  {','.join(r.codes)}  {r.title_fa[:50]}")
+        if shown >= 15:
+            break
+        if r.action in ("rejected", "skipped") or r.integrity_ok is False or r.needs_review:
+            print(f"   - {_row_verdict(r):<34} {r.source_product_id or '?':>10}  {r.title_fa[:50]}")
+            for note in _row_notes(r)[:3]:
+                print(f"       ↳ {note[:200]}")
             shown += 1
 
 
@@ -192,6 +248,69 @@ def _vision_summary(settings: Any) -> str:
     return f"{provider} model={model} {state}"
 
 
+def inspect_raw(path: Path, *, price_unit: str = basalam_adapter.PRICE_UNIT, limit: int = 5) -> int:
+    """Offline diagnosis of a ``--dump-raw`` file: envelope, item keys, and what the adapter makes of them.
+
+    Prints, for the first ``limit`` items, the fields that decide acceptance
+    (title, price as read + as toman, photo URL or the raw photo value,
+    category label, availability, seller link) followed by the normaliser's
+    verdict — the same code path the import uses, without a database.
+    """
+    from app.services.catalog_import.contract import RowRejected, map_category, normalize_row
+
+    if not path.exists():
+        print(f"error: {path} does not exist", file=sys.stderr)
+        return EXIT_USAGE
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except ValueError as exc:
+        print(f"error: {path} is not JSON ({exc})", file=sys.stderr)
+        return EXIT_USAGE
+    query = payload.get("query") if isinstance(payload, dict) else None
+    response = payload.get("response", payload) if isinstance(payload, dict) and "response" in payload else payload
+    items = basalam_adapter.find_product_list(response)
+    print(f"file: {path}")
+    if query:
+        print(f"query: {query}")
+    if isinstance(response, dict):
+        print(f"envelope keys: {', '.join(list(response)[:12])}")
+    print(f"items found: {len(items)}")
+    if not items:
+        print("   (no product list recognised — send this file to the maintainer)")
+        return EXIT_FAILED
+    first = basalam_adapter._unwrap(items[0])
+    print(f"item keys: {', '.join(list(first)[:40])}")
+    # the search term decides the fallback category exactly as iter_search does
+    target = next((cat for cat, terms in basalam_adapter.CATEGORY_QUERIES.items() if query in terms), None)
+    if query and target is None:
+        print(f"(query {query!r} is not one of the built-in terms — declared labels must map on their own)")
+    ok = 0
+    for raw_item in items[:limit]:
+        row = basalam_adapter.item_to_row(raw_item, target_category=target, price_unit=price_unit)
+        row["category"] = basalam_adapter._pick_category(row, map_category)
+        print(f"\n-- item {row['source_product_id'] or '?'}: {str(row['title_fa'])[:70]}")
+        print(f"   price: {row.get('price')!r} {row['currency']}  category: {row.get('feed_category')!r} → "
+              f"{row['category'] or '<unmapped>'}  available: {row['available']}  "
+              f"has_variation: {row['has_variation']}")
+        print(f"   image_url: {row['image_url'] or '<none>'}")
+        if row.get("image_raw"):
+            print(f"   image_raw: {row['image_raw']}")
+        print(f"   seller_link: {row['seller_link'] or '<none>'}")
+        try:
+            feed = normalize_row(row, source=basalam_adapter.SOURCE)
+        except RowRejected as exc:
+            print(f"   verdict: REJECTED {','.join(exc.codes)}")
+            for note in exc.details:
+                print(f"     ↳ {note}")
+        else:
+            ok += 1
+            print(f"   verdict: ok → {feed.price_toman:,} toman, category={feed.category}"
+                  + (f", warnings={feed.warnings}" if feed.warnings else ""))
+    print(f"\n{ok}/{min(limit, len(items))} inspected items pass the normaliser "
+          "(the image download, vision check and integrity gate run only at import time)")
+    return EXIT_OK
+
+
 def run_file(args: argparse.Namespace) -> int:
     try:
         source = seller_source(args.seller)
@@ -222,6 +341,7 @@ def run_file(args: argparse.Namespace) -> int:
             report = pipeline.import_rows(
                 db, rows, source=source, options=_options(args),
                 default_category=args.default_category, allow_local_images=args.allow_local_images,
+                on_row=_Progress(len(rows)),
             )
         except Exception as exc:  # provider/config errors surface as a clean failure
             print(f"error: import aborted: {type(exc).__name__}: {exc}", file=sys.stderr)
@@ -266,13 +386,15 @@ def run_basalam(args: argparse.Namespace) -> int:
         with basalam_adapter.BasalamClient(token=token, base_url=args.base_url) as client:
             if args.vendor:
                 rows_iter = basalam_adapter.iter_vendor(
-                    client, args.vendor, use_packaging_dimensions=args.use_packaging_dimensions, on_raw=on_raw,
+                    client, args.vendor, use_packaging_dimensions=args.use_packaging_dimensions,
+                    price_unit=args.price_unit, on_raw=on_raw,
                 )
             else:
                 rows_iter = basalam_adapter.iter_search(
                     client, queries=queries, rows=args.rows, max_per_query=args.max_per_query,
                     vendor_identifier=args.vendor_identifier, details=args.details,
-                    use_packaging_dimensions=args.use_packaging_dimensions, on_raw=on_raw,
+                    use_packaging_dimensions=args.use_packaging_dimensions, price_unit=args.price_unit,
+                    on_raw=on_raw,
                 )
             rows = list(rows_iter)
     except basalam_adapter.BasalamError as exc:
@@ -284,7 +406,8 @@ def run_basalam(args: argparse.Namespace) -> int:
     print(f"fetched {len(rows)} candidate products from Basalam")
     with SessionLocal() as db:
         try:
-            report = pipeline.import_rows(db, rows, source=basalam_adapter.SOURCE, options=_options(args))
+            report = pipeline.import_rows(db, rows, source=basalam_adapter.SOURCE, options=_options(args),
+                                          on_row=_Progress(len(rows)))
         except Exception as exc:
             print(f"error: import aborted: {type(exc).__name__}: {exc}", file=sys.stderr)
             return EXIT_FAILED
@@ -302,16 +425,39 @@ def _finish(report: pipeline.ImportReport, args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
-def main(argv: list[str] | None = None) -> int:
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+def _configure_logging(verbose: bool) -> None:
+    """Operator-grade console: redacted, and quiet unless ``--verbose``.
+
+    The app installs :func:`install_log_redaction` in ``app.main``; a CLI
+    never imports that module, so the first live run printed every ``httpx``
+    request line raw — including a Gemini key in a query string. Redaction
+    is installed here *before* any handler exists, and the per-request
+    chatter (``httpx``, the content-type sniff warning that fires on every
+    Basalam picture) is demoted to DEBUG so the row lines below stay readable.
+    """
+    from app.core.log_redaction import install_log_redaction
+
+    install_log_redaction()
+    logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO,
+                        format="%(levelname)s %(name)s: %(message)s")
     logging.getLogger("alembic").setLevel(logging.WARNING)  # the preflight reads the revision only
+    if not verbose:
+        for noisy in ("httpx", "httpcore", "app.core.uploads", "PIL"):
+            logging.getLogger(noisy).setLevel(logging.WARNING)
+        logging.getLogger("app.core.uploads").setLevel(logging.ERROR)
+
+
+def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    _configure_logging(bool(getattr(args, "verbose", False)))
     if args.template:
         sys.stdout.write(file_adapter.template_csv())
         return EXIT_OK
     if args.check_db:
         return check_database()
+    if args.inspect_raw is not None:
+        return inspect_raw(args.inspect_raw)
     if args.adapter == "file":
         return run_file(args)
     if args.adapter == "basalam":

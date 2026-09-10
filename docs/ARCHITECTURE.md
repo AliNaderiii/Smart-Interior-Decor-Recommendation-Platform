@@ -549,7 +549,7 @@ heuristics are exactly how the synthetic seed lied. *Trust
 Digikala/Torob* — no public API, legal and stability risk; the affiliate
 programme (links + prices) can be a later adapter behind the same contract.
 
-**Consequences.** `tests/test_catalog_import.py` (42 tests, no network:
+**Consequences.** `tests/test_catalog_import.py` (42 tests at merge, 50 after the 2026-09-10 addendum; no network:
 fixture transport, in-memory images, mock vision) covers the contract, both
 adapters, the image step, the pipeline invariants above and the CLI. The
 card's "buy from" label is host-derived (`lib/sellerLabel.ts`) so Basalam
@@ -574,6 +574,68 @@ placeholder/unparsable URL, missing driver, unreachable host, or a schema
 behind this checkout's Alembic head each stop the run with exit 2, one line
 naming the problem and one naming the fix, the password always rendered as
 `***`. `tests/test_db_preflight.py` (30 tests) pins both.
+
+*Addendum (2026-09-10, first contact with the gateway).* The first dry-run
+that reached Basalam fetched 60 candidates and rejected all 60 as
+`image_url_invalid` — a correct refusal (no picture, no product) that the
+report could not explain, because a rejection carried only its code. Two
+facts and two decisions. Facts: the public `POST /v1/products/search` does
+**not** answer in the SDK's `ProductItemResponse` dialect but in the search
+engine's own (`name`, `photo: {MEDIUM, SMALL}`, `primaryPrice`,
+`IsAvailable`, `categoryTitle`, `vendor.name`, envelope
+`{meta, facets, products}`), and **every money field of the gateway is in
+rial** — product 28107984 is `price: 297000000` on the API and 29٬700٬000
+toman on its public page; the same ×10 holds for every product checked.
+Decisions: (1) the adapter reads both dialects (case-insensitive photo size
+keys, `mainPhoto`/`images`/`media`, protocol-relative URLs, the product's
+own containers only — never the vendor avatar) and declares
+`currency = "rial"` so the *contract's* single conversion rule applies and
+is recorded on the row (`price_converted_from_rial`); `--price-unit` exists
+as an audited operator override, not as a guess. (2) `RowRejected` carries
+*details* — what was seen for each failing field — and the pipeline keeps
+them on the `RowResult`, so `image_url_invalid` now reads
+`image_url=missing image_raw=photo={'MEDIUM': None, 'SMALL': ''}` in the
+report and on the console; `--inspect-raw <dump>` replays a `--dump-raw`
+file through the adapter and normaliser offline. Recorded shape:
+`tests/fixtures/basalam_search_live_shape.json`; `tests/test_catalog_import.py`
+grows to 50. Had the rial/toman mismatch gone unnoticed, every imported price
+would have been ten times the truth — the price band of the ADR-016 gate
+would have caught many rows as `price_out_of_band`, but not the expensive
+rugs whose ×10 still sits inside the band. The lesson is recorded here
+because it generalises: a marketplace's *unit* is a fact to verify against
+its own storefront, not a field to trust.
+
+*Addendum (2026-09-10, second live run — the console is part of the control).*
+With the dialect fixed, the same 60 candidates came back `created=59,
+rejected=0, skipped=1 (duplicate_image), eligible 58, excluded 1
+(image_category_mismatch), needs review 9` — the gate behaving as designed.
+The run exposed three defects in the *operator surface* rather than in the
+data path. (1) **A secret in the console.** The Gemini key travelled as
+`?key=` in the request URL, `httpx` logs every request URL at INFO, and the
+CLI never installed the record-factory redactor that `app.main` installs
+for the server — so the key was printed once per row and then pasted into a
+chat. The key was rotated. Fix in depth: the key now travels in the
+`x-goog-api-key` header (Google's documented form) so no URL ever contains
+it; every CLI configures logging through the redactor *before* the first
+handler exists; `x-goog-api-key`/`x-api-key` join the header patterns; and
+`provider_error` text — an httpx message embeds the request URL and is
+persisted in `extraction_raw` and in JSON reports — is passed through
+`redact()` before it is stored. (2) **Noise hid the signal.** Per-request
+chatter (`httpx`, and the upload content-type warning that fires for every
+Basalam picture because the CDN declares `binary/octet-stream`) made a
+60-row run several hundred lines long with no line per *row*. The CLI now
+prints one line per finished row via an `on_row` callback on `import_rows`
+— action, verdict (`verified` / `review` / `unverified`, `EXCLUDED`), title
+— with the reasons underneath; library chatter is DEBUG unless `--verbose`;
+a CDN's generic content-type is not reported as a mismatch (the sniff
+decides the format regardless). (3) **"needs review: 9" without a why.**
+`RowResult` now carries `review_reasons` (`low_confidence`, `missing_style`,
+`provider_error`, …) and the summary histograms them, so the operator can
+tell a provider outage from a genuinely ambiguous picture before deciding
+`--yes`. The summary also says out loud when nothing is recommendable yet
+(no `--verify` → review queue), because the first run's `verified: 0` was
+read as a failure when it was the default posture. `tests/test_catalog_import.py`
+grows to 55.
 
 ## Data model (ERD)
 

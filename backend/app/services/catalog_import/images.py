@@ -90,8 +90,12 @@ def acquire(url: str, *, timeout: float = 30.0, store: bool = False) -> Acquired
     """
     data, mime = fetch_bytes(url, timeout=timeout)
     filename = url.rsplit("/", 1)[-1][:120] or "feed-image"
+    # Seller CDNs answer ``binary/octet-stream`` (Basalam does, for every
+    # picture); the sniff decides the format anyway, and the "declared type
+    # does not match" warning is meant for a *person* mislabelling an upload.
+    declared = mime if str(mime or "").lower().startswith("image/") else ""
     try:
-        image = validate_image_upload(_Buffered(filename, data, mime))
+        image = validate_image_upload(_Buffered(filename, data, declared))
     except UploadRejected as exc:
         raise ImageUnavailable("image_invalid", str(exc.detail)) from exc
     acquired = AcquiredImage(

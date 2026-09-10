@@ -36,6 +36,7 @@ from sqlalchemy.orm import Session
 
 from ai import catalog_integrity as policy
 from ai.embedding_service import get_embedding, product_to_text
+from app.core.log_redaction import redact
 from app.models.product import Product
 from app.services import catalog_integrity as integrity
 from app.services.catalog_import.contract import FeedRow, RowRejected, normalize_row
@@ -106,6 +107,9 @@ class RowResult:
     integrity_reasons: list[str] = field(default_factory=list)
     detected_category: str | None = None
     needs_review: bool | None = None
+    #: Why the vision gate wants a human (``low_confidence``, ``missing_style``,
+    #: ``provider_error`` …) — the operator reads these before deciding ``--yes``.
+    review_reasons: list[str] = field(default_factory=list)
     verified: bool = False
     #: The URL the product now serves its picture from (own storage or seller CDN).
     image_url: str = ""
@@ -160,6 +164,9 @@ class ImportReport:
             "category_mismatch": sum(
                 1 for r in self.accepted if "image_category_mismatch" in r.integrity_reasons
             ),
+            "review_reasons": dict(Counter(
+                reason for r in self.accepted if r.needs_review for reason in r.review_reasons
+            ).most_common()),
             "by_category": dict(sorted(categories.items())),
             "integrity_reasons": dict(reasons.most_common()),
             "rejection_codes": dict(codes.most_common()),
@@ -173,6 +180,15 @@ class ImportReport:
 
 
 # ------------------------------------------------------------------- helpers
+
+def _record(report: ImportReport, result: RowResult, on_row: Callable[[RowResult], None] | None) -> None:
+    report.rows.append(result)
+    if on_row is not None:
+        try:
+            on_row(result)
+        except Exception as exc:  # a progress printer must never abort an import
+            logger.debug("on_row callback failed: %s", exc)
+
 
 def _origin(url: str) -> str:
     from urllib.parse import urlsplit
@@ -234,12 +250,15 @@ def import_rows(
     category_aliases: Mapping[str, str] | None = None,
     default_category: str | None = None,
     allow_local_images: bool = False,
+    on_row: Callable[[RowResult], None] | None = None,
 ) -> ImportReport:
     """Import ``raw_rows`` (adapter output) under ``source``. Returns the report.
 
     Commits once at the end (or rolls back on ``dry_run``). ``extractor``,
     ``fetch_image`` and ``check_link`` are injectable for tests; the defaults
-    are the production components.
+    are the production components. ``on_row`` is called with each finished
+    :class:`RowResult` (the CLI prints progress from it; a callback failure
+    never aborts the import).
     """
     opts = options or ImportOptions()
     moment = now or datetime.now(timezone.utc)
@@ -277,7 +296,10 @@ def import_rows(
                 category_aliases=category_aliases, default_category=default_category,
             )
         except RowRejected as exc:
-            report.rows.append(RowResult(source_product_id=spid, action="rejected", codes=exc.codes))
+            # ``details`` say what was seen (missing photo, rial price out of
+            # band …) so the report explains a rejection without the raw dump.
+            _record(report, RowResult(source_product_id=spid, action="rejected", codes=exc.codes,
+                                      title_fa=exc.title_fa, warnings=exc.details), on_row)
             continue
 
         result = RowResult(source_product_id=row.source_product_id, title_fa=row.title_fa,
@@ -294,7 +316,7 @@ def import_rows(
                 meta["unavailable_at"] = moment.isoformat()
                 product.extraction_raw = {**(product.extraction_raw or {}), "import": meta}
                 result.product_id = product.id
-            report.rows.append(result)
+            _record(report, result, on_row)
             continue
 
         # ---- image -------------------------------------------------------
@@ -308,7 +330,7 @@ def import_rows(
                 result.action = "rejected"
                 result.codes = [exc.code]
                 result.warnings.append(exc.detail[:200])
-                report.rows.append(result)
+                _record(report, result, on_row)
                 continue
             phash = image.phash
             if product is None and phash:
@@ -320,7 +342,7 @@ def import_rows(
                     result.action = "skipped"
                     result.codes = ["duplicate_image"]
                     result.warnings.append(f"same image as product {sorted(twins)[0]}")
-                    report.rows.append(result)
+                    _record(report, result, on_row)
                     continue
             if persist_images:
                 persist(image)
@@ -342,11 +364,12 @@ def import_rows(
                     )
                 except Exception as exc:  # provider outage: flag, never fabricate
                     logger.warning("vision extraction failed for %s: %s", row.source_product_id, exc)
-                    extraction = {"provider_error": f"{type(exc).__name__}: {exc}"[:200],
+                    extraction = {"provider_error": redact(f"{type(exc).__name__}: {exc}"[:200]),
                                   "needs_review": True, "review_reasons": ["provider_error"]}
         detected = extraction.get("detected_category")
         result.detected_category = detected if isinstance(detected, str) else None
         result.needs_review = bool(extraction.get("needs_review")) if extraction else None
+        result.review_reasons = [str(r) for r in (extraction.get("review_reasons") or []) if r]
 
         # ---- upsert ------------------------------------------------------
         created = product is None
@@ -413,7 +436,7 @@ def import_rows(
         result.product_id = product.id
         result.action = "created" if created else ("updated" if _snapshot(product) != before else "unchanged")
         existing[row.source_product_id] = product
-        report.rows.append(result)
+        _record(report, result, on_row)
         accepted += 1
 
     if opts.dry_run:
