@@ -22,6 +22,35 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Fixed — importer console: no secret in logs, one line per row, review reasons (P4-B·2d, 2026-09-10)
+
+The second live dry-run (60 Basalam rugs) produced the expected verdicts
+but printed the Gemini API key once per row: the key travelled as a `?key=`
+query parameter, `httpx` logs request URLs at INFO, and the CLI had never
+installed the log redactor that the server installs. The key was rotated.
+
+* `backend/ai/feature_extractor.py` — the Gemini key is sent in the
+  `x-goog-api-key` header; no request URL contains it. `provider_error`
+  strings are passed through the redactor before being persisted (an httpx
+  error message embeds the request URL).
+* `backend/scripts/import_catalog.py` — logging is configured through
+  `install_log_redaction()` before any handler exists; `httpx`/`httpcore`/
+  upload-sniff chatter is DEBUG unless `--verbose`; one progress line per
+  finished row (`[12/60] 28107984 created review EXCLUDED …` with the
+  reasons underneath); the summary lists `review reasons` and says when
+  nothing is recommendable yet because `--verify` was not given.
+* `backend/app/services/catalog_import/pipeline.py` — `import_rows(...,
+  on_row=)` callback (a callback failure never aborts an import);
+  `RowResult.review_reasons` + `summary()["review_reasons"]`.
+* `backend/app/services/catalog_import/images.py` — a CDN's
+  `binary/octet-stream` is not reported as a content-type mismatch (the
+  sniff decides the format; Basalam declares it for every picture).
+* `backend/app/core/log_redaction.py` — `x-goog-api-key`/`x-api-key` header
+  patterns; installing twice no longer double-wraps the record factory.
+* Tests: `backend/tests/test_catalog_import.py` 50 → 55 (redacted console,
+  per-row callback, callback failure isolation, redacted `provider_error`,
+  CDN content-type). Docs: ADR-018 third addendum, `docs/ops/CATALOG_IMPORT.fa.md` §5.
+
 ### Fixed — Basalam importer reads the gateway's real search dialect and rial prices (P4-B·2c, 2026-09-10)
 
 The first dry-run that reached `openapi.basalam.com` fetched 60 candidates

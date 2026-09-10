@@ -478,6 +478,17 @@ class TestImages:
             images.acquire("https://cdn.x.ir/a.png", store=False)
         assert exc.value.code == "image_invalid"
 
+    def test_cdn_octet_stream_is_sniffed_without_a_warning(self, monkeypatch, caplog):
+        """Basalam's CDN declares ``binary/octet-stream`` for every picture; the
+        first live run printed the upload-mismatch warning 60 times. The sniff
+        decides the format — the warning is for a person mislabelling an upload."""
+        monkeypatch.setattr(images, "_fetch_image_bytes",
+                            lambda url, timeout=30.0: (_png((90, 60, 30)), "binary/octet-stream"))
+        with caplog.at_level("WARNING", logger="app.core.uploads"):
+            got = images.acquire("https://statics.basalam.com/public-1/users/x/01-01/a.jpg_512X512X70.jpg", store=False)
+        assert got.content_type.startswith("image/") and got.phash
+        assert "does not match sniffed format" not in caplog.text
+
     def test_acquire_refuses_unsafe_urls_before_any_fetch(self):
         """The real SSRF guard runs (no monkeypatch): metadata/loopback hosts never get a request."""
         for url in ("http://169.254.169.254/latest/meta-data/sofa.jpg", "http://127.0.0.1:6379/x.png",
@@ -651,6 +662,49 @@ class TestPipeline:
         assert p.extraction_raw["provider_error"].startswith("RuntimeError")
         assert p.styles == ["modern", "minimal"]  # seller tags kept; nothing invented
 
+    def test_on_row_reports_each_row_with_review_reasons(self, db, fetcher):
+        """The operator console is fed per row (progress on a 60-row live run)
+        and each result says *why* the vision gate wants a human."""
+        seen: list[pipeline.RowResult] = []
+        rows = [_row(source_product_id="PR-1"),
+                _row(source_product_id="PR-bad", image_url=""),
+                _row(source_product_id="PR-2", image_url="https://cdn.example-seller.ir/p/sofa-second.png")]
+        report = _import(db, rows, fetcher=fetcher, on_row=seen.append)
+        assert [r.source_product_id for r in seen] == ["PR-1", "PR-bad", "PR-2"]
+        assert seen[1].action == "rejected" and seen[1].codes == ["image_url_invalid"]
+        first = report.rows[0]
+        assert first.needs_review is not None
+        if first.needs_review:
+            assert first.review_reasons  # never "needs review" without a reason
+        assert set(report.summary()["review_reasons"]) <= {
+            "low_confidence", "missing_style", "missing_material", "provider_error", "fallback_provider",
+            "unknown_taxonomy_values", "ambiguous_style", "category_mismatch",
+        }
+
+    def test_on_row_failure_never_aborts_the_import(self, db, fetcher):
+        def boom(_r):
+            raise RuntimeError("printer died")
+
+        report = _import(db, [_row(source_product_id="PR-3")], fetcher=fetcher, on_row=boom)
+        assert report.summary()["created"] == 1
+
+    def test_provider_error_text_is_redacted_before_it_is_stored(self, db, fetcher):
+        """An httpx error message embeds the request URL; a key in it must not
+        reach ``extraction_raw`` or the JSON report."""
+        class Leaky:
+            def extract_bytes(self, *a, **k):
+                raise RuntimeError("POST https://generativelanguage.googleapis.com/x:generateContent?key=AQ.SECRET-VALUE")
+
+        report = pipeline.import_rows(
+            db, [_row(source_product_id="PR-leak")], source=SOURCE,
+            options=pipeline.ImportOptions(dry_run=False, image_mode="rehost"),
+            extractor=Leaky(), fetch_image=fetcher, check_link=lambda u: FakeLink(),
+        )
+        p = db.scalar(select(Product).where(Product.source_product_id == "PR-leak"))
+        assert "SECRET-VALUE" not in p.extraction_raw["provider_error"]
+        assert "[REDACTED]" in p.extraction_raw["provider_error"]
+        assert report.rows[0].review_reasons == ["provider_error"]
+
     def test_recommender_excludes_mismatched_import_but_can_see_verified_one(self, db, fetcher):
         from app.services.recommender import _catalog_quality as catalog_quality
 
@@ -676,6 +730,41 @@ class TestCli:
         out = capsys.readouterr().out
         assert out.startswith("source_product_id,title_fa,") and "NLP-1042" in out
 
+    def test_cli_console_is_redacted_and_quiet_by_default(self, monkeypatch):
+        """Regression for the 2026-09-10 live run: every ``httpx`` request line was
+        printed raw, one carried the Gemini key in ``?key=``. The CLI now installs
+        the record-factory redactor before any handler exists and demotes
+        per-request chatter unless ``--verbose``."""
+        import logging
+
+        from app.core import log_redaction
+        from scripts import import_catalog
+
+        # Restore *exactly* what we found: app.main layers a request-id factory on
+        # top of the redactor, and other tests depend on it staying in place.
+        saved_factory = logging.getLogRecordFactory()
+        saved_state = (log_redaction._INSTALLED, log_redaction._PREVIOUS_FACTORY)
+        monkeypatch.setattr(log_redaction, "_INSTALLED", False)
+        root = logging.getLogger()
+        saved_level, saved_handlers = root.level, list(root.handlers)
+        try:
+            root.handlers.clear()
+            import_catalog._configure_logging(verbose=False)
+            import_catalog._configure_logging(verbose=False)  # idempotent: no double wrapping
+            assert logging.getLogger("httpx").level == logging.WARNING
+            record = logging.getLogger("httpx").makeRecord(
+                "httpx", logging.INFO, __file__, 1,
+                'HTTP Request: POST https://generativelanguage.googleapis.com/v1beta/m:generateContent?key=AQ.LEAKED-KEY "200"',
+                (), None)
+            assert "LEAKED-KEY" not in record.getMessage() and "[REDACTED]" in record.getMessage()
+        finally:
+            root.handlers[:] = saved_handlers
+            root.setLevel(saved_level)
+            for name in ("httpx", "httpcore", "app.core.uploads", "PIL", "alembic"):
+                logging.getLogger(name).setLevel(logging.NOTSET)
+            logging.setLogRecordFactory(saved_factory)
+            log_redaction._INSTALLED, log_redaction._PREVIOUS_FACTORY = saved_state
+
     def test_file_dry_run_end_to_end(self, tmp_path, monkeypatch, fetcher, capsys):
         from scripts import import_catalog
 
@@ -691,8 +780,11 @@ class TestCli:
         out = capsys.readouterr().out
         assert code == 0, out
         assert "DRY-RUN (nothing written)" in out and "created=1" in out
+        assert "[1/1]   NLP-1042  created" in out                 # one progress line per row
+        assert "note: nothing is recommendable yet" in out        # no --verify → said out loud
         data = json.loads(report.read_text(encoding="utf-8"))
         assert data["summary"]["dry_run"] is True and data["rows"][0]["source_product_id"] == "NLP-1042"
+        assert "review_reasons" in data["summary"] and "review_reasons" in data["rows"][0]
         from app.db.session import SessionLocal
 
         with SessionLocal() as s:

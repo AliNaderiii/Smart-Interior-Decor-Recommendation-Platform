@@ -364,9 +364,13 @@ class GeminiProvider(BaseProvider):
         resp: httpx.Response | None = None
         for attempt in range(1, max_attempts + 1):
             try:
+                # The key travels in a header, never in the query string: httpx
+                # logs every request URL at INFO, and a `?key=` there ends up in
+                # terminals, CI logs and pasted bug reports (observed 2026-09-10
+                # during the first live import; that key was rotated).
                 resp = httpx.post(
                     url,
-                    params={"key": settings.GEMINI_API_KEY},
+                    headers={"x-goog-api-key": settings.GEMINI_API_KEY},
                     json=payload,
                     timeout=60,
                 )
@@ -550,6 +554,15 @@ class MockProvider(BaseProvider):
         })
 
 
+def _error_text(error: BaseException) -> str:
+    """``ExcType: message`` for ``provider_error`` — passed through the log
+    redactor because an ``httpx`` error message embeds the request URL, and
+    that string is persisted in ``products.extraction_raw`` and import reports."""
+    from app.core.log_redaction import redact
+
+    return redact(f"{type(error).__name__}: {str(error)[:300]}")
+
+
 def _empty_failed_extraction(image_url: str, error: Exception) -> dict[str, Any]:
     """Production failure result: no features, honest error, forced review."""
     return {
@@ -562,7 +575,7 @@ def _empty_failed_extraction(image_url: str, error: Exception) -> dict[str, Any]
         "confidence": 0.0,
         "unknown_taxonomy_values": [],
         "provider": "failed",
-        "provider_error": f"{type(error).__name__}: {str(error)[:300]}",
+        "provider_error": _error_text(error),
         "image_url": image_url,
         "needs_review": True,
         "review_reasons": ["provider_error", "low_confidence", "missing_style", "missing_material"],
@@ -586,7 +599,7 @@ def _labelled_fallback(
     result["provider"] = "mock-fallback"
     result["model"] = "filename-heuristic (fallback)"
     if error is not None:
-        result["provider_error"] = f"{type(error).__name__}: {str(error)[:300]}"
+        result["provider_error"] = _error_text(error)
     if config_problem:
         result["provider_config_error"] = config_problem[:300]
     conf = float(result.get("confidence", 0.0) or 0.0)

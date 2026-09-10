@@ -605,6 +605,38 @@ rugs whose ×10 still sits inside the band. The lesson is recorded here
 because it generalises: a marketplace's *unit* is a fact to verify against
 its own storefront, not a field to trust.
 
+*Addendum (2026-09-10, second live run — the console is part of the control).*
+With the dialect fixed, the same 60 candidates came back `created=59,
+rejected=0, skipped=1 (duplicate_image), eligible 58, excluded 1
+(image_category_mismatch), needs review 9` — the gate behaving as designed.
+The run exposed three defects in the *operator surface* rather than in the
+data path. (1) **A secret in the console.** The Gemini key travelled as
+`?key=` in the request URL, `httpx` logs every request URL at INFO, and the
+CLI never installed the record-factory redactor that `app.main` installs
+for the server — so the key was printed once per row and then pasted into a
+chat. The key was rotated. Fix in depth: the key now travels in the
+`x-goog-api-key` header (Google's documented form) so no URL ever contains
+it; every CLI configures logging through the redactor *before* the first
+handler exists; `x-goog-api-key`/`x-api-key` join the header patterns; and
+`provider_error` text — an httpx message embeds the request URL and is
+persisted in `extraction_raw` and in JSON reports — is passed through
+`redact()` before it is stored. (2) **Noise hid the signal.** Per-request
+chatter (`httpx`, and the upload content-type warning that fires for every
+Basalam picture because the CDN declares `binary/octet-stream`) made a
+60-row run several hundred lines long with no line per *row*. The CLI now
+prints one line per finished row via an `on_row` callback on `import_rows`
+— action, verdict (`verified` / `review` / `unverified`, `EXCLUDED`), title
+— with the reasons underneath; library chatter is DEBUG unless `--verbose`;
+a CDN's generic content-type is not reported as a mismatch (the sniff
+decides the format regardless). (3) **"needs review: 9" without a why.**
+`RowResult` now carries `review_reasons` (`low_confidence`, `missing_style`,
+`provider_error`, …) and the summary histograms them, so the operator can
+tell a provider outage from a genuinely ambiguous picture before deciding
+`--yes`. The summary also says out loud when nothing is recommendable yet
+(no `--verify` → review queue), because the first run's `verified: 0` was
+read as a failure when it was the default posture. `tests/test_catalog_import.py`
+grows to 55.
+
 ## Data model (ERD)
 
 ```

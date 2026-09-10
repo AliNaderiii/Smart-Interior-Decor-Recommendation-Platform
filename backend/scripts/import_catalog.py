@@ -67,6 +67,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--inspect-raw", type=Path, default=None, metavar="FILE",
                         help="print how the adapter reads the items in a --dump-raw file, then exit "
                              "(offline: no database, no gateway)")
+    parser.add_argument("--verbose", action="store_true",
+                        help="show every HTTP request and library warning (default: one line per row)")
     sub = parser.add_subparsers(dest="adapter")
 
     def common(p: argparse.ArgumentParser) -> None:
@@ -131,6 +133,42 @@ def _options(args: argparse.Namespace) -> pipeline.ImportOptions:
     )
 
 
+def _row_verdict(r: pipeline.RowResult) -> str:
+    """One word an operator can scan: what happened to the row and whether it can be recommended."""
+    if r.action in ("rejected", "skipped"):
+        return f"{r.action} {','.join(r.codes)}"
+    state = "verified" if r.verified else ("review" if r.needs_review else "unverified")
+    if r.integrity_ok is False:
+        state += " EXCLUDED"
+    return f"{r.action} {state}"
+
+
+def _row_notes(r: pipeline.RowResult) -> list[str]:
+    notes: list[str] = []
+    if r.integrity_reasons:
+        notes.append("integrity: " + ",".join(r.integrity_reasons))
+    if r.needs_review and r.review_reasons:
+        notes.append("review: " + ",".join(r.review_reasons))
+    if r.detected_category and r.category and r.detected_category != r.category:
+        notes.append(f"vision saw {r.detected_category!r}, feed says {r.category!r}")
+    notes.extend(w for w in r.warnings if w != "price_converted_from_rial")
+    return notes
+
+
+class _Progress:
+    """``on_row`` printer: one line per finished row, with the reasons that matter."""
+
+    def __init__(self, total: int | None = None):
+        self.total, self.done = total, 0
+
+    def __call__(self, r: pipeline.RowResult) -> None:
+        self.done += 1
+        counter = f"[{self.done}/{self.total}]" if self.total else f"[{self.done}]"
+        print(f"{counter} {r.source_product_id or '?':>10}  {_row_verdict(r):<32} {r.title_fa[:48]}", flush=True)
+        for note in _row_notes(r)[:3]:
+            print(f"      ↳ {note[:200]}", flush=True)
+
+
 def _print_summary(report: pipeline.ImportReport) -> None:
     s = report.summary()
     mode = "DRY-RUN (nothing written)" if s["dry_run"] else "WRITTEN"
@@ -145,16 +183,23 @@ def _print_summary(report: pipeline.ImportReport) -> None:
         print("   by category: " + ", ".join(f"{k}={v}" for k, v in s["by_category"].items()))
     if s["integrity_reasons"]:
         print("   integrity reasons: " + ", ".join(f"{k}×{v}" for k, v in s["integrity_reasons"].items()))
+    if s.get("review_reasons"):
+        print("   review reasons: " + ", ".join(f"{k}×{v}" for k, v in s["review_reasons"].items()))
     if s["rejection_codes"]:
         print("   rejections/skips: " + ", ".join(f"{k}×{v}" for k, v in s["rejection_codes"].items()))
     if s["external_image_origins"]:
         print("   !! pictures are served from seller origins (image_mode=link): add to IMAGE_EXTRA_ORIGINS → "
               + ",".join(s["external_image_origins"]))
+    if s["verified"] == 0 and s["eligible"] and not any(r.verified for r in report.accepted):
+        print("   note: nothing is recommendable yet — rows land in the admin review queue unless --verify is given "
+              "(then clean rows whose picture matches the category are verified automatically)")
     shown = 0
     for r in report.rows:
-        if r.action in ("rejected", "skipped") and shown < 15:
-            print(f"   - {r.action:8} {r.source_product_id or '?':>14}  {','.join(r.codes)}  {r.title_fa[:50]}")
-            for note in r.warnings[:2]:
+        if shown >= 15:
+            break
+        if r.action in ("rejected", "skipped") or r.integrity_ok is False or r.needs_review:
+            print(f"   - {_row_verdict(r):<34} {r.source_product_id or '?':>10}  {r.title_fa[:50]}")
+            for note in _row_notes(r)[:3]:
                 print(f"       ↳ {note[:200]}")
             shown += 1
 
@@ -296,6 +341,7 @@ def run_file(args: argparse.Namespace) -> int:
             report = pipeline.import_rows(
                 db, rows, source=source, options=_options(args),
                 default_category=args.default_category, allow_local_images=args.allow_local_images,
+                on_row=_Progress(len(rows)),
             )
         except Exception as exc:  # provider/config errors surface as a clean failure
             print(f"error: import aborted: {type(exc).__name__}: {exc}", file=sys.stderr)
@@ -360,7 +406,8 @@ def run_basalam(args: argparse.Namespace) -> int:
     print(f"fetched {len(rows)} candidate products from Basalam")
     with SessionLocal() as db:
         try:
-            report = pipeline.import_rows(db, rows, source=basalam_adapter.SOURCE, options=_options(args))
+            report = pipeline.import_rows(db, rows, source=basalam_adapter.SOURCE, options=_options(args),
+                                          on_row=_Progress(len(rows)))
         except Exception as exc:
             print(f"error: import aborted: {type(exc).__name__}: {exc}", file=sys.stderr)
             return EXIT_FAILED
@@ -378,11 +425,32 @@ def _finish(report: pipeline.ImportReport, args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
-def main(argv: list[str] | None = None) -> int:
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+def _configure_logging(verbose: bool) -> None:
+    """Operator-grade console: redacted, and quiet unless ``--verbose``.
+
+    The app installs :func:`install_log_redaction` in ``app.main``; a CLI
+    never imports that module, so the first live run printed every ``httpx``
+    request line raw — including a Gemini key in a query string. Redaction
+    is installed here *before* any handler exists, and the per-request
+    chatter (``httpx``, the content-type sniff warning that fires on every
+    Basalam picture) is demoted to DEBUG so the row lines below stay readable.
+    """
+    from app.core.log_redaction import install_log_redaction
+
+    install_log_redaction()
+    logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO,
+                        format="%(levelname)s %(name)s: %(message)s")
     logging.getLogger("alembic").setLevel(logging.WARNING)  # the preflight reads the revision only
+    if not verbose:
+        for noisy in ("httpx", "httpcore", "app.core.uploads", "PIL"):
+            logging.getLogger(noisy).setLevel(logging.WARNING)
+        logging.getLogger("app.core.uploads").setLevel(logging.ERROR)
+
+
+def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
+    _configure_logging(bool(getattr(args, "verbose", False)))
     if args.template:
         sys.stdout.write(file_adapter.template_csv())
         return EXIT_OK
