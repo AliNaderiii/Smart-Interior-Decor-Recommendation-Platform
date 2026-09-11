@@ -22,6 +22,46 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Fixed — importer: the picture arbitrates the category, off-scope hits are skipped, `--tolerate ambiguous_style` (P4-B·2e, 2026-09-11)
+
+The first dry-run over the six remaining categories excluded 35 rows as
+`image_category_mismatch`; most were correct products under a wrong label
+(Basalam sellers file armchairs under «مبل» and TV stands under «میز», and
+the adapter otherwise stamped the search term's category on every hit).
+Another ≈30 hits — park lamps, kids' chairs, bathroom shelves, a children's
+book set titled «کتاب خانه درختی» — were downloaded and sent to the vision
+provider before being excluded. 157/164 review flags were `ambiguous_style`
+alone.
+
+* `backend/app/services/catalog_import/adapters/basalam.py` — rows carry
+  `category_candidates` (seller label incl. Basalam's numeric leaf via
+  `BASALAM_CATEGORY_IDS`, and the search term's target) instead of one
+  guessed category; `resolve_category()`/`seller_category()`;
+  `off_scope_reason()` with `OFF_SCOPE_TITLE_TERMS` (whole-word,
+  per-category) and `OFF_SCOPE_CATEGORY_IDS`; search terms «چراغ ایستاده»
+  → «آباژور ایستاده», «کتابخانه چوبی» → «کتابخانه ایستاده».
+* `backend/app/services/catalog_import/pipeline.py` — with two candidates
+  the vision `detected_category` picks the category
+  (`category_resolved_by: image`, stored in `extraction_raw.import`); a
+  picture matching neither is still a mismatch; `off_scope` rows are
+  skipped before download/vision and never modify an existing product;
+  `ImportOptions.tolerate` verifies a row whose *only* review reasons are
+  tolerated (`ai.extraction_review.TOLERABLE_REVIEW_REASONS` =
+  `{ambiguous_style}`), keeps the flag on the row and records
+  `import.tolerated`; summary gains `tolerated`, `tolerated_reasons`,
+  `category_resolved_by_image`, `off_scope`; `needs_review` now counts only
+  rows still waiting for a human. `IMPORT_POLICY_VERSION`
+  `catalog_import/2026-09-11.1`.
+* `backend/scripts/import_catalog.py` — `--tolerate REASON` (validated
+  before the database is touched; exit 2 with the allowed list), console
+  verdict `verified(tolerated)`, summary lines for tolerated / picture-decided
+  / off-scope rows; `--inspect-raw` prints candidates and off-scope marks.
+* `backend/app/services/catalog_import/contract.py` — three more Basalam
+  leaf titles as aliases («کمد، کتابخانه، بوفه», «مجسمه و تندیس», «آینه و
+  تابلو دکوراتیو»).
+* Tests: `backend/tests/test_catalog_import.py` 55 → 83. Docs: ADR-018
+  fourth addendum, `docs/ops/CATALOG_IMPORT.fa.md` §5.
+
 ### Fixed — importer console: no secret in logs, one line per row, review reasons (P4-B·2d, 2026-09-10)
 
 The second live dry-run (60 Basalam rugs) produced the expected verdicts

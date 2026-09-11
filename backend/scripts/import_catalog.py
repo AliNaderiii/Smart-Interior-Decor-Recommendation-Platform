@@ -9,6 +9,7 @@ Usage (dry-run is the default — nothing is written until ``--yes``)::
     # 2) Basalam Open API — public search, no token needed
     python scripts/import_catalog.py basalam --category rug --max-per-query 40
     python scripts/import_catalog.py basalam --yes --verify             # all categories
+    python scripts/import_catalog.py basalam --yes --verify --tolerate ambiguous_style
     BASALAM_TOKEN=... python scripts/import_catalog.py basalam --details  # + GET /v1/products/{id}
     BASALAM_TOKEN=... python scripts/import_catalog.py basalam --vendor 78910
 
@@ -29,9 +30,14 @@ the fix — before Basalam is contacted and before a single row is read.
 Every accepted row goes through: normalise → SSRF-guarded image download →
 upload-grade validation + perceptual hash → vision ``detected_category`` →
 embedding → integrity stamp. Rows are **not** verified unless ``--verify`` is
-given AND the row is clean AND the vision check agreed with the declared
+given AND the row is clean AND the vision check agreed with the row's
 category; everything else lands in the admin review queue (``/admin/products``,
-filter "pending").
+filter "pending"). ``--tolerate ambiguous_style`` (P4-ب·2e) is the one
+audited exception: a row whose *only* review flag is the style hedge is
+verified and keeps the flag. Hits the adapter recognises as outside the
+living-room scope (park lamps, kids' chairs, book sets) are skipped before
+any download (``off_scope``); when the seller's label and the search term
+disagree, the picture decides the category.
 
 Exit codes: 0 done (or dry-run), 1 nothing importable / gateway failure,
 2 bad usage.
@@ -48,6 +54,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from ai.extraction_review import TOLERABLE_REVIEW_REASONS  # noqa: E402
 from app.services.catalog_import import pipeline  # noqa: E402
 from app.services.catalog_import.adapters import basalam as basalam_adapter  # noqa: E402
 from app.services.catalog_import.adapters import file as file_adapter  # noqa: E402
@@ -75,6 +82,10 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--yes", action="store_true", help="actually write (default: dry-run)")
         p.add_argument("--verify", action="store_true",
                        help="mark clean rows verified when the vision check agrees (default: review queue)")
+        p.add_argument("--tolerate", action="append", default=None, metavar="REASON",
+                       help="with --verify: also verify rows whose ONLY review reasons are these (repeatable; "
+                            f"allowed: {', '.join(sorted(TOLERABLE_REVIEW_REASONS))}). The reason stays stored "
+                            "on the row. Default: tolerate nothing")
         p.add_argument("--no-vision", action="store_true", help="skip the vision provider (rows stay unverified)")
         p.add_argument("--no-link-check", action="store_true", help="do not probe seller links")
         p.add_argument("--include-unavailable", action="store_true",
@@ -130,7 +141,23 @@ def _options(args: argparse.Namespace) -> pipeline.ImportOptions:
         image_timeout=args.image_timeout,
         image_mode=args.image_mode,
         refresh_images=args.refresh_images,
+        tolerate=frozenset(r.strip() for r in (args.tolerate or []) if r.strip()),
     )
+
+
+def _check_tolerate(args: argparse.Namespace) -> int:
+    """``--tolerate`` is validated here so the operator gets exit 2 + one sentence, not a traceback."""
+    wanted = {r.strip() for r in (args.tolerate or []) if r.strip()}
+    unknown = sorted(wanted - TOLERABLE_REVIEW_REASONS)
+    if unknown:
+        print(f"error: --tolerate {unknown} is not allowed; only {sorted(TOLERABLE_REVIEW_REASONS)} may be "
+              "tolerated (every other review reason means a feature is missing, invented or from a failed provider)",
+              file=sys.stderr)
+        return EXIT_USAGE
+    if wanted and not args.verify:
+        print("error: --tolerate only has an effect together with --verify", file=sys.stderr)
+        return EXIT_USAGE
+    return EXIT_OK
 
 
 def _row_verdict(r: pipeline.RowResult) -> str:
@@ -138,6 +165,8 @@ def _row_verdict(r: pipeline.RowResult) -> str:
     if r.action in ("rejected", "skipped"):
         return f"{r.action} {','.join(r.codes)}"
     state = "verified" if r.verified else ("review" if r.needs_review else "unverified")
+    if r.verified and r.tolerated_reasons:
+        state += "(tolerated)"
     if r.integrity_ok is False:
         state += " EXCLUDED"
     return f"{r.action} {state}"
@@ -147,8 +176,10 @@ def _row_notes(r: pipeline.RowResult) -> list[str]:
     notes: list[str] = []
     if r.integrity_reasons:
         notes.append("integrity: " + ",".join(r.integrity_reasons))
-    if r.needs_review and r.review_reasons:
+    if r.needs_review and r.review_reasons and not r.verified:
         notes.append("review: " + ",".join(r.review_reasons))
+    if r.tolerated_reasons:
+        notes.append("tolerated: " + ",".join(r.tolerated_reasons))
     if r.detected_category and r.category and r.detected_category != r.category:
         notes.append(f"vision saw {r.detected_category!r}, feed says {r.category!r}")
     notes.extend(w for w in r.warnings if w != "price_converted_from_rial")
@@ -177,8 +208,16 @@ def _print_summary(report: pipeline.ImportReport) -> None:
           f"unchanged={s['unchanged']} rejected={s['rejected']} skipped={s['skipped']}")
     print(f"   eligible for recommendations: {s['eligible']}  excluded by integrity: "
           f"{s['excluded_by_integrity']}  verified: {s['verified']}  needs review: {s['needs_review']}")
+    if s.get("tolerated"):
+        print(f"   verified with tolerated review flags: {s['tolerated']} ("
+              + ", ".join(f"{k}×{v}" for k, v in s["tolerated_reasons"].items()) + ") — the flag stays on the row")
     if s["category_mismatch"]:
         print(f"   !! image≠category on {s['category_mismatch']} rows (kept unverified, excluded)")
+    if s.get("category_resolved_by_image"):
+        print(f"   category decided by the picture on {s['category_resolved_by_image']} rows "
+              "(seller label and search term disagreed)")
+    if s.get("off_scope"):
+        print(f"   skipped as outside the living-room scope before download/vision: {s['off_scope']}")
     if s["by_category"]:
         print("   by category: " + ", ".join(f"{k}={v}" for k, v in s["by_category"].items()))
     if s["integrity_reasons"]:
@@ -197,7 +236,7 @@ def _print_summary(report: pipeline.ImportReport) -> None:
     for r in report.rows:
         if shown >= 15:
             break
-        if r.action in ("rejected", "skipped") or r.integrity_ok is False or r.needs_review:
+        if r.action in ("rejected", "skipped") or r.integrity_ok is False or (r.needs_review and not r.verified):
             print(f"   - {_row_verdict(r):<34} {r.source_product_id or '?':>10}  {r.title_fa[:50]}")
             for note in _row_notes(r)[:3]:
                 print(f"       ↳ {note[:200]}")
@@ -256,7 +295,7 @@ def inspect_raw(path: Path, *, price_unit: str = basalam_adapter.PRICE_UNIT, lim
     category label, availability, seller link) followed by the normaliser's
     verdict — the same code path the import uses, without a database.
     """
-    from app.services.catalog_import.contract import RowRejected, map_category, normalize_row
+    from app.services.catalog_import.contract import RowRejected, normalize_row
 
     if not path.exists():
         print(f"error: {path} does not exist", file=sys.stderr)
@@ -287,11 +326,16 @@ def inspect_raw(path: Path, *, price_unit: str = basalam_adapter.PRICE_UNIT, lim
     ok = 0
     for raw_item in items[:limit]:
         row = basalam_adapter.item_to_row(raw_item, target_category=target, price_unit=price_unit)
-        row["category"] = basalam_adapter._pick_category(row, map_category)
+        row["category"], candidates = basalam_adapter.resolve_category(row)
         print(f"\n-- item {row['source_product_id'] or '?'}: {str(row['title_fa'])[:70]}")
         print(f"   price: {row.get('price')!r} {row['currency']}  category: {row.get('feed_category')!r} → "
               f"{row['category'] or '<unmapped>'}  available: {row['available']}  "
               f"has_variation: {row['has_variation']}")
+        if len(candidates) > 1:
+            print(f"   candidates: {' | '.join(candidates)} (seller label and search term disagree — "
+                  "the picture decides at import time)")
+        if row.get("off_scope"):
+            print(f"   off_scope: {row['off_scope']} (would be skipped before download/vision)")
         print(f"   image_url: {row['image_url'] or '<none>'}")
         if row.get("image_raw"):
             print(f"   image_raw: {row['image_raw']}")
@@ -320,6 +364,8 @@ def run_file(args: argparse.Namespace) -> int:
     if not args.path.exists():
         print(f"error: {args.path} does not exist", file=sys.stderr)
         return EXIT_USAGE
+    if (code := _check_tolerate(args)) != EXIT_OK:
+        return code
     if (code := check_database()) != EXIT_OK:
         return code
     from app.db.session import SessionLocal
@@ -368,6 +414,8 @@ def run_basalam(args: argparse.Namespace) -> int:
             return EXIT_USAGE
         queries = {c: basalam_adapter.CATEGORY_QUERIES[c] for c in args.category}
 
+    if (code := _check_tolerate(args)) != EXIT_OK:
+        return code
     if (code := check_database()) != EXIT_OK:
         return code
 

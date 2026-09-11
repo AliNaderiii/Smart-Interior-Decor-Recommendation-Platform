@@ -64,10 +64,11 @@ _CATEGORY_ALIASES: dict[str, str] = {
     "storage": "storage", "cabinet": "storage", "shelf": "storage", "bookcase": "storage",
     "sideboard": "storage", "tv stand": "storage", "بوفه": "storage", "ویترین": "storage",
     "شلف": "storage", "قفسه": "storage", "کتابخانه": "storage", "کمد": "storage", "شلف و استند": "storage",
-    "میز تلویزیون": "storage", "کنسول": "storage", "دراور": "storage",
+    "میز تلویزیون": "storage", "کنسول": "storage", "دراور": "storage", "کمد، کتابخانه، بوفه": "storage",
     "decor": "decor", "decoration": "decor", "دکور": "decor", "دکوری": "decor", "دکوراتیو": "decor",
     "کوسن": "decor", "بالش و کوسن": "decor", "تابلو": "decor", "آینه": "decor", "گلدان": "decor", "شمعدان": "decor",
     "مجسمه": "decor", "ساعت دیواری": "decor", "لوازم دکوری": "decor",
+    "مجسمه و تندیس": "decor", "آینه و تابلو دکوراتیو": "decor",
 }
 
 
