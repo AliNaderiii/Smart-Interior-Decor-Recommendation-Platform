@@ -459,6 +459,91 @@ class TestBasalamAdapter:
         assert set(by_id) == {"28107984", "41448876", "42115964", "44587637", "13441005"}
         assert all(r["category"] == "rug" for r in rows)                     # فرش دستباف/فرش ماشینی/گلیم all map
         assert by_id["28107984"]["query"] == "فرش دستباف"
+        assert all(r["category_candidates"] == ["rug"] for r in rows)        # seller and query agree → one candidate
+
+    # ---- P4-ب·2e (2026-09-11): the 6-category dry-run excluded 35 rows as
+    # image_category_mismatch, most of them *correct* products under a wrong
+    # label (armchairs filed under «مبل», TV stands under «میز»), and sent ~30
+    # off-scope hits (park lamps, kids' chairs, book sets) to the vision API.
+
+    def _hit(self, live, **overrides):
+        item = dict(basalam.find_product_list(live)[0])
+        item.update(overrides)
+        return item
+
+    def test_seller_and_query_disagreement_yields_two_candidates(self, live):
+        # 46957138 live: query «مبل تک نفره» (chair), seller says «مبل» / 357 (sofa)
+        armchair = self._hit(live, id=46957138, name="مبل تک نفره راحتی مدل لیانا", categoryTitle="مبل",
+                             new_categoryId=357)
+        row = basalam.item_to_row(armchair, target_category="chair")
+        assert row["seller_category"] == "sofa"
+        assert basalam.resolve_category(row) == ("sofa", ["sofa", "chair"])   # filed under the seller's label …
+        # … and the pipeline lets the picture pick between the two (TestPipeline).
+
+        # 23838782 live: query «میز تلویزیون» (storage), seller says «میز» / 358 (table)
+        tv = self._hit(live, id=23838782, name="میز تلویزیون مدرن کد 65", categoryTitle="میز", new_categoryId=358)
+        row = basalam.item_to_row(tv, target_category="storage")
+        assert basalam.resolve_category(row) == ("coffee_table", ["coffee_table", "storage"])
+
+        # agreement → exactly one candidate; unmappable seller label → the query alone
+        sofa = self._hit(live, name="مبل راحتی اسکارلت", categoryTitle="مبل", new_categoryId=357)
+        assert basalam.resolve_category(basalam.item_to_row(sofa, target_category="sofa")) == ("sofa", ["sofa"])
+        bag = self._hit(live, name="کیف چرم", categoryTitle="کیف چرم", new_categoryId=None)
+        assert basalam.resolve_category(basalam.item_to_row(bag, target_category="sofa")) == ("sofa", ["sofa"])
+        assert basalam.resolve_category(basalam.item_to_row(bag)) == (None, [])
+
+    def test_basalam_numeric_leaf_is_a_second_reading_of_the_seller_label(self, live):
+        # «کمد، کتابخانه، بوفه» (356) — a title the alias table did not know before 2e
+        shelf = self._hit(live, name="کتابخانه ایستاده مدل آرتا", categoryTitle="عنوان ناشناخته", new_categoryId=356)
+        row = basalam.item_to_row(shelf, target_category="storage")
+        assert row["seller_category"] == "storage"
+        assert basalam.resolve_category(row) == ("storage", ["storage"])
+        # 297 «تابلو فرش» is wall art, not a floor rug — and its title says so too
+        tableau = self._hit(live, name="تابلو فرش منظره", categoryTitle="تابلو فرش", new_categoryId=297)
+        row = basalam.item_to_row(tableau, target_category="rug")
+        assert row["seller_category"] == "decor" and row["off_scope"] == "title:تابلو"
+
+    @pytest.mark.parametrize("title,category,cid,expected", [
+        ("چراغ پارکی و حیاطی مدل سنگی", "lighting", 360, "title:پارکی"),
+        ("لامپ مادون قرمز فیزیوتراپی", "lighting", None, "title:مادون قرمز"),
+        ("صندلی ماشین کودک", "chair", 355, "title:کودک"),
+        ("مبل کودک تختخوابشو", "sofa", 357, "title:کودک"),
+        ("کتاب خانه درختی جلد ۱", "storage", 791, "basalam_category:791 books"),
+        ("شلف حمام و دستشویی", "storage", 352, "basalam_category:352 bathroom-accessories"),
+        ("صندلی راک و میز مینیاتوری کد17-ماکت", "chair", 290, "title:ماکت"),
+        ("گلیم دیواری 20*20", "rug", None, "title:دیواری"),
+        # legitimate rows the same words must NOT catch
+        ("فرش ماشینی ۱۲۰۰ شانه طرح باغی", "rug", 300, None),        # «ماشینی» ≠ «ماشین»; «باغی» is a carpet design
+        ("شلف دیواری چوبی سه طبقه", "storage", 291, None),           # «دیواری» is off-scope for rugs only
+        ("میز تلویزیون دیواری رنگ دلخواه", "storage", 358, None),
+        ("مبل تک نفره راحتی", "chair", 355, None),
+        ("", "sofa", None, None),
+    ])
+    def test_off_scope_is_explicit_whole_word_and_per_category(self, title, category, cid, expected):
+        assert basalam.off_scope_reason(title, category, cid) == expected
+
+    def test_off_scope_rows_are_marked_by_the_adapter_not_dropped(self, live):
+        """The adapter only *marks*; the pipeline decides (and counts) — a
+        dropped row would vanish from the report."""
+        park = self._hit(live, id=45733176, name="چراغ پارکی مدل حیاطی", categoryTitle="آباژور", new_categoryId=360)
+        row = basalam.item_to_row(park, target_category="lighting")
+        assert row["off_scope"] == "title:پارکی"
+        with basalam.BasalamClient(transport=_basalam_transport({**live, "products": [park]}, key="products"),
+                                   pause_seconds=0) as client:
+            rows = list(basalam.iter_search(client, queries={"lighting": ["آباژور"]}, rows=48))
+        assert [r["source_product_id"] for r in rows] == ["45733176"] and rows[0]["off_scope"] == "title:پارکی"
+
+    def test_query_plan_avoids_the_terms_that_pulled_off_scope_hits(self):
+        # «چراغ ایستاده» → park lamps + physiotherapy lamp; «کتابخانه چوبی» → book sets («کتاب خانه»)
+        assert "چراغ ایستاده" not in basalam.CATEGORY_QUERIES["lighting"]
+        assert "کتابخانه چوبی" not in basalam.CATEGORY_QUERIES["storage"]
+        assert "آباژور ایستاده" in basalam.CATEGORY_QUERIES["lighting"]
+        assert "کتابخانه ایستاده" in basalam.CATEGORY_QUERIES["storage"]
+        # every numeric leaf maps onto a real taxonomy id, and no off-scope leaf is also a mapped one
+        from ai import taxonomy as tax
+
+        assert set(basalam.BASALAM_CATEGORY_IDS.values()) <= set(tax.categories())
+        assert not set(basalam.BASALAM_CATEGORY_IDS) & set(basalam.OFF_SCOPE_CATEGORY_IDS)
 
 
 # --------------------------------------------------------------- image step
@@ -578,6 +663,171 @@ class TestPipeline:
     def test_verify_requires_vision(self):
         with pytest.raises(ValueError):
             pipeline.ImportOptions(verify=True, vision=False)
+
+    # ---- P4-ب·2e: the picture arbitrates between two candidates; off-scope
+    # rows never reach the image step; ``tolerate`` is explicit and stored.
+
+    def test_image_picks_between_seller_label_and_query_target(self, db, fetcher):
+        """An armchair the seller filed under «مبل»: seller says sofa, the
+        query said chair, the picture is a chair → filed as chair, verified,
+        provenance stored. Before 2e this row was excluded as a mismatch."""
+        rows = [_row(source_product_id="ARM-1", title_fa="مبل تک نفره راحتی مدل لیانا", category="sofa",
+                     category_candidates=["sofa", "chair"], seller_category="sofa", target_category="chair",
+                     image_url="https://cdn.example-seller.ir/p/armchair-fabric-modern.png",
+                     width_cm=80, depth_cm=85, height_cm=90)]
+        fetcher.files["https://cdn.example-seller.ir/p/armchair-fabric-modern.png"] = _png((77, 33, 11))
+        report = _import(db, rows, fetcher=fetcher,
+                         options=pipeline.ImportOptions(dry_run=False, verify=True, image_mode="rehost"))
+        r = report.rows[0]
+        assert r.detected_category == "chair" and r.category == "chair"
+        assert r.category_candidates == ["sofa", "chair"] and r.category_resolved_by == "image"
+        assert "category_resolved_by_image:sofa->chair" in r.warnings
+        assert r.integrity_ok is True and r.verified is True
+        assert report.summary()["category_resolved_by_image"] == 1 and report.summary()["category_mismatch"] == 0
+        p = db.scalar(select(Product).where(Product.source_product_id == "ARM-1"))
+        assert p.category == "chair" and p.is_verified is True
+        assert p.extraction_raw["import"]["category_candidates"] == ["sofa", "chair"]
+        assert p.extraction_raw["import"]["category_resolved_by"] == "image"
+
+    def test_image_matching_neither_candidate_is_still_a_mismatch(self, db, fetcher):
+        """Two candidates never widen the gate: a coffee table returned by the
+        sofa query and filed under «مبل» stays excluded."""
+        rows = [_row(source_product_id="ARM-2", category="sofa", category_candidates=["sofa", "chair"],
+                     seller_category="sofa", target_category="chair",
+                     image_url="https://cdn.example-seller.ir/p/coffee-table-wood.png")]
+        fetcher.files["https://cdn.example-seller.ir/p/coffee-table-wood.png"] = _png((5, 99, 42))
+        report = _import(db, rows, fetcher=fetcher,
+                         options=pipeline.ImportOptions(dry_run=False, verify=True, image_mode="rehost"))
+        r = report.rows[0]
+        assert r.detected_category == "coffee_table" and r.category == "sofa"
+        assert r.category_resolved_by is None and "image_category_mismatch" in r.integrity_reasons
+        assert r.integrity_ok is False and r.verified is False
+
+    def test_single_candidate_is_never_re_filed_by_the_picture(self, db, fetcher):
+        # Seller and query agreed on «rug»; the picture is a sofa → mismatch, not a silent re-file.
+        rows = [_row(source_product_id="LIE-2", category="فرش", category_candidates=["rug"], title_fa="فرش دستباف",
+                     width_cm=300, depth_cm=200, height_cm=1, materials="fabric")]
+        report = _import(db, rows, fetcher=fetcher,
+                         options=pipeline.ImportOptions(dry_run=False, verify=True, image_mode="rehost"))
+        r = report.rows[0]
+        assert r.category == "rug" and r.detected_category == "sofa" and r.category_resolved_by is None
+        assert "image_category_mismatch" in r.integrity_reasons and r.verified is False
+
+    def test_off_scope_rows_are_skipped_before_download_and_vision(self, db, fetcher):
+        calls: list[str] = []
+
+        class Counting:
+            def extract_bytes(self, data, mime, *, image_hint="", prompt_kind="product", **kw):
+                calls.append(image_hint)
+                from ai.feature_extractor import FeatureExtractor
+
+                return FeatureExtractor("mock").extract_bytes(data, mime=mime, image_hint=image_hint,
+                                                              prompt_kind=prompt_kind)
+
+        rows = [_row(source_product_id="PARK-1", title_fa="چراغ پارکی مدل حیاطی", category="lighting",
+                     off_scope="title:پارکی", image_url="https://cdn.example-seller.ir/p/chandelier-metal-black.png"),
+                _row(source_product_id="OK-2")]
+        report = pipeline.import_rows(
+            db, rows, source=SOURCE, options=pipeline.ImportOptions(dry_run=False, verify=True, image_mode="rehost"),
+            extractor=Counting(), fetch_image=fetcher, check_link=lambda u: FakeLink(),
+        )
+        park, ok = report.rows
+        assert park.action == "skipped" and park.codes == ["off_scope"] and "title:پارکی" in park.warnings
+        assert ok.action == "created" and ok.verified is True
+        assert "chandelier-metal-black.png" not in " ".join(fetcher.calls)   # never downloaded
+        assert calls == ["sofa-modern-fabric.png"]                          # vision paid once, for the real row
+        assert report.summary()["off_scope"] == 1 and report.summary()["rejection_codes"] == {"off_scope": 1}
+        assert db.scalar(select(Product).where(Product.source_product_id == "PARK-1")) is None
+
+    def test_off_scope_never_touches_an_existing_row(self, db, fetcher):
+        _import(db, [_row(source_product_id="KEEP-1")], fetcher=fetcher,
+                options=pipeline.ImportOptions(dry_run=False, verify=True, image_mode="rehost"))
+        before = db.scalar(select(Product).where(Product.source_product_id == "KEEP-1"))
+        assert before.is_verified is True
+        report = _import(db, [_row(source_product_id="KEEP-1", off_scope="title:کودک")], fetcher=fetcher,
+                         options=pipeline.ImportOptions(dry_run=False, verify=True, image_mode="rehost"))
+        r = report.rows[0]
+        assert r.action == "skipped" and r.product_id == before.id
+        assert any("already in the catalog" in w for w in r.warnings)
+        db.refresh(before)
+        assert before.is_verified is True and before.title_fa == "مبل راحتی سه‌نفره مدل آرتا"
+
+    def test_tolerate_is_restricted_and_needs_verify(self):
+        assert pipeline.ImportOptions(verify=True, tolerate={"ambiguous_style"}).tolerate == frozenset({"ambiguous_style"})
+        with pytest.raises(ValueError, match="not allowed"):
+            pipeline.ImportOptions(verify=True, tolerate={"low_confidence"})
+        with pytest.raises(ValueError, match="not allowed"):
+            pipeline.ImportOptions(verify=True, tolerate={"provider_error"})
+        with pytest.raises(ValueError, match="only affects verify"):
+            pipeline.ImportOptions(tolerate={"ambiguous_style"})
+
+    def test_tolerated_ambiguous_style_is_verified_and_keeps_its_flag(self, db, fetcher):
+        """Mock filename ``modern`` + ``scandi`` → styles {modern, scandinavian}
+        = the confusable cluster → ``ambiguous_style`` as the *sole* reason."""
+        url = "https://cdn.example-seller.ir/p/sofa-modern-scandi-fabric.png"
+        fetcher.files[url] = _png((31, 41, 59))
+        row = _row(source_product_id="AMB-1", image_url=url, styles="")
+        strict = _import(db, [row], fetcher=fetcher,
+                         options=pipeline.ImportOptions(dry_run=False, verify=True, image_mode="rehost"))
+        r = strict.rows[0]
+        assert r.review_reasons == ["ambiguous_style"] and r.verified is False and r.needs_review is True
+        assert strict.summary()["needs_review"] == 1 and strict.summary()["tolerated"] == 0
+
+        tolerant = _import(db, [dict(row, image_url=url)], fetcher=fetcher,
+                           options=pipeline.ImportOptions(dry_run=False, verify=True, image_mode="rehost",
+                                                          refresh_images=True, tolerate={"ambiguous_style"}))
+        r = tolerant.rows[0]
+        assert r.verified is True and r.tolerated_reasons == ["ambiguous_style"]
+        s = tolerant.summary()
+        assert s["verified"] == 1 and s["tolerated"] == 1 and s["tolerated_reasons"] == {"ambiguous_style": 1}
+        assert s["needs_review"] == 0 and s["review_reasons"] == {}      # nobody is waiting for a human
+        p = db.scalar(select(Product).where(Product.source_product_id == "AMB-1"))
+        assert p.is_verified is True
+        assert p.extraction_raw["needs_review"] is True                      # the flag stays on the row …
+        assert p.extraction_raw["review_reasons"] == ["ambiguous_style"]
+        assert p.extraction_raw["import"]["tolerated"] == ["ambiguous_style"]  # … and so does the decision
+
+    def test_tolerate_never_covers_a_second_reason(self, db, fetcher):
+        """ambiguous_style + low_confidence: the tolerated reason does not
+        drag the other one through."""
+        class Hedging:
+            def extract_bytes(self, data, mime, *, image_hint="", prompt_kind="product", **kw):
+                from ai.feature_extractor import FeatureExtractor
+
+                out = FeatureExtractor("mock").extract_bytes(data, mime=mime, image_hint=image_hint,
+                                                             prompt_kind=prompt_kind)
+                out.update(style=["modern", "minimal"], confidence=0.55, needs_review=True,
+                           review_reasons=["low_confidence", "ambiguous_style"])
+                return out
+
+        report = pipeline.import_rows(
+            db, [_row(source_product_id="AMB-2", styles="")], source=SOURCE,
+            options=pipeline.ImportOptions(dry_run=False, verify=True, image_mode="rehost",
+                                           tolerate={"ambiguous_style"}),
+            extractor=Hedging(), fetch_image=fetcher, check_link=lambda u: FakeLink(),
+        )
+        r = report.rows[0]
+        assert r.verified is False and r.tolerated_reasons == []
+        assert r.review_reasons == ["low_confidence", "ambiguous_style"]
+        assert report.summary()["needs_review"] == 1
+
+    def test_tolerate_never_verifies_a_flag_without_a_reason(self, db, fetcher):
+        class Flagged:
+            def extract_bytes(self, data, mime, *, image_hint="", prompt_kind="product", **kw):
+                from ai.feature_extractor import FeatureExtractor
+
+                out = FeatureExtractor("mock").extract_bytes(data, mime=mime, image_hint=image_hint,
+                                                             prompt_kind=prompt_kind)
+                out.update(needs_review=True, review_reasons=[])
+                return out
+
+        report = pipeline.import_rows(
+            db, [_row(source_product_id="AMB-3")], source=SOURCE,
+            options=pipeline.ImportOptions(dry_run=False, verify=True, image_mode="rehost",
+                                           tolerate={"ambiguous_style"}),
+            extractor=Flagged(), fetch_image=fetcher, check_link=lambda u: FakeLink(),
+        )
+        assert report.rows[0].verified is False
 
     def test_upsert_updates_price_without_refetching_unchanged_image(self, db, fetcher):
         first = _import(db, [_row(source_product_id="UP-1", price_toman="40000000")], fetcher=fetcher)
@@ -798,6 +1048,29 @@ class TestCli:
         feed.write_text(file_adapter.template_csv(), encoding="utf-8")
         assert import_catalog.main(["file", "--path", str(feed), "--seller", "Bad Slug"]) == 2
         assert import_catalog.main(["basalam", "--category", "shoes"]) == 2
+
+    def test_tolerate_flag_is_validated_before_anything_runs(self, tmp_path, capsys):
+        from scripts import import_catalog
+
+        feed = tmp_path / "f.csv"
+        feed.write_text(file_adapter.template_csv(), encoding="utf-8")
+        assert import_catalog.main(["file", "--path", str(feed), "--seller", "x", "--verify",
+                                    "--tolerate", "low_confidence"]) == 2
+        err = capsys.readouterr().err
+        assert "--tolerate ['low_confidence'] is not allowed" in err and "ambiguous_style" in err
+        assert import_catalog.main(["file", "--path", str(feed), "--seller", "x", "--tolerate", "ambiguous_style"]) == 2
+        assert "only has an effect together with --verify" in capsys.readouterr().err
+        # the parser help names the allowed reasons, so the operator never has to guess
+        import io
+        from contextlib import redirect_stdout
+
+        buf = io.StringIO()
+        with redirect_stdout(buf), pytest.raises(SystemExit):
+            import_catalog.main(["basalam", "--help"])
+        help_text = " ".join(buf.getvalue().split())   # argparse wraps lines
+        assert "--tolerate REASON" in help_text and "allowed: ambiguous_style" in help_text
+        args = import_catalog.build_parser().parse_args(["basalam", "--verify", "--tolerate", "ambiguous_style"])
+        assert import_catalog._options(args).tolerate == frozenset({"ambiguous_style"})
         assert import_catalog.main(["basalam", "--query", "nonsense"]) == 2
         assert import_catalog.main([]) == 2
 
@@ -816,6 +1089,21 @@ class TestCli:
         assert "image_raw: photo={'MEDIUM': None, 'SMALL': ''}" in out
         assert "verdict: REJECTED image_url_invalid" in out
         assert "4/5 inspected items pass the normaliser" in out
+
+    def test_inspect_raw_shows_candidates_and_off_scope(self, tmp_path, capsys):
+        from scripts import import_catalog
+
+        live = json.loads((FIXTURES / "basalam_search_live_shape.json").read_text(encoding="utf-8"))
+        first = dict(basalam.find_product_list(live)[0])
+        armchair = {**first, "id": 46957138, "name": "مبل تک نفره راحتی", "categoryTitle": "مبل", "new_categoryId": 357}
+        park = {**first, "id": 45733176, "name": "چراغ پارکی حیاطی", "categoryTitle": "آباژور", "new_categoryId": 360}
+        dump = tmp_path / "raw.json"
+        dump.write_text(json.dumps({"query": "مبل تک نفره", "response": {**live, "products": [armchair, park]}},
+                                   ensure_ascii=False), encoding="utf-8")
+        assert import_catalog.main(["--inspect-raw", str(dump)]) == 0
+        out = capsys.readouterr().out
+        assert "candidates: sofa | chair (seller label and search term disagree" in out
+        assert "off_scope: title:پارکی (would be skipped before download/vision)" in out
 
         assert import_catalog.main(["--inspect-raw", str(tmp_path / "missing.json")]) == 2
         (tmp_path / "empty.json").write_text('{"response": {"products": []}}', encoding="utf-8")

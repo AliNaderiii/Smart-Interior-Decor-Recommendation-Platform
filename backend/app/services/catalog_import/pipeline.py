@@ -17,7 +17,22 @@ Per row, in order — and every step can only *reject* or *flag*, never invent:
    with an in-batch duplicate-image index;
 7. ``is_verified`` — stays ``False`` (admin review queue) unless the operator
    passed ``verify=True`` **and** the row is clean **and** the vision check
-   agreed with the seller's category. Verification is never implied.
+   agreed with the row's category. Verification is never implied. The only
+   softening is explicit and audited: ``tolerate={"ambiguous_style"}``
+   (P4-ب·2e) verifies a row whose *sole* review flag is the style hedge, and
+   the flag stays stored on the row.
+
+Two decisions sit between steps 1 and 4 (P4-ب·2e, 2026-09-11):
+
+* an adapter may mark a row ``off_scope`` (a park lamp, a kids' chair, a
+  book set the search engine returned) — it is skipped *before* the image
+  is downloaded or the vision provider is paid, and counted in the report;
+* an adapter may carry two ``category_candidates`` (the seller's label and
+  the search term disagree — an armchair filed under «مبل»). The picture
+  decides: when ``detected_category`` is one of the two, the row is filed
+  there (``category_resolved_by_image`` in the warnings and in
+  ``extraction_raw.import``); when it is neither, the row is an
+  ``image_category_mismatch`` exactly as before.
 
 A dry run performs 1–3 and 6 (evaluate only), writes nothing — not even an
 image — and reports exactly what a real run would do.
@@ -35,7 +50,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ai import catalog_integrity as policy
+from ai import taxonomy as tax
 from ai.embedding_service import get_embedding, product_to_text
+from ai.extraction_review import TOLERABLE_REVIEW_REASONS
 from app.core.log_redaction import redact
 from app.models.product import Product
 from app.services import catalog_integrity as integrity
@@ -44,7 +61,7 @@ from app.services.catalog_import.images import AcquiredImage, ImageUnavailable, 
 
 logger = logging.getLogger(__name__)
 
-IMPORT_POLICY_VERSION = "catalog_import/2026-09-09.1"
+IMPORT_POLICY_VERSION = "catalog_import/2026-09-11.1"
 
 ImageFetcher = Callable[[str], AcquiredImage]
 LinkChecker = Callable[[str], Any]  # returns app.services.link_checker.LinkCheckResult
@@ -78,12 +95,28 @@ class ImportOptions:
     #: vision provider, changed thresholds …). Default: reuse the stored
     #: fingerprint and verdict.
     refresh_images: bool = False
+    #: Review reasons the operator accepts at verification time (``--tolerate``).
+    #: Only :data:`ai.extraction_review.TOLERABLE_REVIEW_REASONS` are allowed;
+    #: a row is verified when *every* reason it carries is tolerated, and the
+    #: reasons stay on the row (``extraction_raw.review_reasons`` +
+    #: ``extraction_raw.import.tolerated``). Default: tolerate nothing.
+    tolerate: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:
         if self.verify and not self.vision:
             raise ValueError("verify=True requires vision=True (no auto-verification without the image check)")
         if self.image_mode not in (None, "rehost", "link"):
             raise ValueError("image_mode must be 'rehost' or 'link'")
+        tolerate = frozenset(str(r) for r in (self.tolerate or ()))
+        object.__setattr__(self, "tolerate", tolerate)
+        unknown = sorted(tolerate - TOLERABLE_REVIEW_REASONS)
+        if unknown:
+            raise ValueError(
+                f"tolerate={unknown} is not allowed; only {sorted(TOLERABLE_REVIEW_REASONS)} may be tolerated "
+                "(every other review reason means a feature is missing, invented or from a failed provider)"
+            )
+        if tolerate and not self.verify:
+            raise ValueError("tolerate=... only affects verify=True (nothing is verified without --verify)")
 
     def resolved_image_mode(self) -> str:
         if self.image_mode:
@@ -110,7 +143,15 @@ class RowResult:
     #: Why the vision gate wants a human (``low_confidence``, ``missing_style``,
     #: ``provider_error`` …) — the operator reads these before deciding ``--yes``.
     review_reasons: list[str] = field(default_factory=list)
+    #: Review reasons the operator tolerated (``ImportOptions.tolerate``) —
+    #: non-empty only when the row was verified *despite* them.
+    tolerated_reasons: list[str] = field(default_factory=list)
     verified: bool = False
+    #: Every category the adapter's signals named (seller label, search term);
+    #: two entries mean the picture had to decide.
+    category_candidates: list[str] = field(default_factory=list)
+    #: ``"image"`` when ``detected_category`` chose between two candidates.
+    category_resolved_by: str | None = None
     #: The URL the product now serves its picture from (own storage or seller CDN).
     image_url: str = ""
     warnings: list[str] = field(default_factory=list)
@@ -160,12 +201,20 @@ class ImportReport:
             "eligible": eligible,
             "excluded_by_integrity": sum(1 for r in self.accepted if r.integrity_ok is False),
             "verified": sum(1 for r in self.accepted if r.verified),
-            "needs_review": sum(1 for r in self.accepted if r.needs_review),
+            #: Rows actually waiting for a human (flagged and not verified).
+            "needs_review": sum(1 for r in self.accepted if r.needs_review and not r.verified),
+            #: Rows verified although flagged, because every flag was tolerated.
+            "tolerated": sum(1 for r in self.accepted if r.tolerated_reasons),
+            "tolerated_reasons": dict(Counter(
+                reason for r in self.accepted for reason in r.tolerated_reasons
+            ).most_common()),
             "category_mismatch": sum(
                 1 for r in self.accepted if "image_category_mismatch" in r.integrity_reasons
             ),
+            "category_resolved_by_image": sum(1 for r in self.accepted if r.category_resolved_by == "image"),
+            "off_scope": codes["off_scope"],
             "review_reasons": dict(Counter(
-                reason for r in self.accepted if r.needs_review for reason in r.review_reasons
+                reason for r in self.accepted if r.needs_review and not r.verified for reason in r.review_reasons
             ).most_common()),
             "by_category": dict(sorted(categories.items())),
             "integrity_reasons": dict(reasons.most_common()),
@@ -213,6 +262,30 @@ def _image_unchanged(product: Product | None, row: FeedRow) -> bool:
     if product is None or not product.image_phash or not product.image_url:
         return False
     return _previous_import(product).get("image_url") == row.image_url
+
+
+def _candidates(row: FeedRow) -> list[str]:
+    """Taxonomy categories the adapter's signals named, filed category first."""
+    raw = row.raw.get("category_candidates")
+    known = set(tax.categories())
+    out = [row.category] if row.category in known else []
+    if isinstance(raw, (list, tuple)):
+        out.extend(str(c) for c in raw if isinstance(c, str) and c in known and str(c) not in out)
+    return out
+
+
+def _category_source(row: FeedRow, category: str, resolved_by: str | None) -> str:
+    """Provenance of the stored category: ``image`` (arbitrated), ``seller``
+    (the seller's own label), ``query`` (the search term's target) or ``feed``
+    (a file feed's column)."""
+    if resolved_by:
+        return resolved_by
+    if "seller_category" in row.raw or "target_category" in row.raw:
+        if row.raw.get("seller_category") == category:
+            return "seller"
+        if row.raw.get("target_category") == category:
+            return "query"
+    return "feed"
 
 
 def _merge_tags(seller: list[str], vision: Any) -> list[str]:
@@ -304,7 +377,23 @@ def import_rows(
 
         result = RowResult(source_product_id=row.source_product_id, title_fa=row.title_fa,
                            category=row.category, warnings=list(row.warnings))
+        result.category_candidates = _candidates(row)
         product = existing.get(row.source_product_id)
+
+        off_scope = str(row.raw.get("off_scope") or "").strip()
+        if off_scope:
+            # The adapter recognised something that is not living-room decor
+            # (a park lamp, a kids' chair, a book set). Nothing is downloaded,
+            # nothing is inferred, nothing is written; an existing row is left
+            # for the admin queue rather than silently changed.
+            result.action = "skipped"
+            result.codes = ["off_scope"]
+            result.warnings.append(off_scope)
+            if product is not None:
+                result.product_id = product.id
+                result.warnings.append(f"already in the catalog as product {product.id}; review it in /admin/products")
+            _record(report, result, on_row)
+            continue
 
         if not row.available and opts.skip_unavailable:
             result.action = "skipped"
@@ -371,6 +460,18 @@ def import_rows(
         result.needs_review = bool(extraction.get("needs_review")) if extraction else None
         result.review_reasons = [str(r) for r in (extraction.get("review_reasons") or []) if r]
 
+        # ---- category: the picture arbitrates between two candidates -----
+        category = row.category
+        if (
+            len(result.category_candidates) > 1
+            and result.detected_category in result.category_candidates
+            and result.detected_category != category
+        ):
+            category = result.detected_category
+            result.category_resolved_by = "image"
+            result.warnings.append(f"category_resolved_by_image:{row.category}->{category}")
+        result.category = category
+
         # ---- upsert ------------------------------------------------------
         created = product is None
         if created:
@@ -381,7 +482,7 @@ def import_rows(
 
         product.title = row.title_en or row.title_fa
         product.title_fa = row.title_fa
-        product.category = row.category
+        product.category = category
         product.room_type = row.room_type
         product.price_toman = row.price_toman
         product.price_checked_at = row.price_checked_at
@@ -405,6 +506,8 @@ def import_rows(
                 "image_url": row.image_url,
                 "seller_name": row.seller_name,
                 "feed_category": str(row.raw.get("feed_category") or row.raw.get("category") or ""),
+                "category_candidates": list(result.category_candidates),
+                "category_resolved_by": _category_source(row, category, result.category_resolved_by),
                 "image_mode": image_mode,
                 "imported_at": moment.isoformat(),
                 "warnings": row.warnings,
@@ -428,9 +531,19 @@ def import_rows(
         result.integrity_reasons = list(product.integrity_reasons or [])
 
         if opts.verify:
-            clean = decision["ok"] and not result.needs_review and result.detected_category == row.category
+            # Every review reason must be one the operator explicitly tolerates
+            # (and a flag without a reason is never tolerated).
+            blocking = [r for r in result.review_reasons if r not in opts.tolerate]
+            flagged = bool(result.needs_review)
+            review_clear = not flagged or (bool(result.review_reasons) and not blocking)
+            clean = decision["ok"] and review_clear and result.detected_category == category
             if clean:
                 product.is_verified = True
+                if flagged:
+                    result.tolerated_reasons = list(result.review_reasons)
+                    meta = dict(product.extraction_raw.get("import") or {})
+                    meta["tolerated"] = list(result.review_reasons)
+                    product.extraction_raw = {**product.extraction_raw, "import": meta}
         result.verified = bool(product.is_verified)
         result.image_url = product.image_url or ""
         result.product_id = product.id
@@ -473,7 +586,8 @@ def _audit(db: Session, report: ImportReport) -> None:
             detail=(
                 f"source={s['source']} created={s['created']} updated={s['updated']} "
                 f"unchanged={s['unchanged']} rejected={s['rejected']} skipped={s['skipped']} "
-                f"excluded={s['excluded_by_integrity']} verified={s['verified']} strict={s['strict']}"
+                f"excluded={s['excluded_by_integrity']} verified={s['verified']} tolerated={s['tolerated']} "
+                f"off_scope={s['off_scope']} strict={s['strict']}"
             ),
         )
     except Exception as exc:  # pragma: no cover - defensive

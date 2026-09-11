@@ -75,6 +75,22 @@ _REASONS = {
 }
 
 
+#: Every reason code :func:`review_decision` can emit.
+KNOWN_REVIEW_REASONS: frozenset[str] = frozenset(_REASONS)
+
+#: Reasons an *operator* may choose to tolerate at import time (``--tolerate``,
+#: P4-ب·2e, 2026-09-11): the row is verified although the gate pre-flagged it,
+#: and the flag stays stored on the row. Only ``ambiguous_style`` qualifies —
+#: it is a hedge *between* styles the model demonstrably confuses, so the
+#: recommendation is still built on real, in-taxonomy features. Every other
+#: reason means a feature is missing, invented or came from a failed/foreign
+#: provider; tolerating those would put unverified data in front of a buyer.
+#: Evidence (benchmark n=50, 2026-09-10 replay): flagged answers were fully
+#: correct 11/27 times (mean score 0.72) with every miss inside the
+#: modern/scandinavian/minimal cluster, versus 18/23 (0.94) unflagged.
+TOLERABLE_REVIEW_REASONS: frozenset[str] = frozenset({"ambiguous_style"})
+
+
 def ambiguous_style(styles: Any) -> bool:
     """True when ≥2 distinct styles were predicted and all sit in one cluster."""
     if not isinstance(styles, (list, tuple, set)):

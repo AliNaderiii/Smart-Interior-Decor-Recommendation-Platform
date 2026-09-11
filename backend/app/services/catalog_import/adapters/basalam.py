@@ -54,10 +54,23 @@ the row (``image_raw``) so the rejection in the report says *what* was seen.
 
 Honesty rules specific to this adapter:
 
-* the **category** is the seller's own label (``categoryTitle`` or the
-  ``category`` chain) when it maps onto the taxonomy, otherwise the query's
-  target category — and in both cases the vision check has to agree before
-  a row can be verified;
+* the **category** is carried as *candidates*, not decided here (P4-ب·2e,
+  2026-09-11): the seller's own label (``categoryTitle`` / the ``category``
+  chain / :data:`BASALAM_CATEGORY_IDS`) and the search term's target
+  category. When they agree there is one candidate; when they disagree —
+  Basalam sellers file armchairs under «مبل» (sofa) and TV stands under
+  «میز» (table) — the pipeline lets the *picture* decide between the two
+  (``detected_category``), and a picture that matches neither is an
+  ``image_category_mismatch`` as before. The vision check has to agree with
+  the final category before a row can be verified;
+* **off-scope hits are skipped before any download or inference**: the
+  search engine returns park lamps for «آباژور», kids' chairs for «صندلی»,
+  book sets for «کتابخانه», bathroom shelves for «شلف». A short, explicit
+  list of title words and Basalam leaf categories that can never be
+  living-room decor (:data:`OFF_SCOPE_TITLE_TERMS`,
+  :data:`OFF_SCOPE_CATEGORY_IDS`) marks such rows ``off_scope``; the
+  pipeline skips them and the report counts them. Skipping is conservative
+  — a false positive costs one candidate, never a wrong row;
 * **dimensions** come only from explicit product attributes (طول/عرض/ارتفاع/
   ابعاد). ``packaging_dimensions`` describe the box, not the product, and are
   used only when the operator opts in (``use_packaging_dimensions``), with
@@ -78,7 +91,12 @@ from typing import Any
 
 import httpx
 
-from app.services.catalog_import.contract import normalize_digits, parse_dimensions, to_int
+from app.services.catalog_import.contract import (
+    map_category,
+    normalize_digits,
+    parse_dimensions,
+    to_int,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -96,11 +114,107 @@ CATEGORY_QUERIES: dict[str, list[str]] = {
     "sofa": ["مبل راحتی", "مبل ال", "کاناپه"],
     "coffee_table": ["میز جلومبلی", "میز عسلی"],
     "rug": ["فرش دستباف", "فرش ماشینی", "گلیم"],
-    "lighting": ["لوستر", "آباژور", "چراغ ایستاده"],
+    # «چراغ ایستاده» pulled park/garden lamps and an infrared physiotherapy
+    # lamp (2026-09-10 dry-run); «آباژور ایستاده» is 96% decorative-lamp live.
+    "lighting": ["لوستر", "آباژور", "آباژور ایستاده"],
     "chair": ["صندلی راحتی", "مبل تک نفره", "صندلی چوبی"],
-    "storage": ["بوفه", "شلف دیواری", "میز تلویزیون", "کتابخانه چوبی"],
+    # «کتابخانه چوبی» is tokenised as «کتاب خانه» and returned book sets
+    # («کتاب خانه درختی»); «کتابخانه ایستاده» is 65% closet/bookcase live.
+    "storage": ["بوفه", "شلف دیواری", "میز تلویزیون", "کتابخانه ایستاده"],
     "decor": ["کوسن", "تابلو دکوراتیو", "آینه دکوراتیو", "گلدان دکوری"],
 }
+
+#: Basalam leaf categories (``new_categoryId`` on search hits) → taxonomy id.
+#: Read live from ``facets.query_category`` and hits on 2026-09-10/11. Used
+#: as a *second reading of the seller's label* when ``categoryTitle`` is not
+#: an alias — never as the final word (see :func:`resolve_category`).
+BASALAM_CATEGORY_IDS: dict[int, str] = {
+    357: "sofa",
+    355: "chair",
+    358: "coffee_table",   # «میز» — any table; the picture tells a TV stand (storage) from a coffee table
+    356: "storage",        # «کمد، کتابخانه، بوفه»
+    291: "storage",        # «شلف و استند»
+    366: "lighting",       # chandelier
+    365: "lighting",       # lamps
+    360: "lighting",       # decorative-lamp (آباژور)
+    362: "lighting",       # bedside-lamp
+    363: "lighting",       # desk-lamp
+    305: "decor",          # «بالش و کوسن»
+    287: "decor",          # «آینه و تابلو دکوراتیو»
+    295: "decor",          # «مجسمه و تندیس»
+    290: "decor",          # «ساعت دیواری»
+    297: "decor",          # «تابلو فرش» hangs on a wall — it is wall art, not a floor rug
+    299: "rug",            # hand-made carpet
+    300: "rug",            # machine-made carpet
+    301: "rug",            # modern carpet
+    302: "rug",            # kilim
+}
+
+#: Basalam leaf categories that can never be living-room decor. A hit filed
+#: there is skipped (``off_scope``) before its picture is downloaded or sent
+#: to the vision provider. Slugs are Basalam's own (``facets.query_category``).
+OFF_SCOPE_CATEGORY_IDS: dict[int, str] = {
+    791: "books", 543: "novel-stories-books", 552: "psychology-books", 556: "kids-teenager-books",
+    594: "travel-appliances", 591: "camping",
+    437: "baby-food-accessories", 439: "baby-travel-accessories", 265: "baby-accessories",
+    352: "bathroom-accessories", 353: "toilet-supplies",
+    424: "rehabilitation-tools",
+    1123: "shoe-rack", 359: "clothes-organizer", 330: "ironing", 289: "tablecloths",
+    562: "blackboard-whiteboard", 576: "turbah-and-stand", 535: "dolls-figor-toys",
+    864: "tv-accessories", 306: "beds",
+}
+
+#: Title words that mark a hit as outside the living-room scope, matched as
+#: whole words (so «ماشین» — a car seat — never fires on «فرش ماشینی»).
+#: ``"*"`` applies to every category; the rest only to that category, because
+#: the same word is legitimate elsewhere («دیواری» kills a wall-hung kilim
+#: but a «شلف دیواری» is exactly what the storage query wants).
+_OUTDOOR_TERMS = ("پارکی", "حیاطی", "محوطه", "محوطه ای", "باغی", "فضای باز", "خیابانی",
+                  "مسافرتی", "کمپینگ", "ساحلی", "پیک نیک")
+OFF_SCOPE_TITLE_TERMS: dict[str, tuple[str, ...]] = {
+    "*": (
+        "کودک", "کودکان", "کودکانه", "بچه", "بچگانه", "نوزاد", "نوزادی", "عروسک", "عروسکی",
+        "حمام", "دستشویی", "توالت", "سرویس بهداشتی",
+        "ماکت", "مینیاتوری", "مینیاتور", "بادی",
+        "مادون قرمز", "فیزیوتراپی", "ماساژور", "ماساژ",
+        "خودرو", "اتومبیل", "ماشین",
+    ),
+    # «طرح باغی» is a classic carpet design and «ساحلی» a decor mood: outdoor
+    # words are off-scope only for furniture and lamps.
+    "sofa": _OUTDOOR_TERMS,
+    "chair": (*_OUTDOOR_TERMS, "آرایشگاهی", "گیمینگ", "چرخدار"),
+    "coffee_table": (*_OUTDOOR_TERMS, "ناهارخوری", "غذاخوری", "تحریر", "آرایش", "اتو",
+                     "لپ تاپ", "لپتاپ", "کامپیوتر"),
+    "storage": (*_OUTDOOR_TERMS, "آشپزخانه", "ادویه", "جاکفشی", "کفش", "دارو"),
+    "lighting": (*_OUTDOOR_TERMS, "هیتر", "بخاری", "رشد گیاه"),
+    "rug": ("دیواری", "تابلو", "تابلوفرش", "سجاده", "جانماز", "پادری"),
+}
+
+_TITLE_WORD_SPLIT_RE = re.compile(r"[\s\u200c\-_/|,،؛;:()\[\]{}«»\"'.!?*+]+")
+
+
+def _title_words(title: str) -> list[str]:
+    return [t for t in _TITLE_WORD_SPLIT_RE.split(normalize_digits(str(title or "")).replace("ي", "ی").replace("ك", "ک"))
+            if t]
+
+
+def off_scope_reason(title: str, category: str | None, basalam_category_id: Any = None) -> str | None:
+    """``"title:پارکی"`` / ``"basalam_category:791 books"`` when the hit is outside
+    the living-room scope, else ``None``. Pure and cheap: runs before any I/O."""
+    cid = to_int(basalam_category_id) if basalam_category_id is not None else None
+    if cid is not None and cid in OFF_SCOPE_CATEGORY_IDS:
+        return f"basalam_category:{cid} {OFF_SCOPE_CATEGORY_IDS[cid]}"
+    tokens = _title_words(title)
+    if not tokens:
+        return None
+    for term in (*OFF_SCOPE_TITLE_TERMS["*"], *OFF_SCOPE_TITLE_TERMS.get(category or "", ())):
+        parts = term.split(" ")
+        if len(parts) == 1:
+            if term in tokens:
+                return f"title:{term}"
+        elif any(tokens[i:i + len(parts)] == parts for i in range(len(tokens) - len(parts) + 1)):
+            return f"title:{term}"
+    return None
 
 #: Basalam status enum (from the SDK): 2976 published; the rest are not sellable.
 _UNSELLABLE_STATUS = {3790, 4184, 3568}
@@ -482,6 +596,10 @@ def item_to_row(raw_item: Mapping[str, Any], *, target_category: str | None = No
     }
     if not image_url:
         row["image_raw"] = _photo_raw(item)
+    row["seller_category"] = seller_category(row)
+    scope = off_scope_reason(row["title_fa"], target_category or row["seller_category"], row["basalam_category_id"])
+    if scope:
+        row["off_scope"] = scope
     dims = dimensions_from_attributes(item)
     if dims:
         row.update(dims)
@@ -496,13 +614,47 @@ def item_to_row(raw_item: Mapping[str, Any], *, target_category: str | None = No
 
 # --------------------------------------------------------------------- crawl
 
-def _pick_category(row: dict[str, Any], map_category: Callable[[Any], str | None]) -> str | None:
-    """Seller label (leaf → root) if it maps; else the query's target category."""
-    for label in row.get("category_chain") or [row.get("category")]:
+def seller_category(row: Mapping[str, Any]) -> str | None:
+    """The taxonomy category the *seller's* labelling maps to, or ``None``.
+
+    Reads the category chain (leaf → root), the flat ``categoryTitle`` and
+    finally Basalam's numeric leaf id (:data:`BASALAM_CATEGORY_IDS`).
+    """
+    for label in [*(row.get("category_chain") or []), row.get("feed_category"), row.get("category")]:
         mapped = map_category(label)
         if mapped:
             return mapped
-    return row.get("target_category")
+    cid = to_int(row.get("basalam_category_id")) if row.get("basalam_category_id") is not None else None
+    if cid is not None:
+        return BASALAM_CATEGORY_IDS.get(cid)
+    return None
+
+
+def resolve_category(row: Mapping[str, Any]) -> tuple[str | None, list[str]]:
+    """``(category, candidates)`` for an adapter row.
+
+    ``category`` is what the row is *filed under before the picture is seen*:
+    the seller's category when it maps, else the query's target. ``candidates``
+    is every category the two signals name (1 or 2 entries, seller first).
+    With two candidates the pipeline lets ``detected_category`` pick — that
+    is the P4-ب·2e fix for armchairs filed under «مبل» and TV stands under
+    «میز» — and still excludes a row whose picture matches neither.
+    """
+    seller = seller_category(row)
+    target = row.get("target_category") or None
+    candidates = [c for c in (seller, target) if c]
+    candidates = list(dict.fromkeys(candidates))
+    return (candidates[0] if candidates else None), candidates
+
+
+def _pick_category(row: dict[str, Any], _mapper: Callable[[Any], str | None] | None = None) -> str | None:
+    """Backward-compatible wrapper: the filed category only (see :func:`resolve_category`)."""
+    return resolve_category(row)[0]
+
+
+def _stamp_category(row: dict[str, Any]) -> dict[str, Any]:
+    row["category"], row["category_candidates"] = resolve_category(row)
+    return row
 
 
 def iter_search(client: BasalamClient, *, queries: Mapping[str, list[str]] | None = None,
@@ -515,8 +667,6 @@ def iter_search(client: BasalamClient, *, queries: Mapping[str, list[str]] | Non
     ``details=True`` additionally fetches ``GET /v1/products/{id}`` (needs a
     token) for attributes, availability and the full description.
     """
-    from app.services.catalog_import.contract import map_category
-
     plan = queries or CATEGORY_QUERIES
     seen: set[str] = set()
     for category, terms in plan.items():
@@ -549,7 +699,7 @@ def iter_search(client: BasalamClient, *, queries: Mapping[str, list[str]] | Non
                             logger.warning("basalam detail fetch failed for %s: %s", product_id, exc)
                     row = item_to_row(item, target_category=category,
                                       use_packaging_dimensions=use_packaging_dimensions, price_unit=price_unit)
-                    row["category"] = _pick_category(row, map_category)
+                    _stamp_category(row)
                     row["query"] = term
                     yield row
                 if len(items) < rows:
@@ -562,8 +712,6 @@ def iter_vendor(client: BasalamClient, vendor_id: int | str, *, per_page: int = 
                 price_unit: str = PRICE_UNIT,
                 on_raw: Callable[[str, Any], None] | None = None) -> Iterator[dict[str, Any]]:
     """Yield every product of one vendor (token with ``vendor.product.read``)."""
-    from app.services.catalog_import.contract import map_category
-
     seen: set[str] = set()
     for page in range(1, max_pages + 1):
         payload = client.vendor_products(vendor_id, page=page, per_page=per_page)
@@ -580,7 +728,7 @@ def iter_vendor(client: BasalamClient, vendor_id: int | str, *, per_page: int = 
             seen.add(product_id)
             row = item_to_row(item, target_category=default_category,
                               use_packaging_dimensions=use_packaging_dimensions, price_unit=price_unit)
-            row["category"] = _pick_category(row, map_category)
+            _stamp_category(row)
             yield row
         if len(items) < per_page:
             break

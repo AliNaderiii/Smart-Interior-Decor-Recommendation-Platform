@@ -637,6 +637,76 @@ tell a provider outage from a genuinely ambiguous picture before deciding
 read as a failure when it was the default posture. `tests/test_catalog_import.py`
 grows to 55.
 
+*Addendum (2026-09-11, the first dry-run over all seven categories — the
+picture arbitrates).* With rugs live (59 rows, 50 verified), the six other
+categories were dry-run against the rehearsal database: 285 candidates,
+241 eligible, **39 excluded — 35 of them `image_category_mismatch`** — and
+164 flagged for review, 157 of those `ambiguous_style` alone. Reading the
+35 exclusions row by row changed the diagnosis: the gate was right that
+picture and label disagreed, but in most cases the *label* was wrong, not
+the product. The adapter stamped the search term's category on every hit
+unless the seller's own leaf title mapped, and Basalam sellers file
+single armchairs under «مبل» (sofa) and TV stands under «میز» (table); so
+about thirteen good armchairs, several coffee tables and TV stands were
+excluded as liars. A second group (≈30) should never have reached the
+vision provider at all: park and garden lamps for «چراغ ایستاده», an
+infrared physiotherapy lamp, kids' and travel chairs, bathroom shelves,
+and a set of children's books titled «کتاب خانه درختی» that the search
+engine tokenised as «کتابخانه». Three decisions.
+
+(1) **Candidates, not a verdict, from the adapter; the picture decides.**
+`adapters/basalam` now carries every category its two signals name — the
+seller's label (title chain, `categoryTitle`, and Basalam's numeric leaf
+`new_categoryId` through a small verified map) and the search term's
+target — as `category_candidates`. When they agree there is one candidate
+and nothing changes. When they disagree the pipeline files the row under
+the seller's label *until the image is seen*, then lets
+`detected_category` choose between the two (`category_resolved_by:
+image`, recorded on the row and in the report); a picture that matches
+neither remains an `image_category_mismatch`. This is deliberately a
+choice between two human-declared labels, not a free re-file by the
+model: a single-candidate row whose picture shows something else is still
+excluded, exactly as ADR-016 requires. The alternative — trusting
+Basalam's leaf id outright — was rejected after live checks showed the
+same product type under 355 and 357 depending on the seller.
+
+(2) **Off-scope hits are skipped before any download or inference.**
+An explicit, whole-word, per-category list of title terms
+(`OFF_SCOPE_TITLE_TERMS`: «پارکی», «کودک», «مادون قرمز», «ماکت», and
+«دیواری»/«تابلو» for rugs only …) plus Basalam leaves that can never be
+living-room decor (`OFF_SCOPE_CATEGORY_IDS`: books, travel, baby,
+bathroom, rehabilitation …) mark a row `off_scope`; the pipeline skips it
+(`skipped off_scope`, counted in the summary), never touches an existing
+product, and pays neither the CDN nor the vision provider. The list is
+conservative on purpose — «ماشین» is matched as a whole word so «فرش
+ماشینی» is untouched, and outdoor words apply to furniture and lamps but
+not to rugs, where «طرح باغی» is a classic design. A false positive costs
+one candidate; the old behaviour cost a Gemini call and a wrong row in the
+review queue. Two search terms were also replaced («آباژور ایستاده» for
+«چراغ ایستاده», «کتابخانه ایستاده» for «کتابخانه چوبی») after checking
+the live facet distribution of each.
+
+(3) **`--tolerate ambiguous_style`, opt-in and stored.** 157/164 review
+flags were the style hedge alone. The 50-image benchmark replay says the
+hedge is real but bounded: flagged answers were fully correct 11/27 times
+(mean score 0.72) and every miss stayed inside the modern/scandinavian/
+minimal cluster, versus 18/23 (0.94) unflagged. A row flagged only for
+`ambiguous_style` therefore still carries real, in-taxonomy features; the
+uncertainty is *which of three neighbouring styles*, which the
+recommender's overlap scoring already tolerates. `ImportOptions.tolerate`
+(CLI `--tolerate REASON`, repeatable) verifies a row whose *every* review
+reason is tolerated; `ai.extraction_review.TOLERABLE_REVIEW_REASONS`
+restricts the option to `ambiguous_style` — every other reason means a
+feature is missing, invented or came from a failed or foreign provider,
+and asking to tolerate one is a usage error, not a warning. The flag is
+not erased: `extraction_raw.review_reasons` keeps it,
+`extraction_raw.import.tolerated` records the decision, the console says
+`verified(tolerated)`, and the summary counts `tolerated` separately from
+`verified`. The default remains strict; the operator chose tolerance for
+the Basalam import on 2026-09-10 with these numbers in front of him.
+`IMPORT_POLICY_VERSION` → `catalog_import/2026-09-11.1`;
+`tests/test_catalog_import.py` grows to 83.
+
 ## Data model (ERD)
 
 ```
