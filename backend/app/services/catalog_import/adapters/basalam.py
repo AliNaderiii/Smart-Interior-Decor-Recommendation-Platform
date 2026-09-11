@@ -117,7 +117,10 @@ CATEGORY_QUERIES: dict[str, list[str]] = {
     # «چراغ ایستاده» pulled park/garden lamps and an infrared physiotherapy
     # lamp (2026-09-10 dry-run); «آباژور ایستاده» is 96% decorative-lamp live.
     "lighting": ["لوستر", "آباژور", "آباژور ایستاده"],
-    "chair": ["صندلی راحتی", "مبل تک نفره", "صندلی چوبی"],
+    # «صندلی راحتی» is 65% chair live and its top hits were folding camping /
+    # relax chairs and a car seat cushion (2026-09-11 pilot); «صندلی راک چوبی»
+    # is 72% chair and reads as a living-room piece.
+    "chair": ["مبل تک نفره", "صندلی چوبی", "صندلی راک چوبی"],
     # «کتابخانه چوبی» is tokenised as «کتاب خانه» and returned book sets
     # («کتاب خانه درختی»); «کتابخانه ایستاده» is 65% closet/bookcase live.
     "storage": ["بوفه", "شلف دیواری", "میز تلویزیون", "کتابخانه ایستاده"],
@@ -161,7 +164,38 @@ OFF_SCOPE_CATEGORY_IDS: dict[int, str] = {
     424: "rehabilitation-tools",
     1123: "shoe-rack", 359: "clothes-organizer", 330: "ironing", 289: "tablecloths",
     562: "blackboard-whiteboard", 576: "turbah-and-stand", 535: "dolls-figor-toys",
+    528: "girls-toys", 532: "baby-toys",
     864: "tv-accessories", 306: "beds",
+}
+
+#: Replica guard (P4-ب·2f). 2026-09-11 live pilot: 14597663 — a 20 g «صندلی
+#: راحتی دکوری کوچک» filed under «مجسمه و تندیس» (295) — reached ``chair`` as
+#: verified because the picture *is* a chair. A blanket rule on leaf 295 is
+#: wrong: 14102454, a 150 cm buffet, sits under the same leaf and is real. So
+#: the guard reads the hit's own numbers instead:
+#:
+#: * a search hit whose ``weight`` (grams) is below
+#:   :data:`MINIATURE_MAX_WEIGHT_G` cannot be a sofa, chair, table, cabinet or
+#:   lamp — whatever the picture shows;
+#: * a hit under a :data:`MINIATURE_PRONE_CATEGORY_IDS` leaf whose title says
+#:   replica («فیگور», «دکوری کوچک», «جاکلیدی» …) is one.
+#:
+#: Decor is exempt from the weight rule: an empty cushion cover is ~150 g and
+#: a wall sticker 20 g.
+MINIATURE_PRONE_CATEGORY_IDS: dict[int, str] = {
+    295: "sculpture-and-statue",
+}
+MINIATURE_MAX_WEIGHT_G = 100
+_WEIGHT_GUARDED_CATEGORIES = frozenset({"sofa", "chair", "coffee_table", "storage", "lighting"})
+_MINIATURE_TERMS = ("فیگور", "فیگورین", "دکوری کوچک", "کوچک دکوری", "مینی", "جاکلیدی", "جا کلیدی", "آویز")
+
+#: Sellers who only make children's furniture (cartoon sofa-beds, kids'
+#: chairs). A vendor allow/deny list is a blunt tool, so it stays tiny and
+#: every entry names the evidence: ``sitatoys`` — «تولید کننده مبل کودک و
+#: نوجوان در طرح های مختلف کارتونی» (shop summary), four «کاناپه تخت شو السا /
+#: کیتی / باب اسفنجی / بن تن» verified as ``sofa`` in the 2026-09-11 dry-run.
+OFF_SCOPE_VENDORS: dict[str, str] = {
+    "sitatoys": "kids-furniture-maker",
 }
 
 #: Title words that mark a hit as outside the living-room scope, matched as
@@ -169,8 +203,15 @@ OFF_SCOPE_CATEGORY_IDS: dict[int, str] = {
 #: ``"*"`` applies to every category; the rest only to that category, because
 #: the same word is legitimate elsewhere («دیواری» kills a wall-hung kilim
 #: but a «شلف دیواری» is exactly what the storage query wants).
-_OUTDOOR_TERMS = ("پارکی", "حیاطی", "محوطه", "محوطه ای", "باغی", "فضای باز", "خیابانی",
-                  "مسافرتی", "کمپینگ", "ساحلی", "پیک نیک")
+# «فضای باز» is NOT here: sellers list it as one of several uses of a real
+# indoor chair («خانه، مطالعه، فضای باز، کافه» — 52820553, 2026-09-11 dry-run).
+_OUTDOOR_TERMS = ("پارکی", "حیاطی", "محوطه", "محوطه ای", "باغی", "خیابانی",
+                  "مسافرتی", "کمپینگ", "کمپ", "ساحلی", "پیک نیک", "چادر", "طبیعت گردی")
+#: Cartoon franchises Iranian kids'-furniture makers print on sofa-beds and
+#: chairs; none is a living-room style.
+_CARTOON_TERMS = ("السا", "فروزن", "کیتی", "باب اسفنجی", "بن تن", "مینیون", "مینیونها", "میکی موس",
+                  "پو", "پونی", "یونیکورن", "اسپایدرمن", "مرد عنکبوتی", "بتمن", "سوپرمن", "کارتونی",
+                  "سیندرلا", "پرنسس", "دایناسور", "مک کوئین")
 OFF_SCOPE_TITLE_TERMS: dict[str, tuple[str, ...]] = {
     "*": (
         "کودک", "کودکان", "کودکانه", "بچه", "بچگانه", "نوزاد", "نوزادی", "عروسک", "عروسکی",
@@ -178,11 +219,20 @@ OFF_SCOPE_TITLE_TERMS: dict[str, tuple[str, ...]] = {
         "ماکت", "مینیاتوری", "مینیاتور", "بادی",
         "مادون قرمز", "فیزیوتراپی", "ماساژور", "ماساژ",
         "خودرو", "اتومبیل", "ماشین",
+        *_CARTOON_TERMS,
     ),
     # «طرح باغی» is a classic carpet design and «ساحلی» a decor mood: outdoor
     # words are off-scope only for furniture and lamps.
     "sofa": _OUTDOOR_TERMS,
-    "chair": (*_OUTDOOR_TERMS, "آرایشگاهی", "گیمینگ", "چرخدار"),
+    # A living-room ``chair`` is an armchair, a rocking / bentwood / wooden
+    # chair. Folding camping and poolside recliners («تاشو», «ریلکسی») and
+    # desk chairs («اداری», «کارمندی», «مدیریتی», «گیمینگ») are real chairs a
+    # decor recommender must not show — 3 of the 5 rows of the 2026-09-11
+    # live pilot were exactly these.
+    "chair": (*_OUTDOOR_TERMS, "آرایشگاهی", "گیمینگ", "چرخدار", "تاشو", "تا شو", "ریلکسی", "پلاژی", "حالته",
+              "اداری", "کارمندی", "کارشناسی", "مدیریتی", "کنفرانسی", "انتظار", "دانش آموزی",
+              "آموزشی", "پزشکی", "طبی", "کانتر", "اپن", "بار", "غذاخوری", "ناهارخوری", "نهارخوری",
+              "تحریر", "کامپیوتر", "ماهیگیری", "استخر", "استخری"),
     "coffee_table": (*_OUTDOOR_TERMS, "ناهارخوری", "غذاخوری", "تحریر", "آرایش", "اتو",
                      "لپ تاپ", "لپتاپ", "کامپیوتر"),
     "storage": (*_OUTDOOR_TERMS, "آشپزخانه", "ادویه", "جاکفشی", "کفش", "دارو"),
@@ -198,22 +248,40 @@ def _title_words(title: str) -> list[str]:
             if t]
 
 
-def off_scope_reason(title: str, category: str | None, basalam_category_id: Any = None) -> str | None:
-    """``"title:پارکی"`` / ``"basalam_category:791 books"`` when the hit is outside
-    the living-room scope, else ``None``. Pure and cheap: runs before any I/O."""
+def _has_term(tokens: list[str], term: str) -> bool:
+    """Whole-word match of ``term`` (one or more words; ZWNJ splits like a space)."""
+    parts = _title_words(term)
+    if not parts:
+        return False
+    if len(parts) == 1:
+        return parts[0] in tokens
+    return any(tokens[i:i + len(parts)] == parts for i in range(len(tokens) - len(parts) + 1))
+
+
+def off_scope_reason(title: str, category: str | None, basalam_category_id: Any = None, *,
+                     vendor_identifier: str | None = None, weight_g: Any = None) -> str | None:
+    """``"title:پارکی"`` / ``"basalam_category:791 books"`` / ``"vendor:sitatoys
+    kids-furniture-maker"`` / ``"miniature:295 weight=20g"`` when the hit is
+    outside the living-room scope, else ``None``. Pure and cheap: runs before
+    any I/O. Every rule names its evidence so the console line explains itself.
+    """
     cid = to_int(basalam_category_id) if basalam_category_id is not None else None
     if cid is not None and cid in OFF_SCOPE_CATEGORY_IDS:
         return f"basalam_category:{cid} {OFF_SCOPE_CATEGORY_IDS[cid]}"
+    vendor = str(vendor_identifier or "").strip().lower()
+    if vendor and vendor in OFF_SCOPE_VENDORS:
+        return f"vendor:{vendor} {OFF_SCOPE_VENDORS[vendor]}"
     tokens = _title_words(title)
-    if not tokens:
-        return None
-    for term in (*OFF_SCOPE_TITLE_TERMS["*"], *OFF_SCOPE_TITLE_TERMS.get(category or "", ())):
-        parts = term.split(" ")
-        if len(parts) == 1:
-            if term in tokens:
+    if tokens:
+        for term in (*OFF_SCOPE_TITLE_TERMS["*"], *OFF_SCOPE_TITLE_TERMS.get(category or "", ())):
+            if _has_term(tokens, term):
                 return f"title:{term}"
-        elif any(tokens[i:i + len(parts)] == parts for i in range(len(tokens) - len(parts) + 1)):
-            return f"title:{term}"
+    grams = to_int(weight_g, allow_zero=False) if weight_g is not None else None
+    if grams is not None and grams < MINIATURE_MAX_WEIGHT_G and category in _WEIGHT_GUARDED_CATEGORIES:
+        return f"miniature:weight={grams}g"
+    if cid is not None and cid in MINIATURE_PRONE_CATEGORY_IDS and tokens:
+        if any(_has_term(tokens, term) for term in _MINIATURE_TERMS):
+            return f"miniature:{cid} {MINIATURE_PRONE_CATEGORY_IDS[cid]} title"
     return None
 
 #: Basalam status enum (from the SDK): 2976 published; the rest are not sellable.
@@ -229,7 +297,17 @@ _AVAILABILITY_FLAGS = ("is_available", "IsAvailable", "isAvailable", "is_saleabl
                        "isSaleable", "can_add_to_cart", "canAddToCart", "published")
 
 _MATERIAL_ALIASES: dict[str, str] = {
-    "چوب": "wood", "چوبی": "wood", "ام دی اف": "wood", "mdf": "wood", "راش": "wood", "گردو": "wood",
+    "چوب": "wood", "چوبی": "wood", "ام دی اف": "wood", "ام‌دی‌اف": "wood", "mdf": "wood", "راش": "wood",
+    "گردو": "wood",
+    # Engineered wood boards Iranian sellers name by their surface — «ملامینه»
+    # (melamine-faced chipboard), «لمینت»/«لمین» (laminate), «نئوپان», «hpl»,
+    # «پی وی سی» on a board (PVC-foil MDF). 3 TV stands / a coffee table were
+    # ``material_implausible`` in the 2026-09-11 dry-run only because these
+    # words were unknown and the vision guess stood alone.
+    "ملامینه": "wood", "ملامین": "wood", "لمینت": "wood", "لمینیت": "wood", "لمین": "wood",
+    "نئوپان": "wood", "هایگلاس": "wood", "های گلاس": "wood", "hpl": "wood", "روکش pvc": "wood",
+    "پی وی سی": "wood", "چند لایی": "wood", "چندلایی": "wood", "بامبو چوبی": "wood",
+    "روس": "wood", "نراد": "wood", "بلوط": "wood", "افرا": "wood", "توسکا": "wood", "ملچ": "wood",
     "فلز": "metal", "فلزی": "metal", "آهن": "metal", "استیل": "metal", "برنج": "metal",
     "پارچه": "fabric", "پارچه‌ای": "fabric", "مخمل": "fabric", "کتان": "fabric", "پشم": "fabric",
     "نخ": "fabric", "ابریشم": "fabric", "اکریلیک": "fabric", "پلی استر": "fabric",
@@ -417,6 +495,16 @@ def _price(item: Mapping[str, Any]) -> int | None:
     return None
 
 
+def _weight_g(item: Mapping[str, Any]) -> int | None:
+    """The hit's own weight in grams (``weight`` on search hits, ``net_weight`` on
+    product objects) — ``None`` when absent or zero, never guessed."""
+    for key in ("weight", "net_weight", "packaged_weight"):
+        value = to_int(item.get(key), allow_zero=False)
+        if value is not None and value > 0:
+            return value
+    return None
+
+
 def _available(item: Mapping[str, Any]) -> bool:
     if any(item.get(flag) is False for flag in _AVAILABILITY_FLAGS):
         return False
@@ -545,6 +633,41 @@ def dimensions_from_attributes(item: Mapping[str, Any]) -> dict[str, int]:
     return dims
 
 
+#: Title words that name a material unambiguously. A subset of
+#: :data:`_MATERIAL_ALIASES` on purpose: «استیل» in a title is the *style*
+#: («مبل استیل» = carved classic sofa), «گردویی» is a colour, «برنج» may be rice.
+_TITLE_MATERIAL_ALIASES: dict[str, str] = {
+    "چوبی": "wood", "چوب": "wood", "ام دی اف": "wood", "mdf": "wood", "ملامینه": "wood", "ملامین": "wood",
+    "لمینت": "wood", "لمین": "wood", "نئوپان": "wood", "هایگلاس": "wood", "های گلاس": "wood",
+    "فلزی": "metal", "آهنی": "metal", "آهن": "metal", "فرفورژه": "metal", "برنجی": "metal", "مسی": "metal",
+    "پارچه ای": "fabric", "پارچه‌ای": "fabric", "پارچه": "fabric", "مخمل": "fabric", "مخملی": "fabric",
+    "کتان": "fabric", "پشمی": "fabric", "ابریشمی": "fabric",
+    "چرم": "leather", "چرمی": "leather",
+    "شیشه ای": "glass", "شیشه‌ای": "glass", "شیشه": "glass", "بلور": "glass", "کریستال": "glass",
+    "حصیری": "rattan", "حصیر": "rattan", "راتان": "rattan", "بامبو": "rattan", "جوت": "rattan",
+}
+
+
+def materials_from_title(title: str) -> list[str]:
+    """Materials the seller wrote *in the title* («میز عسلی چوبی با صفحه شیشه ای»
+    → ``["wood", "glass"]``), in title order. Search hits carry no attributes,
+    so without ``--details`` this is the only seller-declared material; the
+    pipeline lets it win over the vision guess exactly like an attribute would.
+    """
+    tokens = _title_words(title)
+    if not tokens:
+        return []
+    found: list[tuple[int, str]] = []
+    for alias, material in _TITLE_MATERIAL_ALIASES.items():
+        parts = _title_words(alias)
+        for i in range(len(tokens) - len(parts) + 1):
+            if tokens[i:i + len(parts)] == parts:
+                if material not in {m for _, m in found}:
+                    found.append((i, material))
+                break
+    return [m for _, m in sorted(found)]
+
+
 def materials_from_attributes(item: Mapping[str, Any]) -> list[str]:
     """Materials named in the seller's attributes, in the order the seller wrote them."""
     found: list[tuple[int, str]] = []
@@ -588,7 +711,8 @@ def item_to_row(raw_item: Mapping[str, Any], *, target_category: str | None = No
         "vendor_identifier": vendor_identifier,
         "description": item.get("summary") or item.get("description") or "",
         "available": _available(item),
-        "materials": materials_from_attributes(item),
+        "materials": materials_from_attributes(item) or materials_from_title(
+            str(item.get("title") or item.get("name") or "")),
         "basalam_category_id": _category_id(item),
         "sales_count": item.get("sales_count"),
         "rating": item.get("rating"),
@@ -597,7 +721,11 @@ def item_to_row(raw_item: Mapping[str, Any], *, target_category: str | None = No
     if not image_url:
         row["image_raw"] = _photo_raw(item)
     row["seller_category"] = seller_category(row)
-    scope = off_scope_reason(row["title_fa"], target_category or row["seller_category"], row["basalam_category_id"])
+    weight = _weight_g(item)
+    if weight is not None:
+        row["weight_g"] = weight
+    scope = off_scope_reason(row["title_fa"], target_category or row["seller_category"], row["basalam_category_id"],
+                             vendor_identifier=vendor_identifier, weight_g=weight)
     if scope:
         row["off_scope"] = scope
     dims = dimensions_from_attributes(item)

@@ -61,7 +61,7 @@ from app.services.catalog_import.images import AcquiredImage, ImageUnavailable, 
 
 logger = logging.getLogger(__name__)
 
-IMPORT_POLICY_VERSION = "catalog_import/2026-09-11.1"
+IMPORT_POLICY_VERSION = "catalog_import/2026-09-11.2"
 
 ImageFetcher = Callable[[str], AcquiredImage]
 LinkChecker = Callable[[str], Any]  # returns app.services.link_checker.LinkCheckResult
@@ -508,6 +508,9 @@ def import_rows(
                 "feed_category": str(row.raw.get("feed_category") or row.raw.get("category") or ""),
                 "category_candidates": list(result.category_candidates),
                 "category_resolved_by": _category_source(row, category, result.category_resolved_by),
+                #: The seller's own weight (grams) when the feed had one — the
+                #: replica guard's evidence, kept so an audit can re-run it.
+                "weight_g": row.raw.get("weight_g"),
                 "image_mode": image_mode,
                 "imported_at": moment.isoformat(),
                 "warnings": row.warnings,
@@ -596,14 +599,6 @@ def _audit(db: Session, report: ImportReport) -> None:
 
 def _flush_recommendation_cache() -> int:
     """Cached /recommend payloads may reference prices/rows that just changed."""
-    try:
-        from app.core.redis_client import get_redis
+    from app.services.recommender import flush_recommendation_cache
 
-        redis = get_redis()
-        keys = list(redis.scan_iter("rec:*"))
-        if keys:
-            redis.delete(*keys)
-        return len(keys)
-    except Exception as exc:  # pragma: no cover - defensive
-        logger.warning("recommendation cache not flushed after import: %s", exc)
-        return 0
+    return flush_recommendation_cache()

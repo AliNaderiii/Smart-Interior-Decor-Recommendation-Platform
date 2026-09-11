@@ -388,6 +388,27 @@ def quiz_cache_key(quiz: dict[str, Any], user_id: str | None = None) -> str:
     return f"rec:{user_id}:{digest}" if user_id else f"rec:{digest}"
 
 
+def flush_recommendation_cache() -> int:
+    """Drop every cached ``/recommend`` payload (``rec:*``). Returns the number
+    of keys removed; a Redis outage is logged and returns 0 — a stale cache
+    entry expires on its own within the TTL, so this must never raise.
+
+    Callers: the catalog importer after a committed run, and the admin
+    unverify path (P4-ب·2f) — both change which rows may be recommended.
+    """
+    try:
+        from app.core.redis_client import get_redis
+
+        redis = get_redis()
+        keys = list(redis.scan_iter("rec:*"))
+        if keys:
+            redis.delete(*keys)
+        return len(keys)
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.warning("recommendation cache not flushed: %s", exc)
+        return 0
+
+
 def _stage_a_hard_filter(
     db: Session, category: str, lo: int, hi: int
 ) -> list[Product]:

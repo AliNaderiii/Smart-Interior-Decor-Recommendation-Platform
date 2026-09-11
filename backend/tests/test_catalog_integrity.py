@@ -422,6 +422,44 @@ class TestAdminVerifyGate:
         ).first()
         assert log is not None and "FORCED" in log.detail and "material_implausible" in log.detail
 
+    def test_unverify_is_audited_and_flushes_the_recommendation_cache(self, client, admin_headers, db, monkeypatch):
+        """P4-ب·2f: the 2026-09-11 chair pilot verified three rows a decor
+        recommender must not show; the admin takes them out with
+        ``PATCH {is_verified: false}`` — attributable, and the cached
+        ``/recommend`` payloads that may still list them are dropped."""
+        from app.api.routes import products as route
+        from app.models.audit_log import ACTION_PRODUCT_UNVERIFY
+
+        flushed: list[int] = []
+        monkeypatch.setattr(route, "flush_recommendation_cache", lambda: flushed.append(1) or 1)
+        data = _create_via_api(client, admin_headers)
+        assert client.post(f"{PRODUCTS}/{data['id']}/verify", headers=admin_headers).status_code == 200
+        resp = client.patch(f"{PRODUCTS}/{data['id']}", headers=admin_headers, json={"is_verified": False})
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["data"]["is_verified"] is False
+        db.expire_all()
+        assert db.get(Product, data["id"]).is_verified is False
+        log = db.scalars(select(AuditLog).where(AuditLog.action == ACTION_PRODUCT_UNVERIFY)
+                         .order_by(AuditLog.created_at.desc())).first()
+        assert log is not None and f"product={data['id']}" in log.detail
+        assert flushed == [1]
+        # idempotent: un-verifying an already unverified row is a no-op for audit and cache
+        resp = client.patch(f"{PRODUCTS}/{data['id']}", headers=admin_headers, json={"is_verified": False})
+        assert resp.status_code == 200 and flushed == [1]
+        # a plain field edit does not touch verification, audit or cache
+        resp = client.patch(f"{PRODUCTS}/{data['id']}", headers=admin_headers, json={"description": "x"})
+        assert resp.status_code == 200 and flushed == [1]
+
+    def test_unverify_works_on_a_row_that_fails_integrity(self, client, admin_headers, db):
+        # a verified row can always be pulled back — the gate only guards the way *in*
+        data = _create_via_api(client, admin_headers)
+        assert client.post(f"{PRODUCTS}/{data['id']}/verify", headers=admin_headers).status_code == 200
+        resp = client.patch(f"{PRODUCTS}/{data['id']}", headers=admin_headers,
+                            json={"is_verified": False, "materials": ["metal"]})
+        assert resp.status_code == 200, resp.text
+        out = resp.json()["data"]
+        assert out["is_verified"] is False and out["integrity_ok"] is False
+
     def test_price_edit_refreshes_price_checked_at(self, client, admin_headers):
         data = _create_via_api(client, admin_headers)
         assert data["price_checked_at"] is None

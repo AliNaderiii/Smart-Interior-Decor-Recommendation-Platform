@@ -28,6 +28,8 @@ ACTION_PROJECT_DELETE = "project_delete"
 ACTION_MOODBOARD_DELETE = "moodboard_delete"
 ACTION_ROLE_CHANGE = "role_change"
 ACTION_PRODUCT_VERIFY = "product_verify"
+#: P4-ب·2f: an admin took a verified row out of the recommendable set.
+ACTION_PRODUCT_UNVERIFY = "product_unverify"
 ACTION_GDPR_EXPORT = "gdpr_export"
 ACTION_PRODUCT_UPLOAD = "product_upload"
 ACTION_UPLOAD_REJECTED = "upload_rejected"

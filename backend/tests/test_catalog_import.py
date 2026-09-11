@@ -512,15 +512,95 @@ class TestBasalamAdapter:
         ("شلف حمام و دستشویی", "storage", 352, "basalam_category:352 bathroom-accessories"),
         ("صندلی راک و میز مینیاتوری کد17-ماکت", "chair", 290, "title:ماکت"),
         ("گلیم دیواری 20*20", "rug", None, "title:دیواری"),
+        # P4-ب·2f — the 2026-09-11 live pilot / dry-run rows
+        ("صندلی راحتی تاشو مدل راحت نشین برند (F.I.T) مناسب خانه پارک طبیعت", "chair", 355, "title:تاشو"),  # 15184851
+        ("صندلی راحتی پنج حالته سفارشی رنگ بندی طوسی کاور رایگان ( پس کرایه )", "chair", 355, "title:حالته"),  # 6884086
+        ("صندلی راحتی با کفی پارچه نیلپر مدل NOCF515X", "chair", 355, None),  # 58082825: an office chair — the word is not in its title (see vendor/desk-chair terms below)
+        ("صندلی اداری مدیریتی نیلپر", "chair", 355, "title:اداری"),
+        ("صندلی گیمینگ دی ایکس ریسر", "chair", 355, "title:گیمینگ"),
+        ("کاناپه تخت شو طرح السا با تشک های متصل", "sofa", 357, "title:السا"),      # 20158371 (title rule, any vendor)
+        ("مبل کودک طرح باب اسفنجی", "sofa", 7690, "title:کودک"),
+        ("عروسک اسفنجی کوسنی", "decor", 528, "basalam_category:528 girls-toys"),
         # legitimate rows the same words must NOT catch
         ("فرش ماشینی ۱۲۰۰ شانه طرح باغی", "rug", 300, None),        # «ماشینی» ≠ «ماشین»; «باغی» is a carpet design
         ("شلف دیواری چوبی سه طبقه", "storage", 291, None),           # «دیواری» is off-scope for rugs only
         ("میز تلویزیون دیواری رنگ دلخواه", "storage", 358, None),
         ("مبل تک نفره راحتی", "chair", 355, None),
+        ("صندلی مدرن کافه ای فلزی برند آلوارس", "chair", 355, None),  # 52820553: «فضای باز» in the *description* only — dropped from the list
+        ("مبل تختخواب شو دو نفره", "sofa", 3773, None),               # a sofa-bed for adults is a sofa
         ("", "sofa", None, None),
     ])
     def test_off_scope_is_explicit_whole_word_and_per_category(self, title, category, cid, expected):
         assert basalam.off_scope_reason(title, category, cid) == expected
+
+    # ---- P4-ب·2f: replica guard, kids'-furniture vendors, materials from the title
+
+    def test_weight_guard_catches_the_figurine_and_spares_the_buffet(self, live):
+        """14597663 (2026-09-11 live pilot): a 20 g «صندلی راحتی دکوری کوچک» under
+        «مجسمه و تندیس» (295) reached ``chair`` verified because the picture IS a
+        chair. 14102454 — a 150 cm buffet, 1.5 kg, same leaf — is real."""
+        figurine = self._hit(live, id=14597663, name="صندلی راحتی دکوری کوچک چوبی ماهو", categoryTitle="مجسمه و تندیس",
+                             new_categoryId=295, weight=20, price=500000.0)
+        row = basalam.item_to_row(figurine, target_category="chair")
+        assert row["weight_g"] == 20 and row["off_scope"] == "miniature:weight=20g"
+        buffet = self._hit(live, id=14102454, name="بوفه و دکوری", categoryTitle="مجسمه و تندیس",
+                           new_categoryId=295, weight=1500, price=666800000.0)
+        row = basalam.item_to_row(buffet, target_category="storage")
+        assert "off_scope" not in row and row["weight_g"] == 1500
+        # a 295 hit with no weight but a replica word in the title
+        assert basalam.off_scope_reason("مبل فیگور دکوری", "sofa", 295) == "miniature:295 sculpture-and-statue title"
+        # decor is exempt from the weight rule (a cushion cover weighs 150 g, a sticker 20 g)
+        assert basalam.off_scope_reason("کوسن مخمل", "decor", 305, weight_g=20) is None
+        # no weight → no verdict from the weight rule, and a real chair under 355 is untouched
+        assert basalam.off_scope_reason("صندلی چوبی لهستانی", "chair", 355, weight_g=None) is None
+        assert basalam.off_scope_reason("صندلی چوبی لهستانی", "chair", 355, weight_g="۶۰۰۰") is None
+        assert basalam.MINIATURE_MAX_WEIGHT_G == 100
+
+    def test_kids_furniture_vendor_is_off_scope_whatever_the_title(self, live):
+        """sitatoys — «تولید کننده مبل کودک و نوجوان در طرح های مختلف کارتونی» —
+        had four cartoon sofa-beds verified as ``sofa`` in the 2026-09-11
+        dry-run; one title («کاناپه تخت شو کیتی») carries no kids' word."""
+        item = self._hit(live, id=21917212, name="کاناپه تخت شو کیتی با تشک های متصل بهم(پس کرایه)",
+                         categoryTitle="مبل", new_categoryId=357,
+                         vendor={"identifier": "sitatoys", "name": "تولیدی صنعتی سیتا", "id": 322886})
+        row = basalam.item_to_row(item, target_category="sofa")
+        assert row["off_scope"] == "vendor:sitatoys kids-furniture-maker"
+        assert basalam.off_scope_reason(
+            "کاناپه تخت شو کیتی", "sofa", 357, vendor_identifier="SitaToys") == "vendor:sitatoys kids-furniture-maker"
+        # every listed vendor names its evidence, and the list stays small on purpose
+        assert all(v for v in basalam.OFF_SCOPE_VENDORS.values()) and len(basalam.OFF_SCOPE_VENDORS) <= 10
+
+    def test_materials_come_from_the_title_when_the_hit_has_no_attributes(self, live):
+        """Search hits carry no attributes, so a «میز تلویزیون ملامینه» had no
+        seller material and the vision guess alone was ``material_implausible``
+        ×3 in the 2026-09-11 dry-run (28019052, 44651380, 24366842)."""
+        assert basalam.materials_from_title("میز جلومبلی عسلی سه تیکه لمین") == ["wood"]
+        assert basalam.materials_from_title("میز تلویزیون ملامینه مدل 63") == ["wood"]
+        assert basalam.materials_from_title("میز عسلی چوبی با صفحه شیشه ای") == ["wood", "glass"]
+        assert basalam.materials_from_title("مبل راحتی مخمل پایه فلزی") == ["fabric", "metal"]
+        # «استیل» in a title is a *style* («مبل استیل» = carved classic), «گردویی» a colour
+        assert basalam.materials_from_title("مبل استیل سلطنتی رنگ گردویی") == []
+        assert basalam.materials_from_title("") == []
+        item = self._hit(live, id=44651380, name="میز تلویزیون ملامینه کد 63", categoryTitle="میز", new_categoryId=358)
+        item.pop("attributes", None)
+        item.pop("attribute_groups", None)
+        assert basalam.item_to_row(item, target_category="storage")["materials"] == ["wood"]
+        # an attribute, when present, still wins over the title
+        item["attributes"] = [{"key": "جنس", "value": "ملامینه درجه یک"}]
+        assert basalam.item_to_row(item, target_category="storage")["materials"] == ["wood"]
+        item["attributes"] = [{"key": "جنس", "value": "فلز و شیشه"}]
+        assert basalam.item_to_row(item, target_category="storage")["materials"] == ["metal", "glass"]
+
+    def test_material_alias_table_knows_engineered_wood_boards(self):
+        for word in ("ملامینه", "ملامین", "لمینت", "لمین", "نئوپان", "هایگلاس"):
+            assert basalam._MATERIAL_ALIASES[word] == "wood", word
+        assert basalam.materials_from_attributes({"attributes": [{"key": "جنس", "value": "ملامینه درجه یک "}]}) == ["wood"]
+        assert basalam.materials_from_attributes({"attributes": [{"key": "جنس", "value": "لمین"}]}) == ["wood"]
+
+    def test_chair_query_plan_no_longer_uses_the_camping_prone_term(self):
+        # «صندلی راحتی»: 65% chair live; its first page was folding camping / relax chairs (2026-09-11 pilot)
+        assert "صندلی راحتی" not in basalam.CATEGORY_QUERIES["chair"]
+        assert "صندلی راک چوبی" in basalam.CATEGORY_QUERIES["chair"] and "مبل تک نفره" in basalam.CATEGORY_QUERIES["chair"]
 
     def test_off_scope_rows_are_marked_by_the_adapter_not_dropped(self, live):
         """The adapter only *marks*; the pipeline decides (and counts) — a
@@ -544,6 +624,10 @@ class TestBasalamAdapter:
 
         assert set(basalam.BASALAM_CATEGORY_IDS.values()) <= set(tax.categories())
         assert not set(basalam.BASALAM_CATEGORY_IDS) & set(basalam.OFF_SCOPE_CATEGORY_IDS)
+        # a replica-prone leaf is an honest decor leaf (mapped), never a blanket off-scope one
+        assert set(basalam.MINIATURE_PRONE_CATEGORY_IDS) <= set(basalam.BASALAM_CATEGORY_IDS)
+        assert not set(basalam.MINIATURE_PRONE_CATEGORY_IDS) & set(basalam.OFF_SCOPE_CATEGORY_IDS)
+        assert all(v == v.lower().strip() for v in basalam.OFF_SCOPE_VENDORS)
 
 
 # --------------------------------------------------------------- image step
@@ -738,6 +822,26 @@ class TestPipeline:
         assert calls == ["sofa-modern-fabric.png"]                          # vision paid once, for the real row
         assert report.summary()["off_scope"] == 1 and report.summary()["rejection_codes"] == {"off_scope": 1}
         assert db.scalar(select(Product).where(Product.source_product_id == "PARK-1")) is None
+
+    def test_replica_guard_and_vendor_rule_skip_before_download(self, db, fetcher):
+        rows = [_row(source_product_id="MINI-1", title_fa="صندلی راحتی دکوری کوچک چوبی", category="chair",
+                     off_scope="miniature:weight=20g", weight_g=20),
+                _row(source_product_id="KIDS-1", title_fa="کاناپه تخت شو کیتی", category="sofa",
+                     off_scope="vendor:sitatoys kids-furniture-maker")]
+        report = _import(db, rows, fetcher=fetcher,
+                         options=pipeline.ImportOptions(dry_run=False, verify=True, image_mode="rehost"))
+        assert [r.action for r in report.rows] == ["skipped", "skipped"]
+        assert [r.warnings[-1] for r in report.rows] == ["miniature:weight=20g", "vendor:sitatoys kids-furniture-maker"]
+        assert fetcher.calls == [] and report.summary()["off_scope"] == 2
+        assert db.scalar(select(Product).where(Product.source_product_id.in_(["MINI-1", "KIDS-1"]))) is None
+
+    def test_weight_travels_into_the_import_provenance(self, db, fetcher):
+        report = _import(db, [_row(source_product_id="W-1", weight_g="۴۵۰۰۰")], fetcher=fetcher,
+                         options=pipeline.ImportOptions(dry_run=False, verify=True, image_mode="rehost"))
+        assert report.rows[0].action == "created"
+        p = db.scalar(select(Product).where(Product.source_product_id == "W-1"))
+        assert p.extraction_raw["import"]["weight_g"] == "۴۵۰۰۰"
+        assert p.extraction_raw["import"]["policy"] == pipeline.IMPORT_POLICY_VERSION == "catalog_import/2026-09-11.2"
 
     def test_off_scope_never_touches_an_existing_row(self, db, fetcher):
         _import(db, [_row(source_product_id="KEEP-1")], fetcher=fetcher,

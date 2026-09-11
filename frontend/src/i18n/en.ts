@@ -549,6 +549,12 @@ export const en: Dict = {
     verifyForceConfirm: (reasons: string) =>
       `This product fails the integrity check:\n\n${reasons}\n\nVerify anyway? The override is audited and stays visible on the row.`,
     verifyForced: "Verified with an audited override.",
+    /** P4-B·2f: take a verified row out of the recommendable set. */
+    unverify: "Unverify",
+    unverifyConfirm: (title: string) =>
+      `Take “${title}” out of the recommendations? The row is kept, goes back to the review queue, and the decision is audited.`,
+    unverified: "Removed from recommendations; back in the review queue.",
+    unverifyFailed: "Could not unverify that product.",
     integrityReasons: {
       image_category_mismatch: "the image shows a different category than declared",
       image_unreachable: "image URL is not reachable",

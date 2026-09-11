@@ -44,6 +44,7 @@ from app.schemas.sanitize import strip_html
 from app.services import audit
 from app.services import catalog_integrity as integrity
 from app.services.link_checker import check_product_link
+from app.services.recommender import flush_recommendation_cache
 
 router = APIRouter(prefix="/products", tags=["products"])
 
@@ -223,13 +224,15 @@ def update_product(
     product_id: str,
     body: ProductUpdate,
     background: BackgroundTasks,
+    request: Request,
     db: Session = Depends(get_db),
-    _: User = Depends(require_admin),
+    admin: User = Depends(require_admin),
 ):
     product = db.get(Product, product_id)
     if product is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Product not found")
     changes = body.model_dump(exclude_unset=True)
+    was_verified = bool(product.is_verified)
     for key, value in changes.items():
         setattr(product, key, value)
     if {"title", "styles", "colors", "materials", "description", "patterns"} & changes.keys():
@@ -247,6 +250,13 @@ def update_product(
             _integrity_error(decision),
         )
     db.commit()
+    if changes.get("is_verified") is False and was_verified:
+        # P4-ب·2f: taking a row *out* of the recommendable set is the mirror of
+        # verifying it — same privilege, same attributable record, and the
+        # cache may still be serving the row for up to its TTL.
+        audit.record(db, actions.ACTION_PRODUCT_UNVERIFY, user_id=admin.id,
+                     detail=f"product={product.id}", request=request)
+        flush_recommendation_cache()
     if "seller_link" in changes and product.seller_link:
         background.add_task(check_product_link, product.id)
     from app.schemas.product import ProductOut
