@@ -768,6 +768,26 @@ the admin table («لغو تأیید»). `IMPORT_POLICY_VERSION` →
 `catalog_import/2026-09-11.2`; `tests/test_catalog_import.py` 83 → 100,
 `tests/test_catalog_integrity.py` +2.
 
+*Addendum (2026-09-11, 2g — a placeholder is not a measurement).* The
+rehearsal of 2f on the SQLite copy (285 rows) showed the weight rule's
+blind spot the same day it shipped: ten real, full-size pieces — seven
+sofas and sofa sets, a coffee table, a four-tier wall shelf — were skipped
+as `miniature:weight=1g` / `weight=2g`. Basalam's `weight` is what the
+seller typed into the *shipping* form, and sellers who ship furniture by
+freight leave it at 1–2 g (`25744387`'s own product page says
+`net_weight: 2`; `10098793` keeps its real 6 000 g in `unit_quantity`).
+The rule now fires only inside a measured band, `MINIATURE_MIN_WEIGHT_G`
+(10 g) ≤ weight < `MINIATURE_MAX_WEIGHT_G` (100 g); below the floor the
+number is *unknown*, never evidence, and still travels to
+`extraction_raw.import.weight_g`. The figurine that motivated the rule
+weighs 20 g and is still caught; no furniture or lamp hit in the run
+weighed between 3 g and 99 g. Two lessons recorded for the next rule: a
+seller-typed number needs a floor as much as a ceiling, and a scope rule
+is rehearsed on the full six-category dry-run before it meets the live
+database — which is why 2f's version string was never written to a row.
+`IMPORT_POLICY_VERSION` → `catalog_import/2026-09-11.3`;
+`tests/test_catalog_import.py` 100 → 111.
+
 ## Data model (ERD)
 
 ```

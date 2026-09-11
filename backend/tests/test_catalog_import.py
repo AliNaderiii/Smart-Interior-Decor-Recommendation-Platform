@@ -556,6 +556,50 @@ class TestBasalamAdapter:
         assert basalam.off_scope_reason("صندلی چوبی لهستانی", "chair", 355, weight_g="۶۰۰۰") is None
         assert basalam.MINIATURE_MAX_WEIGHT_G == 100
 
+    # ---- P4-ب·2g: a placeholder weight is not a measurement
+
+    @pytest.mark.parametrize("pid, title, category, cid, grams", [
+        (25744387, "مبل تک نفره دسته چوبی افسون تمام چوب", "sofa", 357, 2),
+        (5517592, "مبل راحتی پاریس ویژه جهیزیه", "sofa", 357, 1),
+        (4506396, "مبل راحتی اسکارلت", "sofa", 357, 1),
+        (2448551, "مبل تختخوابشو 140", "sofa", 357, 1),
+        (925069, "مبل ال دسته دوبل", "sofa", 357, 1),
+        (702819, "مبل ال کنج", "sofa", 357, 1),
+        (762717, "مبل ال 5نفره", "sofa", 357, 1),
+        (27740063, "کاناپه چستر سناتور", "sofa", 357, 1),
+        (37977395, "میز جلومبلی کلاسیک", "coffee_table", 358, 1),
+        (10098793, "شلف دیواری آیراد چهار طبقه", "storage", 291, 1),
+    ])
+    def test_placeholder_weights_are_unknown_not_evidence(self, live, pid, title, category, cid, grams):
+        """2026-09-11 rehearsal of 2f: these ten real, full-size pieces were skipped
+        as ``miniature:weight=1g`` / ``2g`` — sellers who ship by freight leave the
+        shipping weight at a placeholder (25744387's own product page says
+        ``net_weight: 2``). Below ``MINIATURE_MIN_WEIGHT_G`` the number is unknown:
+        no verdict, but it still travels on the row for the audit trail."""
+        assert basalam.off_scope_reason(title, category, cid, weight_g=grams) is None
+        hit = self._hit(live, id=pid, name=title, new_categoryId=cid, weight=grams)
+        row = basalam.item_to_row(hit, target_category=category)
+        assert "off_scope" not in row
+        assert row["weight_g"] == grams
+
+    def test_weight_guard_fires_only_inside_the_measured_band(self):
+        """The floor spares placeholders; the figurine (20 g) is still caught, and
+        the band edges are exact so a future tweak shows up here first."""
+        assert basalam.MINIATURE_MIN_WEIGHT_G == 10
+        assert 0 < basalam.MINIATURE_MIN_WEIGHT_G < basalam.MINIATURE_MAX_WEIGHT_G
+        verdict = "miniature:weight={}g"
+        for grams in (1, 2, 5, 9, 0, "۰", "۱"):
+            assert basalam.off_scope_reason("مبل راحتی", "sofa", 357, weight_g=grams) is None, grams
+        for grams in (10, 20, 50, 99, "۲۰"):
+            expected = verdict.format(contract.to_int(grams))
+            assert basalam.off_scope_reason("مبل راحتی", "sofa", 357, weight_g=grams) == expected, grams
+            assert basalam.off_scope_reason("صندلی راک چوبی", "chair", 355, weight_g=grams) == expected, grams
+        for grams in (100, 150, 1500, 70000):
+            assert basalam.off_scope_reason("مبل راحتی", "sofa", 357, weight_g=grams) is None, grams
+        # decor stays exempt at every weight; the title rule under 295 does not need a weight
+        assert basalam.off_scope_reason("کوسن مخمل", "decor", 305, weight_g=20) is None
+        assert basalam.off_scope_reason("مبل فیگور دکوری", "sofa", 295, weight_g=1) == "miniature:295 sculpture-and-statue title"
+
     def test_kids_furniture_vendor_is_off_scope_whatever_the_title(self, live):
         """sitatoys — «تولید کننده مبل کودک و نوجوان در طرح های مختلف کارتونی» —
         had four cartoon sofa-beds verified as ``sofa`` in the 2026-09-11
@@ -841,7 +885,7 @@ class TestPipeline:
         assert report.rows[0].action == "created"
         p = db.scalar(select(Product).where(Product.source_product_id == "W-1"))
         assert p.extraction_raw["import"]["weight_g"] == "۴۵۰۰۰"
-        assert p.extraction_raw["import"]["policy"] == pipeline.IMPORT_POLICY_VERSION == "catalog_import/2026-09-11.2"
+        assert p.extraction_raw["import"]["policy"] == pipeline.IMPORT_POLICY_VERSION == "catalog_import/2026-09-11.3"
 
     def test_off_scope_never_touches_an_existing_row(self, db, fetcher):
         _import(db, [_row(source_product_id="KEEP-1")], fetcher=fetcher,

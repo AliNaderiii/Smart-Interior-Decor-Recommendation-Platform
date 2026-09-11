@@ -22,6 +22,30 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Fixed — importer: the replica guard no longer reads a placeholder weight as a measurement (P4-B·2g, 2026-09-11)
+
+Rehearsing 2f on the SQLite copy (285 rows, six categories) skipped ten
+real, full-size pieces as `miniature:weight=1g` / `weight=2g`: seven sofas
+and sofa sets (`25744387`, `5517592`, `4506396`, `2448551`, `925069`,
+`702819`, `762717`, `27740063`), a coffee table (`37977395`) and a
+four-tier wall shelf (`10098793`). Basalam's `weight` is a *shipping*
+weight; sellers who ship by freight leave it at 1–2 g (the armchair's own
+product page says `net_weight: 2`, the shelf keeps its real 6 000 g in
+`unit_quantity`). The one true replica seen so far weighs 20 g; no
+furniture or lamp hit in the run weighed between 3 g and 99 g.
+
+* `backend/app/services/catalog_import/adapters/basalam.py` — new
+  `MINIATURE_MIN_WEIGHT_G` = 10: the weight rule fires only for
+  `10 g ≤ weight < 100 g`; below the floor the number is unknown, never
+  evidence (it still travels to `extraction_raw.import.weight_g`). The
+  title rule under leaf 295 and the decor exemption are unchanged.
+* `backend/app/services/catalog_import/pipeline.py` — `IMPORT_POLICY_VERSION`
+  `catalog_import/2026-09-11.3` (the 2f version was never used for a
+  written import).
+* `backend/tests/test_catalog_import.py` — the ten rows as a parametrised
+  regression plus an exact band test (1/2/5/9 g pass, 10/20/50/99 g skip,
+  100 g+ pass, decor exempt); 100 → 111.
+
 ### Fixed — importer: replica / camping / kids'-furniture guards, materials from the title; admin unverify (P4-B·2f, 2026-09-11)
 
 The first live `chair` pilot after 2e (5 rows) verified a 20 g laser-cut

@@ -174,17 +174,32 @@ OFF_SCOPE_CATEGORY_IDS: dict[int, str] = {
 #: wrong: 14102454, a 150 cm buffet, sits under the same leaf and is real. So
 #: the guard reads the hit's own numbers instead:
 #:
-#: * a search hit whose ``weight`` (grams) is below
-#:   :data:`MINIATURE_MAX_WEIGHT_G` cannot be a sofa, chair, table, cabinet or
-#:   lamp — whatever the picture shows;
+#: * a search hit whose ``weight`` (grams) reads as a *measurement* — at least
+#:   :data:`MINIATURE_MIN_WEIGHT_G` — and is below :data:`MINIATURE_MAX_WEIGHT_G`
+#:   cannot be a sofa, chair, table, cabinet or lamp, whatever the picture
+#:   shows;
 #: * a hit under a :data:`MINIATURE_PRONE_CATEGORY_IDS` leaf whose title says
 #:   replica («فیگور», «دکوری کوچک», «جاکلیدی» …) is one.
 #:
 #: Decor is exempt from the weight rule: an empty cushion cover is ~150 g and
 #: a wall sticker 20 g.
+#:
+#: The floor exists because the field is a *shipping* weight and sellers who
+#: ship by freight leave it at a placeholder. The 2026-09-11 rehearsal of 2f
+#: skipped ten real, full-size pieces as ``miniature:weight=1g`` /
+#: ``weight=2g``: 25744387 (a solid-wood armchair, ``net_weight`` 2 on its own
+#: product page), 5517592 (a sofa set), 4506396, 2448551, 925069, 702819,
+#: 762717, 27740063, 37977395 (a coffee table), 10098793 (a four-tier wall
+#: shelf whose real 6000 g sits in ``unit_quantity``). No furniture or lamp
+#: hit in those 285 rows carried a weight between 3 g and 99 g; the one true
+#: replica seen so far, 14597663, weighs 20 g. Below the floor the weight is *unknown*, never
+#: evidence — the raw number still travels to ``extraction_raw.import.weight_g``
+#: and the console line names it, so a kilogram typed into a gram field would
+#: show up as ``miniature:weight=15g`` and cost one candidate, never a row.
 MINIATURE_PRONE_CATEGORY_IDS: dict[int, str] = {
     295: "sculpture-and-statue",
 }
+MINIATURE_MIN_WEIGHT_G = 10
 MINIATURE_MAX_WEIGHT_G = 100
 _WEIGHT_GUARDED_CATEGORIES = frozenset({"sofa", "chair", "coffee_table", "storage", "lighting"})
 _MINIATURE_TERMS = ("فیگور", "فیگورین", "دکوری کوچک", "کوچک دکوری", "مینی", "جاکلیدی", "جا کلیدی", "آویز")
@@ -261,9 +276,12 @@ def _has_term(tokens: list[str], term: str) -> bool:
 def off_scope_reason(title: str, category: str | None, basalam_category_id: Any = None, *,
                      vendor_identifier: str | None = None, weight_g: Any = None) -> str | None:
     """``"title:پارکی"`` / ``"basalam_category:791 books"`` / ``"vendor:sitatoys
-    kids-furniture-maker"`` / ``"miniature:295 weight=20g"`` when the hit is
+    kids-furniture-maker"`` / ``"miniature:weight=20g"`` when the hit is
     outside the living-room scope, else ``None``. Pure and cheap: runs before
     any I/O. Every rule names its evidence so the console line explains itself.
+
+    ``weight_g`` below :data:`MINIATURE_MIN_WEIGHT_G` is a placeholder the
+    seller never filled in (1 g armchairs are common) and yields no verdict.
     """
     cid = to_int(basalam_category_id) if basalam_category_id is not None else None
     if cid is not None and cid in OFF_SCOPE_CATEGORY_IDS:
@@ -277,7 +295,11 @@ def off_scope_reason(title: str, category: str | None, basalam_category_id: Any 
             if _has_term(tokens, term):
                 return f"title:{term}"
     grams = to_int(weight_g, allow_zero=False) if weight_g is not None else None
-    if grams is not None and grams < MINIATURE_MAX_WEIGHT_G and category in _WEIGHT_GUARDED_CATEGORIES:
+    if (
+        grams is not None
+        and MINIATURE_MIN_WEIGHT_G <= grams < MINIATURE_MAX_WEIGHT_G
+        and category in _WEIGHT_GUARDED_CATEGORIES
+    ):
         return f"miniature:weight={grams}g"
     if cid is not None and cid in MINIATURE_PRONE_CATEGORY_IDS and tokens:
         if any(_has_term(tokens, term) for term in _MINIATURE_TERMS):
