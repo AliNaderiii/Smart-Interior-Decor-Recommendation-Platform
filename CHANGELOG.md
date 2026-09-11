@@ -22,6 +22,61 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Fixed — importer: a price floor under the replica-prone leaf, wholesale packs and a kids'-lighting shop are off-scope, dining spelled with a space (P4-B·2h, 2026-09-11)
+
+Second pass over the same 285-row rehearsal, this time row by row through
+the 187 *verified* ones. Six real listings that a living-room recommender
+must not show had passed every guard:
+
+* `24617673` «صندلی راک چوبی دکوری» — a solid 800 g, 20×16.5×28 cm
+  ornament under «مجسمه و تندیس» (295) at 495 000 toman. The 2f weight rule
+  looks for 10–99 g, «دکوری» alone is not a replica word (the real buffet
+  `14102454` carries it too), and the picture *is* a rocking chair, so
+  image arbitration filed it as `chair` and it was verified. The picture
+  cannot see scale; the price can: no real chair costs less than the
+  integrity band's floor (1 M toman). New rule, only under a replica-prone
+  leaf and only for the weight-guarded categories:
+  `miniature:295 price=495000t<1000000t`. `REPLICA_PRICE_FLOOR_TOMAN` is
+  read from `PRICE_BANDS_TOMAN`, so there is one notion of "cheaper than
+  any plausible sofa / chair / table / cabinet / lamp". Decor stays exempt
+  (a real figurine under 295 *is* decor); a cheap hit under the real chair
+  leaf remains the integrity gate's `price_out_of_band`, not the adapter's.
+* `36791198` «آباژور عمده مولکولی» — verified as `lighting` at 9.6 M toman,
+  the price of a twelve-pack (`is_wholesale: true`, «پک ها 12 عددی»). A
+  shopper following a recommendation cannot buy one, so the flag is a
+  verdict: `wholesale:is_wholesale`. The *word* «عمده» in a title is not
+  (`8343366` «مبل راحتی پاناما (عمده» is a retail sofa set with a bulk
+  discount, `is_wholesale: false`).
+* `12153417` «لوستر منچستر سیتی» and `10071814` «آباژور فوتبالی کریستیانو
+  رونالدو» — both from `babylightland`, «سرزمین روشنایی کودک … تخصصی ترین
+  تولید کننده محصولات کودک». A club name is not a term one can list; the
+  shop is: `OFF_SCOPE_VENDORS["babylightland"] = "kids-lighting-maker"`.
+  «فوتبالی» / «فوتبال» join the global title terms as well.
+* `17937965` «صندلی چوبی روستیک برای نهار خوری» and `9216895` «صندلی ناهار
+  خوری فایبر» — dining chairs; 2f listed «ناهارخوری/نهارخوری/غذاخوری» as
+  single words and sellers also spell them with a space. The spaced forms
+  are added for `chair` and `coffee_table` (the matcher already handled
+  two-word terms).
+
+Not changed on purpose: `23946903` «مبل گیم نت دسته دار تک نفره» (a
+gaming-café armchair — a real single-seat armchair by the picture, a
+vendor whose whole shop is café/gaming furniture; a title rule on «گیم»
+would also cut real listings, left to admin unverify); `9462869` «صندلی
+چوبی کوچک» (already lands in review, not verified).
+
+* `backend/app/services/catalog_import/adapters/basalam.py` —
+  `REPLICA_PRICE_FLOOR_TOMAN`; `off_scope_reason(…, price_toman=,
+  wholesale=)`; `item_to_row` passes the toman price and `is_wholesale`
+  (kept on the row as `wholesale`); `OFF_SCOPE_VENDORS` += `babylightland`;
+  title terms += «فوتبالی/فوتبال» (all), «غذا خوری/ناهار خوری/نهار خوری»
+  (`chair`, `coffee_table`).
+* `backend/app/services/catalog_import/pipeline.py` — `IMPORT_POLICY_VERSION`
+  `catalog_import/2026-09-11.4`.
+* `backend/tests/test_catalog_import.py` — the rocker vs the buffet with the
+  floor at the band edge (4 999 999 fails, 5 000 000 passes), wholesale flag
+  vs the word «عمده», the kids'-lighting vendor, the spaced dining terms,
+  and all four verdicts skipping before download; 111 → 117.
+
 ### Fixed — importer: the replica guard no longer reads a placeholder weight as a measurement (P4-B·2g, 2026-09-11)
 
 Rehearsing 2f on the SQLite copy (285 rows, six categories) skipped ten

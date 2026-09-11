@@ -91,6 +91,7 @@ from typing import Any
 
 import httpx
 
+from ai.catalog_integrity import PRICE_BANDS_TOMAN
 from app.services.catalog_import.contract import (
     map_category,
     normalize_digits,
@@ -179,10 +180,16 @@ OFF_SCOPE_CATEGORY_IDS: dict[int, str] = {
 #:   cannot be a sofa, chair, table, cabinet or lamp, whatever the picture
 #:   shows;
 #: * a hit under a :data:`MINIATURE_PRONE_CATEGORY_IDS` leaf whose title says
-#:   replica («فیگور», «دکوری کوچک», «جاکلیدی» …) is one.
+#:   replica («فیگور», «دکوری کوچک», «جاکلیدی» …) is one;
+#: * a hit under such a leaf that is *priced* below the cheapest plausible
+#:   piece of its target category (:data:`REPLICA_PRICE_FLOOR_TOMAN`, the
+#:   lower edge of the integrity price bands) is one too — 24617673, a solid
+#:   800 g «صندلی راک چوبی دکوری» 28 cm tall at 495 000 toman, passed the
+#:   weight rule and was verified as ``chair`` in the 2026-09-11 rehearsal.
+#:   The picture cannot see scale; weight and price can.
 #:
-#: Decor is exempt from the weight rule: an empty cushion cover is ~150 g and
-#: a wall sticker 20 g.
+#: Decor is exempt from the weight and price rules: an empty cushion cover is
+#: ~150 g and a wall sticker 20 g.
 #:
 #: The floor exists because the field is a *shipping* weight and sellers who
 #: ship by freight leave it at a placeholder. The 2026-09-11 rehearsal of 2f
@@ -202,6 +209,12 @@ MINIATURE_PRONE_CATEGORY_IDS: dict[int, str] = {
 MINIATURE_MIN_WEIGHT_G = 10
 MINIATURE_MAX_WEIGHT_G = 100
 _WEIGHT_GUARDED_CATEGORIES = frozenset({"sofa", "chair", "coffee_table", "storage", "lighting"})
+#: Toman. Below this a hit under a replica-prone leaf cannot be the real
+#: thing; read from the integrity bands so there is one notion of "cheaper
+#: than any plausible sofa / chair / table / cabinet / lamp".
+REPLICA_PRICE_FLOOR_TOMAN: dict[str, int] = {
+    category: PRICE_BANDS_TOMAN[category][0] for category in sorted(_WEIGHT_GUARDED_CATEGORIES)
+}
 _MINIATURE_TERMS = ("فیگور", "فیگورین", "دکوری کوچک", "کوچک دکوری", "مینی", "جاکلیدی", "جا کلیدی", "آویز")
 
 #: Sellers who only make children's furniture (cartoon sofa-beds, kids'
@@ -209,8 +222,14 @@ _MINIATURE_TERMS = ("فیگور", "فیگورین", "دکوری کوچک", "کو
 #: every entry names the evidence: ``sitatoys`` — «تولید کننده مبل کودک و
 #: نوجوان در طرح های مختلف کارتونی» (shop summary), four «کاناپه تخت شو السا /
 #: کیتی / باب اسفنجی / بن تن» verified as ``sofa`` in the 2026-09-11 dry-run.
+#: ``babylightland`` — «سرزمین روشنایی کودک … تخصصی ترین تولید کننده محصولات
+#: کودک» (shop title and summary): a Manchester City chandelier (12153417)
+#: and a Cristiano Ronaldo figure lamp (10071814) verified as ``lighting`` in
+#: the 2026-09-11 rehearsal; the same shop's 12-pack «آباژور عمده» (36791198)
+#: is also caught by the wholesale flag.
 OFF_SCOPE_VENDORS: dict[str, str] = {
     "sitatoys": "kids-furniture-maker",
+    "babylightland": "kids-lighting-maker",
 }
 
 #: Title words that mark a hit as outside the living-room scope, matched as
@@ -234,6 +253,9 @@ OFF_SCOPE_TITLE_TERMS: dict[str, tuple[str, ...]] = {
         "ماکت", "مینیاتوری", "مینیاتور", "بادی",
         "مادون قرمز", "فیزیوتراپی", "ماساژور", "ماساژ",
         "خودرو", "اتومبیل", "ماشین",
+        # football-club merchandise (a «لوستر منچستر سیتی», an «آباژور فوتبالی»)
+        # is a kids'-room theme, not a living-room style
+        "فوتبالی", "فوتبال",
         *_CARTOON_TERMS,
     ),
     # «طرح باغی» is a classic carpet design and «ساحلی» a decor mood: outdoor
@@ -247,9 +269,12 @@ OFF_SCOPE_TITLE_TERMS: dict[str, tuple[str, ...]] = {
     "chair": (*_OUTDOOR_TERMS, "آرایشگاهی", "گیمینگ", "چرخدار", "تاشو", "تا شو", "ریلکسی", "پلاژی", "حالته",
               "اداری", "کارمندی", "کارشناسی", "مدیریتی", "کنفرانسی", "انتظار", "دانش آموزی",
               "آموزشی", "پزشکی", "طبی", "کانتر", "اپن", "بار", "غذاخوری", "ناهارخوری", "نهارخوری",
+              # sellers also spell dining with a space («صندلی چوبی روستیک برای نهار خوری»,
+              # 17937965, verified in the 2026-09-11 rehearsal); a term may be two words
+              "غذا خوری", "ناهار خوری", "نهار خوری",
               "تحریر", "کامپیوتر", "ماهیگیری", "استخر", "استخری"),
-    "coffee_table": (*_OUTDOOR_TERMS, "ناهارخوری", "غذاخوری", "تحریر", "آرایش", "اتو",
-                     "لپ تاپ", "لپتاپ", "کامپیوتر"),
+    "coffee_table": (*_OUTDOOR_TERMS, "ناهارخوری", "غذاخوری", "ناهار خوری", "نهار خوری", "غذا خوری",
+                     "تحریر", "آرایش", "اتو", "لپ تاپ", "لپتاپ", "کامپیوتر"),
     "storage": (*_OUTDOOR_TERMS, "آشپزخانه", "ادویه", "جاکفشی", "کفش", "دارو"),
     "lighting": (*_OUTDOOR_TERMS, "هیتر", "بخاری", "رشد گیاه"),
     "rug": ("دیواری", "تابلو", "تابلوفرش", "سجاده", "جانماز", "پادری"),
@@ -274,14 +299,20 @@ def _has_term(tokens: list[str], term: str) -> bool:
 
 
 def off_scope_reason(title: str, category: str | None, basalam_category_id: Any = None, *,
-                     vendor_identifier: str | None = None, weight_g: Any = None) -> str | None:
+                     vendor_identifier: str | None = None, weight_g: Any = None,
+                     price_toman: Any = None, wholesale: bool = False) -> str | None:
     """``"title:پارکی"`` / ``"basalam_category:791 books"`` / ``"vendor:sitatoys
-    kids-furniture-maker"`` / ``"miniature:weight=20g"`` when the hit is
-    outside the living-room scope, else ``None``. Pure and cheap: runs before
-    any I/O. Every rule names its evidence so the console line explains itself.
+    kids-furniture-maker"`` / ``"wholesale:is_wholesale"`` /
+    ``"miniature:weight=20g"`` / ``"miniature:295 price=495000t<1000000t"``
+    when the hit is outside the living-room scope, else ``None``. Pure and
+    cheap: runs before any I/O. Every rule names its evidence so the console
+    line explains itself.
 
     ``weight_g`` below :data:`MINIATURE_MIN_WEIGHT_G` is a placeholder the
     seller never filled in (1 g armchairs are common) and yields no verdict.
+    ``wholesale`` is Basalam's ``is_wholesale`` flag: the listed price buys a
+    carton (36791198: twelve lamps for 9.6 M toman), which a shopper following
+    a recommendation cannot act on.
     """
     cid = to_int(basalam_category_id) if basalam_category_id is not None else None
     if cid is not None and cid in OFF_SCOPE_CATEGORY_IDS:
@@ -289,6 +320,8 @@ def off_scope_reason(title: str, category: str | None, basalam_category_id: Any 
     vendor = str(vendor_identifier or "").strip().lower()
     if vendor and vendor in OFF_SCOPE_VENDORS:
         return f"vendor:{vendor} {OFF_SCOPE_VENDORS[vendor]}"
+    if wholesale is True:
+        return "wholesale:is_wholesale"
     tokens = _title_words(title)
     if tokens:
         for term in (*OFF_SCOPE_TITLE_TERMS["*"], *OFF_SCOPE_TITLE_TERMS.get(category or "", ())):
@@ -301,9 +334,13 @@ def off_scope_reason(title: str, category: str | None, basalam_category_id: Any 
         and category in _WEIGHT_GUARDED_CATEGORIES
     ):
         return f"miniature:weight={grams}g"
-    if cid is not None and cid in MINIATURE_PRONE_CATEGORY_IDS and tokens:
-        if any(_has_term(tokens, term) for term in _MINIATURE_TERMS):
+    if cid is not None and cid in MINIATURE_PRONE_CATEGORY_IDS:
+        if tokens and any(_has_term(tokens, term) for term in _MINIATURE_TERMS):
             return f"miniature:{cid} {MINIATURE_PRONE_CATEGORY_IDS[cid]} title"
+        toman = to_int(price_toman, allow_zero=False) if price_toman is not None else None
+        floor = REPLICA_PRICE_FLOOR_TOMAN.get(category or "")
+        if toman is not None and floor and toman < floor:
+            return f"miniature:{cid} price={toman}t<{floor}t"
     return None
 
 #: Basalam status enum (from the SDK): 2976 published; the rest are not sellable.
@@ -746,8 +783,13 @@ def item_to_row(raw_item: Mapping[str, Any], *, target_category: str | None = No
     weight = _weight_g(item)
     if weight is not None:
         row["weight_g"] = weight
+    if item.get("is_wholesale") is True:
+        row["wholesale"] = True
+    price = row["price"]
+    price_toman = (price // 10 if price_unit == "rial" else price) if isinstance(price, int) else None
     scope = off_scope_reason(row["title_fa"], target_category or row["seller_category"], row["basalam_category_id"],
-                             vendor_identifier=vendor_identifier, weight_g=weight)
+                             vendor_identifier=vendor_identifier, weight_g=weight, price_toman=price_toman,
+                             wholesale=row.get("wholesale", False))
     if scope:
         row["off_scope"] = scope
     dims = dimensions_from_attributes(item)

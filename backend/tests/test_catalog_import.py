@@ -518,6 +518,9 @@ class TestBasalamAdapter:
         ("صندلی راحتی با کفی پارچه نیلپر مدل NOCF515X", "chair", 355, None),  # 58082825: an office chair — the word is not in its title (see vendor/desk-chair terms below)
         ("صندلی اداری مدیریتی نیلپر", "chair", 355, "title:اداری"),
         ("صندلی گیمینگ دی ایکس ریسر", "chair", 355, "title:گیمینگ"),
+        ("صندلی چوبی روستیک برای نهار خوری", "chair", 358, "title:نهار خوری"),   # 17937965: dining, spelled with a space
+        ("صندلی ناهار خوری فایبر پایه فلزی (پسکرایه)", "chair", 355, "title:ناهار خوری"),  # 9216895
+        ("آباژور (چراغ خواب)فوتبالی کریستیانو رونالدو", "lighting", 360, "title:فوتبالی"),  # 10071814
         ("کاناپه تخت شو طرح السا با تشک های متصل", "sofa", 357, "title:السا"),      # 20158371 (title rule, any vendor)
         ("مبل کودک طرح باب اسفنجی", "sofa", 7690, "title:کودک"),
         ("عروسک اسفنجی کوسنی", "decor", 528, "basalam_category:528 girls-toys"),
@@ -599,6 +602,74 @@ class TestBasalamAdapter:
         # decor stays exempt at every weight; the title rule under 295 does not need a weight
         assert basalam.off_scope_reason("کوسن مخمل", "decor", 305, weight_g=20) is None
         assert basalam.off_scope_reason("مبل فیگور دکوری", "sofa", 295, weight_g=1) == "miniature:295 sculpture-and-statue title"
+
+    # ---- P4-ب·2h: the picture cannot see scale — price can
+
+    def test_price_floor_catches_the_heavy_replica_under_the_sculpture_leaf(self, live):
+        """24617673 (2026-09-11 rehearsal): «صندلی راک چوبی دکوری» under «مجسمه و
+        تندیس» (295), a solid 800 g, 20×16.5×28 cm, 495 000 toman — passed the
+        weight rule, «دکوری» alone is not a replica word, and the picture IS a
+        rocking chair, so it was verified as ``chair``. No real chair costs less
+        than the integrity band's floor; under the replica-prone leaf that is a
+        verdict. The 1.5 kg buffet (14102454, 66.7 M toman) stays real."""
+        rocker = self._hit(live, id=24617673, name="صندلی راک چوبی دکوری ", categoryTitle="مجسمه و تندیس",
+                           new_categoryId=295, weight=800, price=4950000.0)
+        row = basalam.item_to_row(rocker, target_category="chair")
+        assert row["off_scope"] == "miniature:295 price=495000t<1000000t"
+        assert row["price"] == 4950000 and row["currency"] == "rial" and row["weight_g"] == 800
+        buffet = self._hit(live, id=14102454, name="بوفه و دکوری با مرغوبترین چوب و اکسسوری منزل",
+                           categoryTitle="مجسمه و تندیس", new_categoryId=295, weight=1500, price=666790000.0)
+        assert "off_scope" not in basalam.item_to_row(buffet, target_category="storage")
+        # the floor is the integrity band's lower edge — one notion of "cheaper than any real X"
+        assert basalam.REPLICA_PRICE_FLOOR_TOMAN == {
+            c: policy.PRICE_BANDS_TOMAN[c][0] for c in ("chair", "coffee_table", "lighting", "sofa", "storage")}
+        assert (basalam.off_scope_reason("مبل راحتی دکوری", "sofa", 295, price_toman=4_999_999)
+                == "miniature:295 price=4999999t<5000000t")
+        assert basalam.off_scope_reason("مبل راحتی دکوری", "sofa", 295, price_toman=5_000_000) is None
+        # only under a replica-prone leaf: a cheap hit under the real chair leaf is the integrity
+        # gate's business (``price_out_of_band``), not the adapter's
+        assert basalam.off_scope_reason("صندلی چوبی", "chair", 355, price_toman=495_000) is None
+        # decor is exempt (a real figurine under 295 IS decor), and no price → no verdict
+        assert basalam.off_scope_reason("مجسمه اسب", "decor", 295, price_toman=50_000) is None
+        assert basalam.off_scope_reason("صندلی راک چوبی دکوری", "chair", 295) is None
+        assert basalam.off_scope_reason("صندلی راک چوبی دکوری", "chair", 295, price_toman="") is None
+        # the title rule still wins when both apply, and the weight rule before it
+        assert (basalam.off_scope_reason("صندلی راحتی دکوری کوچک", "chair", 295, price_toman=50_000)
+                == "miniature:295 sculpture-and-statue title")
+        assert (basalam.off_scope_reason("صندلی راک", "chair", 295, weight_g=20, price_toman=50_000)
+                == "miniature:weight=20g")
+
+    def test_wholesale_listings_are_off_scope(self, live):
+        """36791198 (2026-09-11 rehearsal): «آباژور عمده مولکولی» verified as
+        ``lighting`` at 9.6 M toman — the price of a 12-pack (``is_wholesale``
+        true, «پک ها 12 عددی»). A shopper following a recommendation cannot buy
+        one, so the flag is a verdict; the word «عمده» in a title is not (8343366
+        «مبل راحتی پاناما (عمده» is a retail listing with a bulk discount)."""
+        pack = self._hit(live, id=36791198, name="آباژور عمده مولکولی( چراغ خواب رومیزی)", categoryTitle="آباژور",
+                         new_categoryId=360, weight=350, price=96000000.0, is_wholesale=True)
+        row = basalam.item_to_row(pack, target_category="lighting")
+        assert row["off_scope"] == "wholesale:is_wholesale" and row["wholesale"] is True
+        retail = self._hit(live, id=8343366, name="مبل راحتی پاناما (عمده ", categoryTitle="مبل",
+                           new_categoryId=357, weight=28000, price=727500000.0, is_wholesale=False)
+        row = basalam.item_to_row(retail, target_category="sofa")
+        assert "off_scope" not in row and "wholesale" not in row
+        # absent flag (the fixture, older dumps) → nothing; only a literal true counts
+        assert "is_wholesale" not in basalam.find_product_list(live)[0]
+        assert "off_scope" not in basalam.item_to_row(self._hit(live, is_wholesale="true"), target_category="sofa")
+        assert basalam.off_scope_reason("آباژور", "lighting", 360, wholesale=True) == "wholesale:is_wholesale"
+        assert basalam.off_scope_reason("آباژور", "lighting", 360, wholesale=False) is None
+
+    def test_kids_lighting_vendor_is_off_scope(self, live):
+        """babylightland — «سرزمین روشنایی کودک … تخصصی ترین تولید کننده محصولات
+        کودک» — had a Manchester City chandelier (12153417) and a Ronaldo figure
+        lamp (10071814) verified as ``lighting`` in the 2026-09-11 rehearsal. A
+        club name is not a term we can list; the shop is."""
+        item = self._hit(live, id=12153417, name="لوستر منچستر سیتی (ارسال رایگان)قابل شستشو", categoryTitle="لوستر",
+                         new_categoryId=366, price=79000000.0,
+                         vendor={"identifier": "babylightland", "name": "سرزمین روشنایی کودک.... babylightland", "id": 507021})
+        row = basalam.item_to_row(item, target_category="lighting")
+        assert row["off_scope"] == "vendor:babylightland kids-lighting-maker"
+        assert basalam.OFF_SCOPE_VENDORS["babylightland"] == "kids-lighting-maker"
 
     def test_kids_furniture_vendor_is_off_scope_whatever_the_title(self, live):
         """sitatoys — «تولید کننده مبل کودک و نوجوان در طرح های مختلف کارتونی» —
@@ -871,13 +942,20 @@ class TestPipeline:
         rows = [_row(source_product_id="MINI-1", title_fa="صندلی راحتی دکوری کوچک چوبی", category="chair",
                      off_scope="miniature:weight=20g", weight_g=20),
                 _row(source_product_id="KIDS-1", title_fa="کاناپه تخت شو کیتی", category="sofa",
-                     off_scope="vendor:sitatoys kids-furniture-maker")]
+                     off_scope="vendor:sitatoys kids-furniture-maker"),
+                _row(source_product_id="MINI-2", title_fa="صندلی راک چوبی دکوری", category="chair",
+                     price_toman="495000", off_scope="miniature:295 price=495000t<1000000t", weight_g=800),
+                _row(source_product_id="PACK-1", title_fa="آباژور عمده مولکولی", category="lighting",
+                     off_scope="wholesale:is_wholesale", wholesale=True)]
         report = _import(db, rows, fetcher=fetcher,
                          options=pipeline.ImportOptions(dry_run=False, verify=True, image_mode="rehost"))
-        assert [r.action for r in report.rows] == ["skipped", "skipped"]
-        assert [r.warnings[-1] for r in report.rows] == ["miniature:weight=20g", "vendor:sitatoys kids-furniture-maker"]
-        assert fetcher.calls == [] and report.summary()["off_scope"] == 2
-        assert db.scalar(select(Product).where(Product.source_product_id.in_(["MINI-1", "KIDS-1"]))) is None
+        assert [r.action for r in report.rows] == ["skipped"] * 4
+        assert [r.warnings[-1] for r in report.rows] == [
+            "miniature:weight=20g", "vendor:sitatoys kids-furniture-maker",
+            "miniature:295 price=495000t<1000000t", "wholesale:is_wholesale"]
+        assert fetcher.calls == [] and report.summary()["off_scope"] == 4
+        ids = ["MINI-1", "KIDS-1", "MINI-2", "PACK-1"]
+        assert db.scalar(select(Product).where(Product.source_product_id.in_(ids))) is None
 
     def test_weight_travels_into_the_import_provenance(self, db, fetcher):
         report = _import(db, [_row(source_product_id="W-1", weight_g="۴۵۰۰۰")], fetcher=fetcher,
@@ -885,7 +963,7 @@ class TestPipeline:
         assert report.rows[0].action == "created"
         p = db.scalar(select(Product).where(Product.source_product_id == "W-1"))
         assert p.extraction_raw["import"]["weight_g"] == "۴۵۰۰۰"
-        assert p.extraction_raw["import"]["policy"] == pipeline.IMPORT_POLICY_VERSION == "catalog_import/2026-09-11.3"
+        assert p.extraction_raw["import"]["policy"] == pipeline.IMPORT_POLICY_VERSION == "catalog_import/2026-09-11.4"
 
     def test_off_scope_never_touches_an_existing_row(self, db, fetcher):
         _import(db, [_row(source_product_id="KEEP-1")], fetcher=fetcher,
