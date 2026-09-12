@@ -22,6 +22,136 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Fixed — the test suite refuses a database, vision provider or Redis inherited from the operator's shell (P4-B·2i, 2026-09-12)
+
+`tests/conftest.py` sets the suite's environment with `os.environ.setdefault`,
+so anything already exported in the shell wins — CI relies on that to point
+the suite at its PostgreSQL service. The same rule bit the importer rehearsal
+on 2026-09-12: after dot-sourcing the rehearsal profile
+(`DATABASE_URL=sqlite:///./import_rehearsal.sqlite3`, `AI_PROVIDER=gemini`
+with a real key) in the same PowerShell window, the 2g+2h test run reported
+`1 failed, 201 passed` — `TestCli::test_file_dry_run_end_to_end`, whose
+captured output began with `database: sqlite:///./import_rehearsal.sqlite3`.
+Nothing in 2h was wrong; the suite had run *against the rehearsal database*:
+it created the schema there with `create_all`, seeded 100 `synthetic-demo`
+products and the three demo accounts into it, the importer tests' cleanup
+fixture deleted every `source=basalam` row it held, and the fixtures' flat
+PNGs went to the real Gemini key, whose `detected_category` then made the
+dry-run row "verified" so the `note: nothing is recommendable yet` line was
+not printed. With `live-db.txt` sourced instead of the rehearsal profile the
+same command would have done that to the sold catalog.
+
+* `backend/tests/_env_guard.py` (new) — `shell_env_hazards(environ)`: a pure
+  function over a mapping, judged **before** the defaults are filled in so
+  only values that really came from the shell are on trial. Refused: a
+  `DATABASE_URL` whose database *name* does not contain `test` (CI's
+  `decor_test`, compose's `decor_test`, the suite's `test_decor.sqlite3` and
+  in-memory `sqlite://` pass; `import_rehearsal.sqlite3`, `neondb`, `decor`
+  do not — only the file name is judged, a directory called `tests` does not
+  vouch), an empty or unparsable `DATABASE_URL`, `AI_PROVIDER` other than
+  `mock`, `STORAGE_BACKEND` other than `local`, and a `REDIS_URL` with a
+  remote host (the suite runs `FLUSHALL` before every test; `localhost`,
+  `127.0.0.1` and compose's bare `redis` pass). Passwords are rendered as
+  `***`; a value that does not parse is not echoed at all.
+  `PYTEST_ACCEPT_SHELL_ENV=1` runs with the shell's values on purpose.
+* `backend/tests/conftest.py` — `pytest_configure` raises
+  `pytest.UsageError` with the list and the fix (`Remove-Item Env:… ` /
+  `unset …`): exit code **4** before any fixture, any connection or any
+  file is created — not an import-time exception, which pytest prints as a
+  traceback.
+* `backend/tests/test_env_guard.py` (new, 14) — what passes (fresh shell,
+  GitHub Actions, the compose test overlay, in-memory), what is refused, that
+  no credential or pasted placeholder is echoed, and a subprocess `pytest`
+  with the rehearsal profile really exits 4 with the fix in its output and
+  without creating the database file.
+* `docs/ops/CATALOG_IMPORT.fa.md` §3 — one paragraph for the operator: run
+  the tests in a window where no rehearsal or live profile was sourced; what
+  the refusal looks like and why.
+
+The failing rehearsal database is not harmed beyond what is described: it now
+carries 100 extra `synthetic-demo` rows and three demo accounts, and lost its
+`basalam` rows; it is a scratch file — delete it and re-run `alembic upgrade
+head` before the next rehearsal (the guide says so).
+
+### Fixed — importer: a price floor under the replica-prone leaf, wholesale packs and a kids'-lighting shop are off-scope, dining spelled with a space (P4-B·2h, 2026-09-11)
+
+Second pass over the same 285-row rehearsal, this time row by row through
+the 187 *verified* ones. Six real listings that a living-room recommender
+must not show had passed every guard:
+
+* `24617673` «صندلی راک چوبی دکوری» — a solid 800 g, 20×16.5×28 cm
+  ornament under «مجسمه و تندیس» (295) at 495 000 toman. The 2f weight rule
+  looks for 10–99 g, «دکوری» alone is not a replica word (the real buffet
+  `14102454` carries it too), and the picture *is* a rocking chair, so
+  image arbitration filed it as `chair` and it was verified. The picture
+  cannot see scale; the price can: no real chair costs less than the
+  integrity band's floor (1 M toman). New rule, only under a replica-prone
+  leaf and only for the weight-guarded categories:
+  `miniature:295 price=495000t<1000000t`. `REPLICA_PRICE_FLOOR_TOMAN` is
+  read from `PRICE_BANDS_TOMAN`, so there is one notion of "cheaper than
+  any plausible sofa / chair / table / cabinet / lamp". Decor stays exempt
+  (a real figurine under 295 *is* decor); a cheap hit under the real chair
+  leaf remains the integrity gate's `price_out_of_band`, not the adapter's.
+* `36791198` «آباژور عمده مولکولی» — verified as `lighting` at 9.6 M toman,
+  the price of a twelve-pack (`is_wholesale: true`, «پک ها 12 عددی»). A
+  shopper following a recommendation cannot buy one, so the flag is a
+  verdict: `wholesale:is_wholesale`. The *word* «عمده» in a title is not
+  (`8343366` «مبل راحتی پاناما (عمده» is a retail sofa set with a bulk
+  discount, `is_wholesale: false`).
+* `12153417` «لوستر منچستر سیتی» and `10071814` «آباژور فوتبالی کریستیانو
+  رونالدو» — both from `babylightland`, «سرزمین روشنایی کودک … تخصصی ترین
+  تولید کننده محصولات کودک». A club name is not a term one can list; the
+  shop is: `OFF_SCOPE_VENDORS["babylightland"] = "kids-lighting-maker"`.
+  «فوتبالی» / «فوتبال» join the global title terms as well.
+* `17937965` «صندلی چوبی روستیک برای نهار خوری» and `9216895` «صندلی ناهار
+  خوری فایبر» — dining chairs; 2f listed «ناهارخوری/نهارخوری/غذاخوری» as
+  single words and sellers also spell them with a space. The spaced forms
+  are added for `chair` and `coffee_table` (the matcher already handled
+  two-word terms).
+
+Not changed on purpose: `23946903` «مبل گیم نت دسته دار تک نفره» (a
+gaming-café armchair — a real single-seat armchair by the picture, a
+vendor whose whole shop is café/gaming furniture; a title rule on «گیم»
+would also cut real listings, left to admin unverify); `9462869` «صندلی
+چوبی کوچک» (already lands in review, not verified).
+
+* `backend/app/services/catalog_import/adapters/basalam.py` —
+  `REPLICA_PRICE_FLOOR_TOMAN`; `off_scope_reason(…, price_toman=,
+  wholesale=)`; `item_to_row` passes the toman price and `is_wholesale`
+  (kept on the row as `wholesale`); `OFF_SCOPE_VENDORS` += `babylightland`;
+  title terms += «فوتبالی/فوتبال» (all), «غذا خوری/ناهار خوری/نهار خوری»
+  (`chair`, `coffee_table`).
+* `backend/app/services/catalog_import/pipeline.py` — `IMPORT_POLICY_VERSION`
+  `catalog_import/2026-09-11.4`.
+* `backend/tests/test_catalog_import.py` — the rocker vs the buffet with the
+  floor at the band edge (4 999 999 fails, 5 000 000 passes), wholesale flag
+  vs the word «عمده», the kids'-lighting vendor, the spaced dining terms,
+  and all four verdicts skipping before download; 111 → 117.
+
+### Fixed — importer: the replica guard no longer reads a placeholder weight as a measurement (P4-B·2g, 2026-09-11)
+
+Rehearsing 2f on the SQLite copy (285 rows, six categories) skipped ten
+real, full-size pieces as `miniature:weight=1g` / `weight=2g`: seven sofas
+and sofa sets (`25744387`, `5517592`, `4506396`, `2448551`, `925069`,
+`702819`, `762717`, `27740063`), a coffee table (`37977395`) and a
+four-tier wall shelf (`10098793`). Basalam's `weight` is a *shipping*
+weight; sellers who ship by freight leave it at 1–2 g (the armchair's own
+product page says `net_weight: 2`, the shelf keeps its real 6 000 g in
+`unit_quantity`). The one true replica seen so far weighs 20 g; no
+furniture or lamp hit in the run weighed between 3 g and 99 g.
+
+* `backend/app/services/catalog_import/adapters/basalam.py` — new
+  `MINIATURE_MIN_WEIGHT_G` = 10: the weight rule fires only for
+  `10 g ≤ weight < 100 g`; below the floor the number is unknown, never
+  evidence (it still travels to `extraction_raw.import.weight_g`). The
+  title rule under leaf 295 and the decor exemption are unchanged.
+* `backend/app/services/catalog_import/pipeline.py` — `IMPORT_POLICY_VERSION`
+  `catalog_import/2026-09-11.3` (the 2f version was never used for a
+  written import).
+* `backend/tests/test_catalog_import.py` — the ten rows as a parametrised
+  regression plus an exact band test (1/2/5/9 g pass, 10/20/50/99 g skip,
+  100 g+ pass, decor exempt); 100 → 111.
+
 ### Fixed — importer: replica / camping / kids'-furniture guards, materials from the title; admin unverify (P4-B·2f, 2026-09-11)
 
 The first live `chair` pilot after 2e (5 rows) verified a 20 g laser-cut

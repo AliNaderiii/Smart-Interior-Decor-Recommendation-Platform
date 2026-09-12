@@ -768,6 +768,50 @@ the admin table («لغو تأیید»). `IMPORT_POLICY_VERSION` →
 `catalog_import/2026-09-11.2`; `tests/test_catalog_import.py` 83 → 100,
 `tests/test_catalog_integrity.py` +2.
 
+*Addendum (2026-09-11, 2g — a placeholder is not a measurement).* The
+rehearsal of 2f on the SQLite copy (285 rows) showed the weight rule's
+blind spot the same day it shipped: ten real, full-size pieces — seven
+sofas and sofa sets, a coffee table, a four-tier wall shelf — were skipped
+as `miniature:weight=1g` / `weight=2g`. Basalam's `weight` is what the
+seller typed into the *shipping* form, and sellers who ship furniture by
+freight leave it at 1–2 g (`25744387`'s own product page says
+`net_weight: 2`; `10098793` keeps its real 6 000 g in `unit_quantity`).
+The rule now fires only inside a measured band, `MINIATURE_MIN_WEIGHT_G`
+(10 g) ≤ weight < `MINIATURE_MAX_WEIGHT_G` (100 g); below the floor the
+number is *unknown*, never evidence, and still travels to
+`extraction_raw.import.weight_g`. The figurine that motivated the rule
+weighs 20 g and is still caught; no furniture or lamp hit in the run
+weighed between 3 g and 99 g. Two lessons recorded for the next rule: a
+seller-typed number needs a floor as much as a ceiling, and a scope rule
+is rehearsed on the full six-category dry-run before it meets the live
+database — which is why 2f's version string was never written to a row.
+`IMPORT_POLICY_VERSION` → `catalog_import/2026-09-11.3`;
+`tests/test_catalog_import.py` 100 → 111.
+
+*Addendum (2026-09-11, 2h — the picture cannot see scale).* Reading the
+same rehearsal's 187 *verified* rows one by one found the weight rule's
+other blind spot: `24617673`, a «صندلی راک چوبی دکوری» under «مجسمه و
+تندیس» that weighs a solid 800 g, stands 28 cm tall and costs 495 000
+toman. It is above the weight band, «دکوری» alone is not a replica word
+(the real 1.5 kg buffet under the same leaf carries it too), and the
+picture *is* a rocking chair — so image arbitration filed it as `chair`
+and the gate verified it. Weight and price are the only signals in a
+search hit that carry scale; the second is now used under the
+replica-prone leaf: a hit priced below the integrity band's floor for its
+target category (`REPLICA_PRICE_FLOOR_TOMAN`, read from
+`PRICE_BANDS_TOMAN` so the two never drift apart) is
+`miniature:295 price=495000t<1000000t`. Two more verdicts came from the
+same reading: Basalam's `is_wholesale` flag (`36791198`, a twelve-pack
+of lamps whose price a shopper cannot act on — the *word* «عمده» in a
+title is not evidence, `8343366` is a retail set with a bulk discount)
+and a second listed vendor, the kids'-lighting maker `babylightland`
+(a Manchester City chandelier and a Ronaldo lamp verified as `lighting`).
+Dining terms gained their spaced spellings. What was deliberately *not*
+turned into a rule is recorded in the CHANGELOG (the gaming-café
+armchair): a rule that would cut real listings is worse than one manual
+unverify. `IMPORT_POLICY_VERSION` → `catalog_import/2026-09-11.4`;
+`tests/test_catalog_import.py` 111 → 117.
+
 ## Data model (ERD)
 
 ```

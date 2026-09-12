@@ -61,7 +61,7 @@ from app.services.catalog_import.images import AcquiredImage, ImageUnavailable, 
 
 logger = logging.getLogger(__name__)
 
-IMPORT_POLICY_VERSION = "catalog_import/2026-09-11.2"
+IMPORT_POLICY_VERSION = "catalog_import/2026-09-11.4"
 
 ImageFetcher = Callable[[str], AcquiredImage]
 LinkChecker = Callable[[str], Any]  # returns app.services.link_checker.LinkCheckResult
