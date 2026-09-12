@@ -22,6 +22,48 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Fixed — importer: replica / camping / kids'-furniture guards, materials from the title; admin unverify (P4-B·2f, 2026-09-11)
+
+The first live `chair` pilot after 2e (5 rows) verified a 20 g laser-cut
+figurine of an armchair (`14597663`, filed under «مجسمه و تندیس») and two
+folding camping recliners — real, buyable, correctly pictured chairs that a
+living-room recommender must not show. The dry-run also verified four
+cartoon-print kids' sofa-beds as `sofa` and excluded three melamine TV
+stands / coffee tables as `material_implausible` only because the alias
+table did not know «ملامینه»/«لمین».
+
+* `backend/app/services/catalog_import/adapters/basalam.py` —
+  `off_scope_reason()` gains a replica guard that reads the hit's own
+  `weight` (`miniature:weight=20g` below `MINIATURE_MAX_WEIGHT_G` = 100 g for
+  furniture and lamps; decor exempt) and replica title words under
+  `MINIATURE_PRONE_CATEGORY_IDS` (295) — a leaf-wide rule was rejected
+  because a real 150 cm buffet sits under the same leaf; `OFF_SCOPE_VENDORS`
+  (`sitatoys`, evidence in the comment, capped at 10 by a test);
+  `_CARTOON_TERMS` for every category; camping / relax / office / gaming
+  words for `chair`; «فضای باز» removed from the outdoor list (false positive
+  on a café chair); `OFF_SCOPE_CATEGORY_IDS` += 528, 532 (toys);
+  `materials_from_title()` (unambiguous subset of the alias table) used when
+  a hit has no attributes; `_MATERIAL_ALIASES` learns «ملامینه», «ملامین»,
+  «لمینت», «لمین», «نئوپان», «هایگلاس», …; chair queries «صندلی راحتی» →
+  «صندلی راک چوبی»; `weight_g` carried on the row.
+* `backend/app/services/catalog_import/pipeline.py` — `weight_g` stored in
+  `extraction_raw.import`; cache flush moved to
+  `app.services.recommender.flush_recommendation_cache` (shared).
+  `IMPORT_POLICY_VERSION` `catalog_import/2026-09-11.2`.
+* `backend/app/api/routes/products.py` — `PATCH /products/{id}` with
+  `is_verified: false` on a verified row writes an audit row
+  (`product_unverify`, new constant in `app/models/audit_log.py`) and
+  flushes `rec:*`; unchanged otherwise (never refused: the gate guards the
+  way *in*).
+* `frontend/src/pages/admin/ProductsPage.tsx` — «لغو تأیید» / "Unverify"
+  button on verified rows (confirm → `PATCH is_verified=false`), strings in
+  `i18n/fa.ts` + `en.ts`.
+* Tests: `tests/test_catalog_import.py` 83 → 100 (pilot rows as fixtures:
+  figurine vs buffet, kids' vendor, camping titles, materials from the
+  title, list invariants); `tests/test_catalog_integrity.py` +2 (unverify is
+  audited + flushes; works on a failing row). Docs: ADR-018 fifth addendum,
+  `docs/ops/CATALOG_IMPORT.fa.md` §5.
+
 ### Fixed — importer: the picture arbitrates the category, off-scope hits are skipped, `--tolerate ambiguous_style` (P4-B·2e, 2026-09-11)
 
 The first dry-run over the six remaining categories excluded 35 rows as

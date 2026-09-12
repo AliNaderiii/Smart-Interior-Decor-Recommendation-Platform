@@ -707,6 +707,67 @@ the Basalam import on 2026-09-10 with these numbers in front of him.
 `IMPORT_POLICY_VERSION` → `catalog_import/2026-09-11.1`;
 `tests/test_catalog_import.py` grows to 83.
 
+*Addendum (2026-09-11, the first live pilot after 2e — "real" is not the
+same as "in scope").* The 2e dry-run did what it promised (excluded 39 →
+21, review queue 164 → 21, three sampled picture-arbitrations checked
+against the seller pages and correct). The five-row live pilot for `chair`
+then showed the next class of error, one the truth tier cannot see: all
+five rows were *real, buyable, correctly pictured chairs* — and three of
+them must never appear in a living-room recommendation. A 20 g
+laser-cut figurine of an armchair (`14597663`, filed under «مجسمه و
+تندیس», 50 000 toman) had been arbitrated from `decor` to `chair` because
+the picture *is* a chair; two folding camping / poolside recliners
+(`15184851`, `6884086`) passed every check because they are chairs. The
+dry-run added two more findings of the same kind: four cartoon-print
+kids' sofa-beds from one manufacturer («السا», «کیتی», «باب اسفنجی»,
+«بن تن»; the shop describes itself as «تولید کننده مبل کودک») verified
+as `sofa`, and three `material_implausible` exclusions that were the
+importer's fault — sellers write «ملامینه» / «لمین» for melamine-faced
+board, the alias table did not know the words, so the seller's material
+was empty and the vision guess stood alone. Four decisions, all in the
+adapter's scope rule, none in the gate.
+
+(1) **Scope rules must name their evidence and must not be leaf-wide.**
+A blanket off-scope on leaf 295 would have been wrong: `14102454`, a
+150 cm buffet, sits under the same leaf and is real. The replica guard
+therefore reads the hit's own numbers — a search hit whose `weight` is
+below `MINIATURE_MAX_WEIGHT_G` (100 g) cannot be a sofa, chair, table,
+cabinet or lamp whatever the picture shows (`miniature:weight=20g`), and
+a hit under a replica-prone leaf whose *title* says replica («فیگور»,
+«دکوری کوچک», «جاکلیدی» …) is one. Decor is exempt from the weight rule
+(a cushion cover weighs 150 g). The weight is stored in
+`extraction_raw.import.weight_g` so the decision can be re-run.
+(2) **A living-room `chair` is defined by exclusion, in words.** Folding /
+camping / relax / poolside («تاشو», «حالته», «ریلکسی», «کمپ», «چادر» …)
+and desk / office / gaming («اداری», «کارمندی», «مدیریتی», «گیمینگ» …)
+terms are off-scope for `chair` only; the query plan drops «صندلی
+راحتی» (65 % chair live and its first page was exactly these) for «صندلی
+راک چوبی» (72 %). The office chair from the pilot (`58082825`) carries
+none of the words in its title and is handled by the operator, not by a
+rule that would have to guess. «فضای باز» leaves the outdoor list: a real
+café chair (`52820553`) listed it as one of several uses.
+(3) **Kids' furniture: cartoon words globally, plus a deliberately tiny
+vendor list.** `_CARTOON_TERMS` («السا», «کیتی», «باب اسفنجی», «بن تن»,
+«کارتونی» …) apply to every category; `OFF_SCOPE_VENDORS` holds one
+entry (`sitatoys`) with its evidence in the comment, because one of the
+four titles carried no kids' word at all. A vendor rule is the bluntest
+instrument here and is capped by a test at ten entries.
+(4) **Materials from the title when the hit has no attributes.** Search
+hits carry no `attributes`, so `materials_from_title()` reads an
+unambiguous subset of the alias table from the title («ملامینه», «چوبی»,
+«شیشه ای», «مخمل» …; not «استیل», which in a title is the *style*, nor
+colour words) and the pipeline lets it win over the vision guess exactly
+as an attribute would. The alias table itself learns the engineered-board
+vocabulary («ملامینه», «ملامین», «لمینت», «لمین», «نئوپان», «هایگلاس»).
+
+Operationally the pilot rows were pulled back with `PATCH /products/{id}`
+`{"is_verified": false}`; that path is now audited
+(`product_unverify`), flushes the `rec:*` cache like the importer does
+(`recommender.flush_recommendation_cache`, shared), and has a button in
+the admin table («لغو تأیید»). `IMPORT_POLICY_VERSION` →
+`catalog_import/2026-09-11.2`; `tests/test_catalog_import.py` 83 → 100,
+`tests/test_catalog_integrity.py` +2.
+
 ## Data model (ERD)
 
 ```

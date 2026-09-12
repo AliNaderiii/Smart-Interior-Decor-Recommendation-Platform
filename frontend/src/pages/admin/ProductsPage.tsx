@@ -256,6 +256,18 @@ export default function AdminProductsPage() {
     },
   });
 
+  /** P4-B·2f: the mirror of verify. The API audits it (`product_unverify`)
+   *  and drops the cached recommendations that may still list the row; the
+   *  row itself is kept and shows up under "pending review" again. */
+  const unverify = useMutation({
+    mutationFn: (id: string) => patch(`/products/${id}`, { is_verified: false }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["admin-products"] });
+      toast.success(t.admin.unverified);
+    },
+    onError: () => toast.error(t.admin.unverifyFailed),
+  });
+
   /** Bulk verify: fire all PATCHes, then report how many actually landed. */
   const bulkVerify = useMutation({
     mutationFn: async (ids: string[]) => {
@@ -712,6 +724,19 @@ export default function AdminProductsPage() {
                             disabled={verify.isPending}
                           >
                             Verify
+                          </Button>
+                        )}
+                        {p.is_verified && (
+                          <Button
+                            variant="ghost"
+                            className="py-1 text-xs text-red-700 dark:text-red-400"
+                            data-testid="admin-unverify"
+                            onClick={() => {
+                              if (window.confirm(t.admin.unverifyConfirm(p.title_fa || p.title))) unverify.mutate(p.id);
+                            }}
+                            disabled={unverify.isPending}
+                          >
+                            {t.admin.unverify}
                           </Button>
                         )}
                         <Button variant="ghost" className="py-1 text-xs" onClick={() => openEdit(p)}>
