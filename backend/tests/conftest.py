@@ -5,6 +5,18 @@ import os
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from tests._env_guard import refusal_message, shell_env_hazards  # noqa: E402
+
+# P4-B·2i: judged *before* the defaults below are filled in, so only values
+# that really came from the shell are on trial. A rehearsal profile left in
+# the operator's PowerShell session once pointed this suite at the importer's
+# rehearsal database and at the real vision provider. Raised from
+# ``pytest_configure`` (exit code 4, the fix on the next line), not here — an
+# exception at conftest import time is printed as a traceback.
+_SHELL_ENV_HAZARDS = shell_env_hazards(os.environ)
+
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_decor.sqlite3")
 os.environ.setdefault("REDIS_URL", "")
 os.environ.setdefault("AI_PROVIDER", "mock")
@@ -22,14 +34,18 @@ os.environ.setdefault("SEED_DEMO_ACCOUNTS", "true")
 # cookies over http:// — so exercise the cookie path with Secure off.
 os.environ.setdefault("COOKIE_SECURE", "false")
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app.core.redis_client import get_redis  # noqa: E402
 from app.db.session import SessionLocal, engine  # noqa: E402
 from app.models import Base  # noqa: E402
+
+
+def pytest_configure(config):
+    """Refuse to run against an inherited database / provider (P4-B·2i, see ``tests/_env_guard.py``)."""
+    if _SHELL_ENV_HAZARDS:
+        raise pytest.UsageError(refusal_message(_SHELL_ENV_HAZARDS))
 
 
 @pytest.fixture(scope="session", autouse=True)

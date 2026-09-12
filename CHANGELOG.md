@@ -22,6 +22,57 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Fixed — the test suite refuses a database, vision provider or Redis inherited from the operator's shell (P4-B·2i, 2026-09-12)
+
+`tests/conftest.py` sets the suite's environment with `os.environ.setdefault`,
+so anything already exported in the shell wins — CI relies on that to point
+the suite at its PostgreSQL service. The same rule bit the importer rehearsal
+on 2026-09-12: after dot-sourcing the rehearsal profile
+(`DATABASE_URL=sqlite:///./import_rehearsal.sqlite3`, `AI_PROVIDER=gemini`
+with a real key) in the same PowerShell window, the 2g+2h test run reported
+`1 failed, 201 passed` — `TestCli::test_file_dry_run_end_to_end`, whose
+captured output began with `database: sqlite:///./import_rehearsal.sqlite3`.
+Nothing in 2h was wrong; the suite had run *against the rehearsal database*:
+it created the schema there with `create_all`, seeded 100 `synthetic-demo`
+products and the three demo accounts into it, the importer tests' cleanup
+fixture deleted every `source=basalam` row it held, and the fixtures' flat
+PNGs went to the real Gemini key, whose `detected_category` then made the
+dry-run row "verified" so the `note: nothing is recommendable yet` line was
+not printed. With `live-db.txt` sourced instead of the rehearsal profile the
+same command would have done that to the sold catalog.
+
+* `backend/tests/_env_guard.py` (new) — `shell_env_hazards(environ)`: a pure
+  function over a mapping, judged **before** the defaults are filled in so
+  only values that really came from the shell are on trial. Refused: a
+  `DATABASE_URL` whose database *name* does not contain `test` (CI's
+  `decor_test`, compose's `decor_test`, the suite's `test_decor.sqlite3` and
+  in-memory `sqlite://` pass; `import_rehearsal.sqlite3`, `neondb`, `decor`
+  do not — only the file name is judged, a directory called `tests` does not
+  vouch), an empty or unparsable `DATABASE_URL`, `AI_PROVIDER` other than
+  `mock`, `STORAGE_BACKEND` other than `local`, and a `REDIS_URL` with a
+  remote host (the suite runs `FLUSHALL` before every test; `localhost`,
+  `127.0.0.1` and compose's bare `redis` pass). Passwords are rendered as
+  `***`; a value that does not parse is not echoed at all.
+  `PYTEST_ACCEPT_SHELL_ENV=1` runs with the shell's values on purpose.
+* `backend/tests/conftest.py` — `pytest_configure` raises
+  `pytest.UsageError` with the list and the fix (`Remove-Item Env:… ` /
+  `unset …`): exit code **4** before any fixture, any connection or any
+  file is created — not an import-time exception, which pytest prints as a
+  traceback.
+* `backend/tests/test_env_guard.py` (new, 14) — what passes (fresh shell,
+  GitHub Actions, the compose test overlay, in-memory), what is refused, that
+  no credential or pasted placeholder is echoed, and a subprocess `pytest`
+  with the rehearsal profile really exits 4 with the fix in its output and
+  without creating the database file.
+* `docs/ops/CATALOG_IMPORT.fa.md` §3 — one paragraph for the operator: run
+  the tests in a window where no rehearsal or live profile was sourced; what
+  the refusal looks like and why.
+
+The failing rehearsal database is not harmed beyond what is described: it now
+carries 100 extra `synthetic-demo` rows and three demo accounts, and lost its
+`basalam` rows; it is a scratch file — delete it and re-run `alembic upgrade
+head` before the next rehearsal (the guide says so).
+
 ### Fixed — importer: a price floor under the replica-prone leaf, wholesale packs and a kids'-lighting shop are off-scope, dining spelled with a space (P4-B·2h, 2026-09-11)
 
 Second pass over the same 285-row rehearsal, this time row by row through
