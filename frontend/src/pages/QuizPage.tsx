@@ -7,6 +7,7 @@ import { useAuthStore } from "@/stores/authStore";
 import {
   BUDGET_MAX,
   BUDGET_MIN,
+  BUDGET_STEP,
   MATERIALS,
   STYLES,
 } from "@/lib/constants";
@@ -31,6 +32,7 @@ import { useLocale } from "@/i18n";
 const COLOR_PALETTES = (DATASET_STEPS.find((item) => item.id === "color_palette")?.options ?? []) as ColorPalette[];
 const DIMENSION_HELP = DATASET_STEPS.find((item) => item.id === "room_dimensions")?.help_text_fa;
 const BUDGET_RANGES = (DATASET_STEPS.find((item) => item.id === "budget")?.ranges ?? []) as BudgetRange[];
+const BUDGET_HELP = DATASET_STEPS.find((item) => item.id === "budget")?.help_text_fa;
 
 export default function QuizPage() {
   const { t, locale } = useLocale();
@@ -282,10 +284,16 @@ export default function QuizPage() {
             <BudgetHistogram
               min={BUDGET_MIN}
               max={BUDGET_MAX}
+              step={BUDGET_STEP}
               valueMin={quiz.budget_min_toman}
               valueMax={quiz.budget_max_toman}
               onChange={(lo, hi) => quiz.setBudget(lo, hi)}
             />
+            {/* ADR-019: the number is the room TOTAL; the engine splits it per
+                category and shows each window on the results page. */}
+            <p className="mt-3 text-sm text-[var(--color-muted)]">
+              {locale === "fa" ? BUDGET_HELP : t.quiz.totalBudgetHelp}
+            </p>
             <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
               {BUDGET_RANGES.map((range) => (
                 <button key={range.id} type="button" onClick={() => quiz.setBudget(range.min, range.max)}

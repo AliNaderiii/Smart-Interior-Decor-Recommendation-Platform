@@ -47,5 +47,19 @@ export function formatTomanLatin(value: number): string {
 const budgetStep = questionnaire.steps.find((step) => step.id === "budget");
 type BudgetRange = { min: number; max: number };
 const ranges = (("ranges" in (budgetStep ?? {}) ? budgetStep?.ranges : []) ?? []) as BudgetRange[];
+/** The quiz budget is the living-room TOTAL (ADR-019); the server splits it per category. */
 export const BUDGET_MIN = Math.min(...ranges.map((range) => range.min));
 export const BUDGET_MAX = Math.max(...ranges.map((range) => range.max));
+/** Slider/number-input granularity, from the dataset so a real-price floor (500k) is reachable. */
+export const BUDGET_STEP =
+  (("slider_step" in (budgetStep ?? {}) ? Number(budgetStep?.slider_step) : 0) || 1_000_000);
+/**
+ * Default window offered before the user touches the control: every preset
+ * except the top ("luxury") one — deliberately broad, because the first
+ * result set should show the room and the user narrows from there; a narrow
+ * default on a per-category split (ADR-019) would start with empty sections.
+ */
+const sortedRanges = [...ranges].sort((a, b) => a.min - b.min);
+export const BUDGET_DEFAULT_MIN = BUDGET_MIN;
+export const BUDGET_DEFAULT_MAX =
+  sortedRanges.length >= 2 ? sortedRanges[sortedRanges.length - 2].max : BUDGET_MAX;

@@ -6,7 +6,7 @@
  * B2B2C tenancy bug, so reset() is asserted field by field).
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import { BUDGET_MAX, BUDGET_MIN } from "@/lib/constants";
+import { BUDGET_DEFAULT_MAX, BUDGET_DEFAULT_MIN, BUDGET_MAX, BUDGET_MIN } from "@/lib/constants";
 import { useQuizStore } from "@/stores/quizStore";
 
 const initialState = () => useQuizStore.getState();
@@ -72,8 +72,13 @@ describe("defaults", () => {
     expect(s.color_palette).toEqual([]);
     expect(s.materials).toEqual([]);
     expect(s.patterns).toEqual([]);
-    expect(s.budget_min_toman).toBe(BUDGET_MIN);
-    expect(s.budget_max_toman).toBe(Math.round(BUDGET_MAX / 3));
+    expect(s.budget_min_toman).toBe(BUDGET_DEFAULT_MIN);
+    expect(s.budget_max_toman).toBe(BUDGET_DEFAULT_MAX);
+    // ADR-019: the default window is a valid, realistic room TOTAL inside the slider range.
+    expect(BUDGET_MIN).toBeLessThanOrEqual(5_000_000);
+    expect(s.budget_min_toman).toBeGreaterThanOrEqual(BUDGET_MIN);
+    expect(s.budget_max_toman).toBeGreaterThan(s.budget_min_toman);
+    expect(s.budget_max_toman).toBeLessThanOrEqual(BUDGET_MAX);
     expect(s.project_id).toBeNull();
     expect(s.client_name).toBe("");
   });
@@ -124,8 +129,8 @@ describe("reset", () => {
     expect(after.color_palette).toEqual([]);
     expect(after.materials).toEqual([]);
     expect(after.patterns).toEqual([]);
-    expect(after.budget_min_toman).toBe(BUDGET_MIN);
-    expect(after.budget_max_toman).toBe(Math.round(BUDGET_MAX / 3));
+    expect(after.budget_min_toman).toBe(BUDGET_DEFAULT_MIN);
+    expect(after.budget_max_toman).toBe(BUDGET_DEFAULT_MAX);
     expect(after.project_id).toBeNull();
     expect(after.client_name).toBe("");
   });

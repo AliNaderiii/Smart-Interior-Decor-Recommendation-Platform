@@ -35,6 +35,9 @@ ACTION_PRODUCT_UPLOAD = "product_upload"
 ACTION_UPLOAD_REJECTED = "upload_rejected"
 #: P4-ب-2: one row per seller-feed import run (counts only, never row data).
 ACTION_CATALOG_IMPORT = "catalog_import"
+#: P4-ب-3: ``scripts/retire_synthetic.py --delete`` (hard removal of the
+#: synthetic sample; the default soft path records ACTION_PRODUCT_UNVERIFY).
+ACTION_SYNTHETIC_RETIRE = "synthetic_retire"
 
 
 class AuditLog(Base, UUIDPk, TimestampMixin):

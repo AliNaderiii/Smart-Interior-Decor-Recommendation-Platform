@@ -342,13 +342,16 @@ class TestRecommenderExclusion:
     def test_config_version_bump_invalidates_pre_gate_cache_entries(self, db):
         from ai.model_registry import RECOMMENDER_CONFIG_VERSION
 
-        assert RECOMMENDER_CONFIG_VERSION == "2026-09-07.1"
+        # 2026-09-07.1 = ADR-016 gate; 2026-09-14.1 = ADR-019 per-category budget.
+        assert RECOMMENDER_CONFIG_VERSION == "2026-09-14.1"
         assert recommender.CONFIG["config_version"] == RECOMMENDER_CONFIG_VERSION
         # The cache fingerprint carries the config version, so a payload cached
-        # under 2026-09-06.1 (pre-gate Stage A) can never be served now.
+        # under 2026-09-06.1 (pre-gate Stage A) or 2026-09-07.1 (one budget
+        # window for every category) can never be served now.
         old = recommender.quiz_cache_key({**QUIZ, "_categories": ["sofa"], "_cfg": "2026-09-06.1"})
+        gate = recommender.quiz_cache_key({**QUIZ, "_categories": ["sofa"], "_cfg": "2026-09-07.1"})
         new = recommender.quiz_cache_key({**QUIZ, "_categories": ["sofa"], "_cfg": RECOMMENDER_CONFIG_VERSION})
-        assert old != new
+        assert len({old, gate, new}) == 3
         result = recommender.recommend(db, QUIZ, categories=["sofa"], use_cache=False)
         assert result["meta"]["weights_version"] == RECOMMENDER_CONFIG_VERSION
 

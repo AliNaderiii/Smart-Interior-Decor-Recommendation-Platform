@@ -221,8 +221,30 @@ class TestNoResultAndFewResult:
                     assert item["price_toman"] <= 1_600_000
 
     def test_out_of_budget_never_recommended(self, db):
+        """ADR-019: the quiz window is the room TOTAL, so "out of budget" is
+        judged per category against ``meta.budget_allocation`` — a 100M–2B
+        total legitimately buys a 6M lamp. Every returned price must sit inside
+        its own category's window, and the sofa window must start at the
+        configured share of the floor rather than at the floor itself."""
         res = recommend(db, make_quiz(budget_min_toman=100_000_000,
                                       budget_max_toman=2_000_000_000), use_cache=False)
+        alloc = res["meta"]["budget_allocation"]
+        assert res["meta"]["budget_mode"] == "split_total"
+        assert alloc["sofa"]["min"] == int(100_000_000 * rec.BUDGET_SHARES["sofa"]["min"])
+        for category, items in res["categories"].items():
+            lo, hi = alloc[category]["min"], alloc[category]["max"]
+            for item in items:
+                assert lo <= item["price_toman"] <= hi, (category, item["price_toman"], lo, hi)
+
+    def test_per_item_mode_keeps_the_legacy_single_window(self, db):
+        """The pre-ADR-019 rule is still available: ``budget_mode=per_item``
+        applies the whole window to every category."""
+        res = recommend(db, make_quiz(budget_min_toman=100_000_000,
+                                      budget_max_toman=2_000_000_000,
+                                      budget_mode="per_item"), use_cache=False)
+        assert res["meta"]["budget_mode"] == "per_item"
+        assert all(w == {"min": 100_000_000, "max": 2_000_000_000}
+                   for w in res["meta"]["budget_allocation"].values())
         for items in res["categories"].values():
             for item in items:
                 assert item["price_toman"] >= 100_000_000

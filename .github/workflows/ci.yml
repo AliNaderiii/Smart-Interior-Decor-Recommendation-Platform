@@ -1172,8 +1172,17 @@ jobs:
   # the T-2.5 verdict is made there. Polite: 1 req/s, retries only on
   # network errors, honest classification (ok/redirect/blocked/dead/...).
   # ---------------------------------------------------------------------------
+  # P4-B·3 (2026-09-14): the acceptance criterion «all shopping-list links
+  # valid» is about the links a shopper is shown, i.e. the REAL rows. This job
+  # therefore probes the live catalog's verified, non-synthetic rows as
+  # exported by backend/scripts/export_real_links.py into
+  # backend/seed_data/products_real_links.json (refreshed by the operator
+  # after each import; the export is in the importer's file contract, so the
+  # same file can be re-imported anywhere). Until that file is committed the
+  # job falls back to the 150-row sample and says so in its annotation, so
+  # nothing is faked.
   link-liveness:
-    name: Seller-link liveness — 150-product catalog (advisory, T-2.5)
+    name: Seller-link liveness — real seller rows only (advisory, T-2.5 / P4-B·3)
     runs-on: ubuntu-latest
     continue-on-error: true
     needs:
@@ -1205,20 +1214,36 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.lock.txt
 
-      - name: Migrate and load the 150-product catalog
+      - name: Pick the catalog — real seller rows (export) or the sample fallback
+        id: catalog
         working-directory: backend
         run: |
-          alembic upgrade head
-          python scripts/load_realistic_products.py --realistic --if-empty --expand-to 150
+          if [ -s seed_data/products_real_links.json ]; then
+            n=$(python -c "import json;print(len(json.load(open('seed_data/products_real_links.json'))['items']))")
+            echo "mode=real" >> "$GITHUB_OUTPUT"
+            echo "::notice title=link-liveness::checking $n REAL seller rows from seed_data/products_real_links.json (verified, non-synthetic export of the live catalog)"
+          else
+            echo "mode=sample" >> "$GITHUB_OUTPUT"
+            echo "::warning title=link-liveness::backend/seed_data/products_real_links.json missing — checking the 150-row SAMPLE catalog (retailer home pages), not real seller links. Run backend/scripts/export_real_links.py after the live import and commit the file."
+            alembic upgrade head
+            python scripts/load_realistic_products.py --realistic --if-empty --expand-to 150
+          fi
 
       - name: "Check every seller link — polite 1 req/s, retry network errors"
         run: |
           set -o pipefail
           mkdir -p /tmp/link-liveness
+          if [ "${{ steps.catalog.outputs.mode }}" = "real" ]; then
+            # No database in this mode: the export IS the catalog; only the
+            # seller links are probed (no image fetch, no vision).
+            SELECT="--file backend/seed_data/products_real_links.json --exclude-synthetic --min-links 20"
+          else
+            SELECT=""
+          fi
           python scripts/check_links.py \
             --report /tmp/link-liveness/links-summary.json \
             --detailed-report /tmp/link-liveness/links-detailed.json \
-            --delay 1.0 --retries 2 \
+            --delay 1.0 --retries 2 $SELECT \
             | tee /tmp/link-liveness/check-links.log
 
       - name: Upload link-liveness artifacts

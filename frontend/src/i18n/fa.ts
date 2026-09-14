@@ -101,7 +101,9 @@ export const fa = {
     roomLength: "طول اتاق (سانتی‌متر)",
     roomHint: (area: string) =>
       `≈ ${area} متر مربع — طبق قانون طلایی، برای راه عبور حداقل ۷۶ سانتی‌متر نیاز داریم.`,
-    totalBudget: "بودجه کل",
+    totalBudget: "بودجه کل نشیمن",
+    totalBudgetHelp:
+      "بودجهٔ کل را بگو؛ ما آن را بین دسته‌ها تقسیم می‌کنیم (حدود نیمی برای مبل، بقیه بین فرش، میز، صندلی، روشنایی و دکور).",
     min: "حداقل (تومان)",
     max: "حداکثر (تومان)",
     materialsQuestion: "چه متریالی دوست داری؟",
@@ -174,6 +176,8 @@ export const fa = {
     priceUnchecked: "قیمت هنوز با فروشنده تأیید نشده است",
     catalogQualityNote: (excluded: number) =>
       `${excluded} محصول به‌دلیل رد شدن در بررسی صحت کاتالوگ (تصویر اشتباه، دادهٔ غیرمنطقی یا آگهی غیرقابل‌خرید) پنهان شده است.`,
+    /** ADR-019: سهم این دسته از بودجهٔ کل. */
+    budgetWindow: (lo: string, hi: string) => `سهم از بودجه: ${lo} تا ${hi} تومان`,
     whyMatched: (title: string, pct: number) =>
       `چرا ${title} پیشنهاد شد: ${pct} درصد تطابق کلی`,
     moreLike: (title: string) => `بیشتر شبیه ${title}`,

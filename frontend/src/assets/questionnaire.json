@@ -152,20 +152,22 @@
       "id": "budget",
       "title_fa": "بودجه‌ات چقدره؟",
       "title_en": "What's your budget?",
-      "description_fa": "برای هر دسته جداگانه پیشنهاد می‌دیم",
+      "description_fa": "بودجهٔ کل نشیمن؛ برای هر دسته سهم جداگانه در نظر می‌گیریم",
       "type": "budget_histogram_slider",
       "inspired_by": "Wayfair price histogram + Digikala price filter",
       "currency": "تومان",
       "display_format": "fa-IR",
       "ranges": [
-        {"id": "low", "label_fa": "اقتصادی", "min": 10000000, "max": 30000000, "label_en": "Budget", "color": "#4C6444"},
+        {"id": "low", "label_fa": "اقتصادی", "min": 5000000, "max": 30000000, "label_en": "Budget", "color": "#4C6444"},
         {"id": "medium", "label_fa": "متوسط", "min": 30000000, "max": 70000000, "label_en": "Mid-range", "color": "#C8A165"},
         {"id": "high", "label_fa": "حرفه‌ای", "min": 70000000, "max": 150000000, "label_en": "Premium", "color": "#1A1A1A"},
-        {"id": "luxury", "label_fa": "لوکس", "min": 150000000, "max": 300000000, "label_en": "Luxury", "color": "#7B1E26"}
+        {"id": "luxury", "label_fa": "لوکس", "min": 150000000, "max": 500000000, "label_en": "Luxury", "color": "#7B1E26"}
       ],
+      "slider_step": 500000,
       "per_category": true,
-      "categories": ["sofa", "coffee_table", "rug", "lighting", "chair", "storage"],
-      "help_text_fa": "بودجه کل نشیمن را بگو، ما بین دسته‌ها تقسیم می‌کنیم"
+      "allocation": "ADR-019: the server splits the total per category (backend/ai/recommender_config.json::budget.category_share) and echoes the windows in meta.budget_allocation",
+      "categories": ["sofa", "coffee_table", "rug", "lighting", "chair", "storage", "decor"],
+      "help_text_fa": "بودجهٔ کل نشیمن را بگو؛ ما آن را بین دسته‌ها تقسیم می‌کنیم (مثلاً حدود نیمی برای مبل، بقیه بین فرش، میز، صندلی، روشنایی و دکور)."
     },
     {
       "step": 5,

@@ -1,5 +1,5 @@
 {
-  "config_version": "2026-09-07.1",
+  "config_version": "2026-09-14.1",
   "weights": {
     "style": 0.25,
     "color": 0.25,
@@ -69,6 +69,40 @@
     "min_results": 3,
     "max_results": 5,
     "no_result_policy": "never pad beyond the hard budget/category filters; report the empty category explicitly in meta.empty_categories"
+  },
+  "budget": {
+    "mode": "split_total",
+    "category_share": {
+      "sofa": {
+        "min": 0.42,
+        "max": 0.6
+      },
+      "rug": {
+        "min": 0.15,
+        "max": 0.45
+      },
+      "chair": {
+        "min": 0.1,
+        "max": 0.25
+      },
+      "storage": {
+        "min": 0.1,
+        "max": 0.25
+      },
+      "coffee_table": {
+        "min": 0.1,
+        "max": 0.2
+      },
+      "lighting": {
+        "min": 0.1,
+        "max": 0.25
+      },
+      "decor": {
+        "min": 0.03,
+        "max": 0.12
+      }
+    },
+    "note": "ADR-019. The quiz window is the living-room TOTAL (questionnaire help text). split_total derives one window per requested category: lo = total_min x min-share (min shares sum to 1 = the cheapest basket), hi = total_max x max-share (each <= 1, sum >= 1: one category may absorb most of the ceiling, not all of them at once). When a subset of categories is requested the shares are renormalised over that subset, so a single category gets the whole window. The budget component scores against the category window's midpoint. Shares are expert judgement for an Iranian living room (seating anchors the room; rugs span machine-made to hand-knotted; decor = accessories). per_item = pre-2026-09-14 behaviour (one window for all)."
   },
   "feedback_rerank": {
     "boost": 0.12,

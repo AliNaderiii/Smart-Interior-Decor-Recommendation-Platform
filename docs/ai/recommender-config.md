@@ -100,6 +100,34 @@ weight change above.
 * `no_result_policy`: empty categories are reported in
   `meta.empty_categories`; the response always echoes the budget window.
 
+### 3.1 Budget allocation (ADR-019) — the window is the room's TOTAL
+
+The quiz's `budget_min_toman`/`budget_max_toman` is the **living-room total**
+(that is what the questionnaire asks). The `budget` section turns it into one
+window per category; Stage A filters with it and `budget_fit` is scored
+against *its* midpoint.
+
+| knob | value | meaning |
+|---|---|---|
+| `mode` | `split_total` | default when the request does not name one; `per_item` = one window for every category (pre-2026-09-14) |
+| `category_share.<cat>.min` | sofa .42 · rug .15 · chair .10 · storage .10 · coffee_table .10 · lighting .10 · decor .03 | the *cheapest basket*: **Σ = 1** |
+| `category_share.<cat>.max` | sofa .60 · rug .45 · chair .25 · storage .25 · coffee_table .20 · lighting .25 · decor .12 | how much of the ceiling one category may absorb alone (each ≤ 1, Σ ≥ 1) |
+
+```
+lo_c = total_min × min_c / Σ_requested(min)
+hi_c = total_max × min(1, max_c × Σ_all(max) / Σ_requested(max))
+```
+
+Shares are renormalised over the categories actually requested: the full set
+uses them as-is, a subset spreads the same money over fewer categories, a
+single category gets the whole window. Windows are integers (toman).
+`meta.budget_mode` and `meta.budget_allocation{<cat>: {min, max}}` are
+returned with every payload. Validation at load: mode known, exactly the
+seven categories, `0 < min ≤ max ≤ 1`, `Σmin = 1` (±1e-6), `Σmax ≥ 1`.
+Changing a share follows the same three rules as a weight change (bump
+`config_version` + `RECOMMENDER_CONFIG_VERSION`, re-run the harness, record
+the ranking delta). Tests: `tests/test_budget_allocation.py`.
+
 ## 4. Feedback re-rank (bounded heuristic — not a trained model)
 
 `boost +0.12` on 👍, `penalty −0.35` on 👎 (penalty > boost because "no" is a

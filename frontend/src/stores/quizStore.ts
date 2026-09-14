@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { QuizAnswers } from "@/lib/types";
-import { BUDGET_MAX, BUDGET_MIN } from "@/lib/constants";
+import { BUDGET_DEFAULT_MAX, BUDGET_DEFAULT_MIN } from "@/lib/constants";
 
 interface QuizState extends QuizAnswers {
   step: number;
@@ -37,8 +37,10 @@ const initial: QuizAnswers & { step: number } = {
   color_palette: [],
   room_width_cm: 400,
   room_length_cm: 500,
-  budget_min_toman: BUDGET_MIN,
-  budget_max_toman: Math.round(BUDGET_MAX / 3),
+  // ADR-019: the window is the room TOTAL; the server splits it per category.
+  // Default = every preset but "luxury" (5M–150M): broad first, narrow later.
+  budget_min_toman: BUDGET_DEFAULT_MIN,
+  budget_max_toman: BUDGET_DEFAULT_MAX,
   materials: [],
   patterns: [],
   project_id: null,
