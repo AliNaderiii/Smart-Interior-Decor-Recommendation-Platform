@@ -198,5 +198,17 @@ class TestCheckDb:
         code = cli.main(["--check-db"])
         out = capsys.readouterr().out
         assert code == cli.EXIT_OK
-        assert out.startswith("database: ")
-        assert "://" not in out.split("(")[0] or "@" not in out
+        assert out.startswith("database: ") and "APP_ENV=" in out
+        # The target is echoed with the password rendered as ``***``. On the
+        # SQLite fallback there is no credential at all; on CI's PostgreSQL the
+        # URL legitimately contains ``://``, ``@`` and the user name — what
+        # must never appear is the ``user:password@`` pair (CI: decor:decor@).
+        assert "sqlite:///" in out or "postgresql+psycopg://" in out
+        from sqlalchemy.engine import make_url
+
+        from app.core.config import settings
+
+        url = make_url(settings.DATABASE_URL)
+        if url.password:
+            assert f"{url.username}:{url.password}@" not in out
+            assert f"{url.username}:***@" in out
