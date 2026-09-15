@@ -153,7 +153,9 @@ def recommend_endpoint(
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Quiz not found")
         payload = _quiz_dict(quiz)
     elif body is not None:
-        payload = body.model_dump(exclude={"project_id", "client_name"})
+        # ``budget_mode`` (ADR-019) rides along when set; ``exclude_none`` keeps
+        # the default path identical to the saved-quiz path (engine default).
+        payload = body.model_dump(exclude={"project_id", "client_name"}, exclude_none=True)
     else:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "quiz_id or body required")
 

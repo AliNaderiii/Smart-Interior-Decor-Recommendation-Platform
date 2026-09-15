@@ -22,6 +22,78 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Fixed — CI: an evidence upload can no longer fail a green gate (2026-09-15)
+
+PR #35's first run (#320) went red although every test had passed: the
+account's GitHub Actions **artifact storage quota** was exhausted, so every
+`actions/upload-artifact` step failed — and because those steps were plain
+steps, the backend job died at step 7 (before pytest even ran), the frontend
+and e2e jobs died on their last step after passing, and six dependent jobs were
+skipped. All ten upload steps (`ci.yml`, `stage4-verify.yml` and the reviewed
+copy `ci/github-ci.yml`) now carry `continue-on-error: true` and an explicit
+`retention-days` (7 for the bulky e2e/Lighthouse/dist bundles, 14 for JSON
+evidence, 30 for the stage-4 latency proof) instead of GitHub's 90-day default.
+No job downloads another job's artifact, so nothing else changes; a missing
+artifact shows as a step warning, the gate's verdict stays the tests'.
+
+### Fixed — the quiz budget is the room's total and is now split per category (ADR-019, P4-B·3, 2026-09-14)
+
+The questionnaire asks for **one** number and promises to split it («بودجه کل
+نشیمن را بگو، ما بین دسته‌ها تقسیم می‌کنیم»); the engine applied that one window
+to every category and scored every price against the same midpoint. With real
+seller rows the defect showed in both directions — a 20 M total was offered a
+19 M sofa *and* a 19 M rug *and* a 19 M chair, while a 60–150 M total never saw
+a 3 M lamp, a 900 k cushion or a 2 M machine-made rug (≈22 of the 59 imported
+rugs were unreachable, and the 10 M questionnaire floor hid the rest before the
+request left the browser).
+
+* **Engine.** `ai/recommender_config.json` gains a versioned `budget` section
+  (`mode: split_total`, `category_share` min/max per category — the min
+  shares are the cheapest basket and sum to 1, the max shares are ceilings).
+  `allocate_budget()` derives one window per *requested* category
+  (renormalised: the full set uses the shares as-is, a subset spreads the
+  same money, a single category gets the whole window); Stage A filters and
+  `budget_fit` scores against the category window. The loader validates the
+  section like the weights and refuses to boot on a bad one.
+* **API (backward compatible).** `budget_min_toman`/`budget_max_toman` keep
+  meaning the total; `QuizIn` accepts an optional request-only
+  `budget_mode` (`split_total` default \| `per_item` = the old rule, not
+  persisted); `meta.budget_mode` + `meta.budget_allocation{<category>: {min,
+  max}}` are returned. `RECOMMENDER_CONFIG_VERSION` → `2026-09-14.1`,
+  `AI_STACK_VERSION` → `2026-09-14.1`; the mode is part of the cache identity.
+* **SPA.** Questionnaire floor 10 M → 5 M, luxury preset to 500 M,
+  `slider_step` 500 k, default window 5–150 M (every preset but luxury),
+  help text under the slider; each category heading on the results page
+  shows its window («سهم از بودجه: … تا … تومان», `data-testid=budget-window-<cat>`).
+* **Evidence.** `tests/test_budget_allocation.py` (32 cases); backend suite
+  1028 → 1060 passed; harness 18/18 under all four profiles (scenario 10's
+  duplicate listings now share one embedding — what a duplicate *is* — rather
+  than passing by accident under the wide window);
+  `docs/reports/weights_profiles.md` regenerated. Docs: ADR-019 in
+  `docs/ARCHITECTURE.md`, `docs/ai/recommender-config.md` §3.1, `docs/API.md`,
+  `docs/ai/model-versions.md`. Nothing to migrate; first request after deploy
+  is a cold compute.
+
+### Added — retiring the synthetic sample and pointing link-liveness at real seller rows (P4-B·3, 2026-09-14)
+
+* `backend/scripts/retire_synthetic.py` — dry-run by default; selects rows
+  with the integrity gate's own `is_synthetic` predicate; **unverifies** (never
+  deletes) them, records an audit row, flushes the recommendation cache;
+  refuses (exit 1) while any category would keep fewer than
+  `results.min_results` recommendable real rows; `--delete` for a staging reset
+  refuses while moodboards/approvals still reference a row unless `--force`.
+  New audit action `synthetic_retire`. `tests/test_retire_synthetic.py` (14).
+* `backend/scripts/export_real_links.py` — reads the live catalog's verified,
+  non-synthetic rows through the admin API (public card fields only) and
+  writes the CI fixture (backend/seed_data/products_real_links.json, committed by the operator after each import) in the importer's file contract.
+  `ProductOut` now exposes `source_product_id` (read-only).
+* `scripts/check_links.py` gains `--file`, `--source`, `--exclude-synthetic`,
+  `--verified-only`, `--min-links` (exit 2 when the selection is thinner than
+  expected — an empty catalog can no longer "pass"). CI `link-liveness` probes
+  the export when it is committed and falls back to the 150-row sample with a
+  visible warning otherwise. `tests/test_export_real_links.py` (5).
+* `docs/ops/CATALOG_IMPORT.fa.md` §۶-ب documents the cut-over.
+
 ### Fixed — the test suite refuses a database, vision provider or Redis inherited from the operator's shell (P4-B·2i, 2026-09-12)
 
 `tests/conftest.py` sets the suite's environment with `os.environ.setdefault`,

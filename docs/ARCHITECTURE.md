@@ -812,6 +812,103 @@ armchair): a rule that would cut real listings is worse than one manual
 unverify. `IMPORT_POLICY_VERSION` → `catalog_import/2026-09-11.4`;
 `tests/test_catalog_import.py` 111 → 117.
 
+## ADR-019 — The quiz budget is the room's total, split per category
+
+**Context.** The questionnaire has asked for *one* number since v2.0 and
+said so in its own help text — «بودجه کل نشیمن را بگو، ما بین دسته‌ها تقسیم
+می‌کنیم» (`per_category: true`). The engine never did the second half: Stage A
+applied the one window `[budget_min, budget_max]` to **every** category and
+`budget_score` judged every price against the midpoint of that same window.
+On the synthetic catalog (every category priced 1.5–120 M) nobody noticed.
+The seller-feed importer (ADR-018) made it visible in both directions:
+
+* a shopper with 20 M *in total* was offered a 19 M sofa **and** a 19 M rug
+  **and** a 19 M chair — three times the money, each item "in budget";
+* a shopper with 60–150 M in total never saw a 3 M lamp, a 900 k cushion or a
+  2 M machine-made rug — the price points real sellers actually list — because
+  each was *below* the window. On the live catalog that hid ≈22 of the 59
+  imported rugs; the questionnaire's 10 M floor hid the rest of the cheap
+  tail before the request even left the browser.
+
+Fixing this "in the UI" (seven sliders) contradicts the ad's one-number quiz
+and every comparable product (Havenly, Modsy, Wayfair's quiz all ask for a
+room total); fixing it by *dropping* the floor per category would recommend
+a 300 k cushion to a 500 M client. The split has to be an explicit, versioned
+rule.
+
+**Decision.** `ai/recommender_config.json` gains a `budget` section:
+
+```json
+"budget": {
+  "mode": "split_total",
+  "category_share": {
+    "sofa":  {"min": 0.42, "max": 0.60}, "rug":      {"min": 0.15, "max": 0.45},
+    "chair": {"min": 0.10, "max": 0.25}, "storage":  {"min": 0.10, "max": 0.25},
+    "coffee_table": {"min": 0.10, "max": 0.20}, "lighting": {"min": 0.10, "max": 0.25},
+    "decor": {"min": 0.03, "max": 0.12}
+  }
+}
+```
+
+`allocate_budget(total_min, total_max, categories, mode)` in
+`app/services/recommender.py` derives one window per **requested** category:
+
+```
+lo_c = total_min × min_c / Σ_requested(min)          with Σ_all(min) = 1
+hi_c = total_max × min(1, max_c × Σ_all(max) / Σ_requested(max))
+```
+
+* The **min shares are the cheapest basket** — they sum to exactly 1, so a
+  shopper who spends precisely the floor buys one of each; the renormalisation
+  makes a subset spread the same money over fewer categories, and a single
+  category (`categories=["sofa"]`, 44–46 M) gets the whole window — which is
+  what every pre-existing single-category caller and test meant.
+* The **max shares are ceilings, not slices** — each ≤ 1, together > 1: one
+  category may absorb most of the maximum (a 90 M sofa out of 150 M), but the
+  most expensive sofa **and** the most expensive rug together never fit.
+* Stage A (`_stage_a_hard_filter`, `_stage_ab_postgres`) filters each
+  category with its own window; `calculate_score` scores `budget_fit` against
+  the **category** window's midpoint (the allocation travels inside the quiz
+  dict as `_budget_windows`; a bare quiz passed by a test or a tool derives
+  the same full-room split, so the two paths cannot disagree).
+* The loader validates the section like the weights (mode ∈
+  `{split_total, per_item}`, exactly the seven categories, `0 < min ≤ max ≤ 1`,
+  `Σmin = 1`, `Σmax ≥ 1`) and refuses to boot otherwise.
+* **API stays backward compatible.** `budget_min_toman`/`budget_max_toman`
+  keep meaning the total (nothing stored changes, no migration). `QuizIn`
+  accepts an optional `budget_mode` (`split_total` default \| `per_item` =
+  the pre-ADR-019 rule, one window for every category) as a *request*
+  option — it is not persisted on the quiz row, so a saved quiz keeps
+  meaning "the total" whatever the default becomes. The response echoes
+  `meta.budget_mode` and `meta.budget_allocation{<category>: {min, max}}`;
+  the SPA prints the window under each category heading («سهم از بودجه: … تا
+  … تومان») so an empty or thin category is explainable.
+* Cache identity: `RECOMMENDER_CONFIG_VERSION` → `2026-09-14.1` (a payload
+  cached under the room-wide window can never be served again) and the mode
+  is part of the fingerprint even when defaulted.
+* Frontend: the questionnaire floor drops from 10 M to 5 M, the luxury preset
+  ends at 500 M, `slider_step` 500 k (a 300 k floor share is reachable), the
+  default window becomes 5–150 M (every preset but luxury — broad first,
+  narrow later; a narrow default on a per-category split would open with empty
+  sections), and the help text says what the number means.
+
+**Shares are expert judgement, not learned.** They describe an Iranian living
+room as the catalog and the ad frame it: seating anchors the room (≈ 40–60 %),
+rugs span machine-made to hand-knotted (15–45 %), tables/chairs/storage/lighting
+are 10–25 % each, decor is accessories (3–12 %). They are versioned with the
+weights and change under the same three rules (config bump, harness re-run,
+report). Feedback events (ADR-014) are the data that could later fit them.
+
+**Consequences.** `tests/test_budget_allocation.py` (32 cases: the math, the
+validator, the engine, the cache, HTTP); `tests/test_recommender_v2.py` and
+`tests/test_catalog_integrity.py` updated to the per-category contract;
+scenario harness 18/18 under all four profiles (scenario 10's six duplicate
+listings now share one embedding — what a duplicate *is* — instead of
+passing by accident under the wide window). `AI_STACK_VERSION` →
+`2026-09-14.1`. Docs: `docs/ai/recommender-config.md` §3.1, `docs/API.md`,
+`docs/ai/model-versions.md`. Operators: nothing to migrate; the first
+request after deploy is a cold compute (new cache identity).
+
 ## Data model (ERD)
 
 ```

@@ -232,10 +232,13 @@ jobs:
       - name: Upload diagnostics
         if: always()
         uses: actions/upload-artifact@v4
+        # Evidence upload must never mask the gate's verdict (GitHub artifact
+        # storage quota, 2026-09-15: run #320 went red with every test green).
+        continue-on-error: true
         with:
           name: demo-verify-evidence
           path: /tmp/demo-eviden/
-          retention-days: 30
+          retention-days: 14
 
       - name: Tear down
         if: always()
@@ -368,10 +371,13 @@ jobs:
       - name: Upload the latency evidence
         if: always()
         uses: actions/upload-artifact@v4
+        # Evidence upload must never mask the gate's verdict (GitHub artifact
+        # storage quota, 2026-09-15: run #320 went red with every test green).
+        continue-on-error: true
         with:
           name: g4x-evidence
           path: /tmp/g4x-*.json
-          retention-days: 90
+          retention-days: 30
 
       - name: Tear down
         if: always()

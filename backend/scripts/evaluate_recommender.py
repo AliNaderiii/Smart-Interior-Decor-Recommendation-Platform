@@ -264,7 +264,14 @@ def build_scenarios(db, profile_name: str) -> list[tuple[str, object]]:
         return f"{n} matched_materials entries verified against real products"
 
     def s10() -> str:
-        dupes = [_mk_product(f"Duplicate Walnut Sofa XYZ {i}", price=55_000_000) for i in range(6)]
+        # Six listings of the same sofa: same photo/description → identical
+        # embedding (that is what a duplicate listing looks like to the
+        # engine; the serial in the title is the seller's variant suffix).
+        # Before ADR-019 the numbered titles produced six DIFFERENT hash
+        # embeddings and the scenario only passed because the copies ranked
+        # below other sofas under the old room-wide window.
+        dupes = [_mk_product(f"Duplicate Walnut Sofa XYZ {i}", price=55_000_000,
+                             emb_text="Duplicate Walnut Sofa XYZ modern wood") for i in range(6)]
         db.add_all(dupes)
         db.commit()
         try:

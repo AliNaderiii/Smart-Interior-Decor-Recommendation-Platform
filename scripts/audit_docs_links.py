@@ -89,6 +89,11 @@ INTENTIONALLY_UNTRACKED = {
     ".env.example.v2",
     "seed_data/embeddings_real.json",
     "backend/seed_data/embeddings_real.json",
+    # P4-B·3: the CI link-liveness fixture is exported by the operator from the
+    # live catalog (scripts/export_real_links.py) and committed AFTER the real
+    # import; the docs describe it before it exists on purpose.
+    "seed_data/products_real_links.json",
+    "backend/seed_data/products_real_links.json",
     "/openapi.json",
     "scripts/purge_audit_logs.py",
     # ci/README.md documents the activation path: the workflow file is created

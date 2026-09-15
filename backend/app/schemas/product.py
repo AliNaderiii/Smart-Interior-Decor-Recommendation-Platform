@@ -184,6 +184,9 @@ class ProductOut(BaseModel):
     is_verified: bool
     # ADR-016 provenance / integrity (read-only; never accepted on write)
     source: str = "manual"
+    #: The seller's own id (e.g. the Basalam product number) — what
+    #: ``scripts/export_real_links.py`` keys the CI link-liveness fixture on.
+    source_product_id: str | None = None
     price_checked_at: datetime | None = None
     integrity_ok: bool | None = None
     integrity_reasons: list[str] | None = None

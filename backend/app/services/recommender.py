@@ -45,6 +45,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import math
 import re
 import threading
 import time
@@ -113,9 +114,63 @@ def load_recommender_config(path: Path = CONFIG_PATH) -> dict[str, Any]:
                     "top-level weights must mirror profiles[default_profile].weights "
                     "(drift guard — update both together)"
                 )
+    _validate_budget_section(cfg.get("budget"), problems)
     if problems:
         raise RuntimeError("invalid recommender config: " + "; ".join(problems))
     return cfg
+
+
+#: Budget-allocation modes (ADR-019). ``split_total``: the quiz window is the
+#: living-room TOTAL and every category gets its own share of it.
+#: ``per_item``: the pre-2026-09-14 behaviour — one window for every category.
+BUDGET_MODES = ("split_total", "per_item")
+
+
+def _validate_budget_section(budget: Any, problems: list[str]) -> None:
+    """ADR-019 budget section: one share pair per catalog category.
+
+    Rules (each violation is a boot failure, like a bad weight):
+    * ``mode`` ∈ :data:`BUDGET_MODES`;
+    * ``category_share`` covers exactly :data:`CATEGORIES`;
+    * every share is ``0 < min <= max <= 1``;
+    * ``sum(min) == 1`` — the min shares describe the *cheapest basket*: a
+      user who spends exactly their minimum splits it this way, so a subset
+      of categories renormalises continuously and one category gets it all;
+    * ``sum(max) >= 1`` — the user must be able to spend the whole maximum
+      (each max share is the most one category may absorb, not a slice).
+    """
+    if not isinstance(budget, dict):
+        problems.append("budget section missing (expected {mode, category_share})")
+        return
+    mode = budget.get("mode")
+    if mode not in BUDGET_MODES:
+        problems.append(f"budget.mode {mode!r} not in {list(BUDGET_MODES)}")
+    shares = budget.get("category_share")
+    if not isinstance(shares, dict) or set(shares) != set(CATEGORIES):
+        problems.append(
+            f"budget.category_share keys "
+            f"{sorted(shares) if isinstance(shares, dict) else type(shares).__name__} "
+            f"!= {sorted(CATEGORIES)}"
+        )
+        return
+    sum_min = sum_max = 0.0
+    for category, share in shares.items():
+        try:
+            lo, hi = float(share["min"]), float(share["max"])
+        except (TypeError, KeyError, ValueError):
+            problems.append(f"budget.category_share[{category!r}] must be {{min, max}}")
+            return
+        if not (0 < lo <= hi <= 1):
+            problems.append(
+                f"budget.category_share[{category!r}] must satisfy 0 < min <= max <= 1 "
+                f"(got min={lo}, max={hi})"
+            )
+        sum_min += lo
+        sum_max += hi
+    if abs(sum_min - 1.0) > 1e-6:
+        problems.append(f"budget.category_share min shares sum to {sum_min:.3f}, expected 1.0")
+    if sum_max < 1 - 1e-9:
+        problems.append(f"budget.category_share max shares sum to {sum_max:.3f}, expected >= 1")
 
 
 def _validate_weight_set(weights: Any, label: str, problems: list[str]) -> None:
@@ -196,6 +251,75 @@ _FIT_NEUTRAL: float = float(FIT_CONFIG["neutral_score"])
 _FIT_FLOOR: float = float(FIT_CONFIG["floor"])
 _FIT_CIRCULATION_CM: float = float(FIT_CONFIG["circulation_cm"])
 _FIT_CEILING_CM: float = float(FIT_CONFIG["assumed_ceiling_cm"])
+
+BUDGET_CONFIG: dict[str, Any] = CONFIG["budget"]
+#: Mode used when the quiz payload does not name one (``quiz["budget_mode"]``).
+DEFAULT_BUDGET_MODE: str = BUDGET_CONFIG["mode"]
+BUDGET_SHARES: dict[str, dict[str, float]] = {
+    c: {"min": float(s["min"]), "max": float(s["max"])}
+    for c, s in BUDGET_CONFIG["category_share"].items()
+}
+_SUM_MAX_SHARE_ALL: float = sum(s["max"] for s in BUDGET_SHARES.values())
+
+
+# ---------------------------------------------------------------------------
+# Budget allocation (ADR-019) — the quiz window is the room's TOTAL
+# ---------------------------------------------------------------------------
+# The questionnaire has said since day one "tell us the total budget for the
+# living room, we split it across categories" (per_category: true), yet until
+# 2026-09-14 the engine applied the ONE total window to EVERY category. With a
+# real catalog that is visibly wrong in both directions: a user with 20M in
+# total was offered a 19M sofa AND a 19M rug AND a 19M chair (three times the
+# money), while a user with 60–150M in total never saw a 3M lamp or a 900k
+# cushion because each was "below budget" — the exact rows the seller-feed
+# importer brings in. allocate_budget() turns the total into one window per
+# category from the versioned share table; the budget component then scores
+# each item against its own category's midpoint.
+def allocate_budget(
+    total_min: int, total_max: int, categories: list[str], mode: str | None = None,
+) -> dict[str, dict[str, int]]:
+    """Per-category price windows (toman) for a quiz budget.
+
+    ``split_total`` (default)::
+
+        lo_c = total_min × min_c / Σ_requested(min)          (Σ_all(min) == 1)
+        hi_c = total_max × min(1, max_c × Σ_all(max) / Σ_requested(max))
+
+    The min shares are the *cheapest basket* (they sum to 1 over the full
+    catalog); the max shares say how much of the ceiling one category may
+    absorb on its own (each ≤ 1, together > 1 — nobody buys the most
+    expensive sofa AND the most expensive rug). Both are renormalised over
+    the categories actually requested, so the full set uses the configured
+    shares as-is, a subset spreads the same money over fewer categories, and
+    a single category gets the whole window — which is exactly what a caller
+    asking for "sofas between 44M and 46M" means.
+
+    ``per_item``: the pre-ADR-019 behaviour — every category sees the total
+    window. Windows are integers because ``price_toman`` is an integer column
+    and the Stage A predicate is ``>= lo AND <= hi``. Unknown categories get
+    the total window so an unexpected name degrades to the old rule, never to
+    an empty result.
+    """
+    mode = mode or DEFAULT_BUDGET_MODE
+    if mode not in BUDGET_MODES:
+        raise ValueError(f"unknown budget_mode {mode!r}; expected one of {list(BUDGET_MODES)}")
+    total_min = max(0, int(total_min))
+    total_max = max(total_min, int(total_max))
+    known = [c for c in categories if c in BUDGET_SHARES]
+    sum_min = sum(BUDGET_SHARES[c]["min"] for c in known) or 1.0
+    sum_max = sum(BUDGET_SHARES[c]["max"] for c in known) or 1.0
+    out: dict[str, dict[str, int]] = {}
+    for category in categories:
+        share = BUDGET_SHARES.get(category)
+        if mode == "per_item" or share is None:
+            out[category] = {"min": total_min, "max": total_max}
+            continue
+        w_min = share["min"] / sum_min
+        w_max = min(1.0, share["max"] * _SUM_MAX_SHARE_ALL / sum_max)
+        lo = int(math.floor(total_min * w_min))
+        hi = int(math.ceil(total_max * w_max))
+        out[category] = {"min": lo, "max": max(lo, hi)}
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -521,11 +645,20 @@ def calculate_score(
     """
     weights = weights or WEIGHTS
     c_score = color_score(quiz.get("color_palette", []), product.colors or [])
-    b_score = budget_score(
-        product.price_toman,
-        quiz.get("budget_min_toman", 0),
-        quiz.get("budget_max_toman", 10**9),
+    # ADR-019: the budget component judges the price against the window of
+    # ITS category, not against the room total. ``_compute`` passes the
+    # allocation it filtered with; direct callers (tests, tools) that pass a
+    # bare quiz get the full-room split derived on the fly, so the two paths
+    # agree whenever the whole catalog was queried.
+    windows = quiz.get("_budget_windows") or allocate_budget(
+        quiz.get("budget_min_toman", 0), quiz.get("budget_max_toman", 10**9),
+        list(CATEGORIES), quiz.get("budget_mode"),
     )
+    window = windows.get(product.category) or {
+        "min": int(quiz.get("budget_min_toman", 0)),
+        "max": int(quiz.get("budget_max_toman", 10**9)),
+    }
+    b_score = budget_score(product.price_toman, window["min"], window["max"])
     m_score = jaccard(quiz.get("materials", []), product.materials or [])
     p_score = jaccard(quiz.get("patterns", []), product.patterns or [])
     f_score, f_reason = fit_score(
@@ -797,6 +930,9 @@ def recommend(
         # A config bump (new weights or fit rules) must never serve a payload
         # whose breakdown was computed under the previous version.
         "_cfg": CONFIG["config_version"],
+        # ADR-019: the allocation mode is part of the identity even when the
+        # caller relied on the default — a config default flip must miss.
+        "_budget_mode": quiz.get("budget_mode") or DEFAULT_BUDGET_MODE,
     }
     cache_key = quiz_cache_key(fingerprint, user_id)
     redis = get_redis()
@@ -875,19 +1011,24 @@ def _compute(
     )
     lo = int(quiz.get("budget_min_toman", 0))
     hi = int(quiz.get("budget_max_toman", 10**9))
+    # ADR-019: one Stage A window per category, derived from the room total.
+    budget_mode = quiz.get("budget_mode") or DEFAULT_BUDGET_MODE
+    windows = allocate_budget(lo, hi, list(categories), budget_mode)
+    scoring_quiz = {**quiz, "_budget_windows": windows}
 
     result_categories: dict[str, list[dict[str, Any]]] = {}
     empty_categories: list[str] = []
     for category in categories:
+        cat_lo, cat_hi = windows[category]["min"], windows[category]["max"]
         if _session_is_postgres(db):
-            scored_pairs = _stage_ab_postgres(db, category, lo, hi, user_emb)
+            scored_pairs = _stage_ab_postgres(db, category, cat_lo, cat_hi, user_emb)
         else:
-            pool = _stage_a_hard_filter(db, category, lo, hi)
+            pool = _stage_a_hard_filter(db, category, cat_lo, cat_hi)
             scored_pairs = _stage_b_semantic(db, pool, user_emb)
 
         ranked = []
         for product, style_sim in scored_pairs:
-            score = calculate_score(product, quiz, style_sim, weights)
+            score = calculate_score(product, scoring_quiz, style_sim, weights)
             ranked.append({
                 **_product_payload(product),
                 **score,
@@ -922,6 +1063,12 @@ def _compute(
             "empty_categories": empty_categories,
             "budget_min_toman": lo,
             "budget_max_toman": hi,
+            # ADR-019: how the room total was split — the window each
+            # category was filtered and scored with. The SPA shows it under
+            # each category heading so an empty or thin category is
+            # explainable ("we looked for rugs between 1M and 22.5M").
+            "budget_mode": budget_mode,
+            "budget_allocation": windows,
             # ADR-016: how much of the verified catalog the gate excluded for
             # the queried categories — the honest denominator behind an empty
             # or thin category, visible to the SPA and to load tests.

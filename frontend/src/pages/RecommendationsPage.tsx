@@ -17,7 +17,7 @@ import { useCommands } from "@/components/CommandPalette";
 import { spring, staggerContainer, staggerItem } from "@/lib/motion";
 import { track, trackImpressions } from "@/lib/events";
 
-import { useT } from "@/i18n";
+import { useLocale, useT } from "@/i18n";
 import { ScrollStage, CardTilt3D } from "@/components/Scroll3D";
 
 type LayoutMode = "grid" | "masonry";
@@ -130,7 +130,7 @@ function CategoryTabs({
 /* --------------------------------------------------------------------- page */
 
 export default function RecommendationsPage() {
-  const t = useT();
+  const { t, money } = useLocale();
   const [params] = useSearchParams();
   const quizId = params.get("quiz");
   const { data, isLoading, isError, error, refetch, isFetching } = useRecommendations(quizId);
@@ -430,9 +430,24 @@ export default function RecommendationsPage() {
           aria-labelledby={`h-${category}`}
         >
           <div className="mb-4 flex items-baseline justify-between">
-            <h2 id={`h-${category}`} className="h2 text-[var(--color-ink)]">
-              {CATEGORY_LABELS[category] ?? category}
-            </h2>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h2 id={`h-${category}`} className="h2 text-[var(--color-ink)]">
+                {CATEGORY_LABELS[category] ?? category}
+              </h2>
+              {/* ADR-019: the window this category was filtered and scored
+                  with — the honest answer to "why is my 20M rug not here". */}
+              {data.meta?.budget_allocation?.[category] && (
+                <span
+                  className="text-xs tabular-nums text-[var(--color-muted)]"
+                  data-testid={`budget-window-${category}`}
+                >
+                  {t.recommendations.budgetWindow(
+                    money(data.meta.budget_allocation[category].min),
+                    money(data.meta.budget_allocation[category].max),
+                  )}
+                </span>
+              )}
+            </div>
             <span className="text-xs tabular-nums text-[var(--color-faint)]">{t.recommendations.optionsCount(items.length)}</span>
           </div>
           <motion.div

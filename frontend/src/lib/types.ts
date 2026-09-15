@@ -19,12 +19,21 @@ export interface QuizAnswers {
   color_palette: string[];
   room_width_cm: number;
   room_length_cm: number;
+  /** ADR-019: the living-room TOTAL — the server splits it per category. */
   budget_min_toman: number;
   budget_max_toman: number;
+  /** Optional request option; omitted = server default (`split_total`). */
+  budget_mode?: "split_total" | "per_item";
   materials: string[];
   patterns: string[];
   project_id?: string | null;
   client_name?: string;
+}
+
+/** ADR-019: the price window one category was filtered and scored with. */
+export interface BudgetWindow {
+  min: number;
+  max: number;
 }
 
 export interface Explanation {
@@ -170,6 +179,11 @@ export interface RecommendResult {
     /** ADR-016: how much of the verified catalog the integrity gate excluded per queried category. */
     catalog_quality?: CatalogQuality;
     empty_categories?: string[];
+    /** ADR-019: the room total echoed back and how it was split per category. */
+    budget_min_toman?: number;
+    budget_max_toman?: number;
+    budget_mode?: "split_total" | "per_item";
+    budget_allocation?: Record<string, BudgetWindow>;
   };
 }
 

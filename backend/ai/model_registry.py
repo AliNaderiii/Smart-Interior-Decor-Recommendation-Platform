@@ -42,7 +42,7 @@ from __future__ import annotations
 from app.core.config import settings
 
 #: Coarse version of the AI stack as deployed by this branch.
-AI_STACK_VERSION = "2026-09-07.2"
+AI_STACK_VERSION = "2026-09-14.1"
 
 #: Version of the extraction prompt template in ``ai.feature_extractor``.
 EXTRACTION_PROMPT_VERSION = "p6"
@@ -58,7 +58,10 @@ ROOM_PROMPT_VERSION = "r1"
 #: 2026-09-07.1 = ADR-016: Stage A additionally requires
 #: ``integrity_ok IS NOT FALSE`` (weights unchanged; bumped because the filter
 #: semantics — and therefore the cache identity — changed).
-RECOMMENDER_CONFIG_VERSION = "2026-09-07.1"
+#: 2026-09-14.1 = ADR-019: the quiz budget is a TOTAL split per category
+#: (``budget.category_share``); Stage A windows and the budget component's
+#: midpoint are now per category (weights unchanged; filter semantics changed).
+RECOMMENDER_CONFIG_VERSION = "2026-09-14.1"
 
 #: Embedding model identity. ``clip-ViT-B/32`` via sentence-transformers
 #: produces 512-d unit vectors; the deterministic hash backend mimics the

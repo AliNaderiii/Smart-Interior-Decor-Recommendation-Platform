@@ -98,7 +98,9 @@ export const en: Dict = {
     roomLength: "Room length (cm)",
     roomHint: (area: string) =>
       `≈ ${area} m² — the golden rule needs at least 76 cm of walkway.`,
-    totalBudget: "Total budget",
+    totalBudget: "Total budget for the room",
+    totalBudgetHelp:
+      "Tell us the total for the living room; we split it across categories (roughly half for the sofa, the rest between rug, table, chair, lighting and decor).",
     min: "Minimum (Toman)",
     max: "Maximum (Toman)",
     materialsQuestion: "Which materials do you love?",
@@ -168,6 +170,8 @@ export const en: Dict = {
     priceUnchecked: "Price not yet confirmed with the seller",
     catalogQualityNote: (excluded: number) =>
       `${excluded} product${excluded === 1 ? "" : "s"} hidden by the catalog-integrity check (wrong image, implausible data or unsellable listing).`,
+    /** ADR-019: this category's share of the room total. */
+    budgetWindow: (lo: string, hi: string) => `Budget share: ${lo} – ${hi} Toman`,
     whyMatched: (title: string, pct: number) =>
       `Why we matched ${title}: ${pct} percent overall`,
     moreLike: (title: string) => `More like ${title}`,

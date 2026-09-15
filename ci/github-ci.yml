@@ -87,6 +87,9 @@ jobs:
       - name: Upload locked-install proof
         if: always()
         uses: actions/upload-artifact@v5
+        # Evidence upload must never mask the gate's verdict (GitHub artifact
+        # storage quota, 2026-09-15: run #320 went red with every test green).
+        continue-on-error: true
         with:
           name: backend-lock-verification
           path: |
@@ -94,6 +97,7 @@ jobs:
             backend/lock-verification.log
             backend/pip-freeze.txt
             backend/requirements.lock.txt
+          retention-days: 14
 
       - name: Install CI-only tooling
         working-directory: backend
@@ -182,11 +186,15 @@ jobs:
       - name: Upload dependency audit report
         if: always()
         uses: actions/upload-artifact@v5
+        # Evidence upload must never mask the gate's verdict (GitHub artifact
+        # storage quota, 2026-09-15: run #320 went red with every test green).
+        continue-on-error: true
         with:
           name: backend-dependency-audit
           path: |
             backend/dependency-audit.log
             backend/security/pip-audit-allowlist.yml
+          retention-days: 14
 
       - name: Security probe — production demo seeding refusal
         working-directory: backend
@@ -354,9 +362,13 @@ jobs:
 
       - name: Upload frontend artifact
         uses: actions/upload-artifact@v5
+        # Evidence upload must never mask the gate's verdict (GitHub artifact
+        # storage quota, 2026-09-15: run #320 went red with every test green).
+        continue-on-error: true
         with:
           name: frontend-dist
           path: frontend/dist
+          retention-days: 7
 
   e2e:
     name: E2E — Playwright (auth negatives + three-role journeys)
@@ -519,9 +531,13 @@ jobs:
       - name: Upload e2e report (JSON + HTML) and traces
         if: always()
         uses: actions/upload-artifact@v5
+        # Evidence upload must never mask the gate's verdict (GitHub artifact
+        # storage quota, 2026-09-15: run #320 went red with every test green).
+        continue-on-error: true
         with:
           name: e2e-report
           path: frontend/test-results
+          retention-days: 7
 
   security-scans:
     name: Security & docs gates
@@ -947,9 +963,13 @@ jobs:
       - name: Upload Lighthouse matrix (JSON + HTML, all cells)
         if: always()
         uses: actions/upload-artifact@v5
+        # Evidence upload must never mask the gate's verdict (GitHub artifact
+        # storage quota, 2026-09-15: run #320 went red with every test green).
+        continue-on-error: true
         with:
           name: lighthouse-matrix
           path: /tmp/lighthouse-matrix/
+          retention-days: 7
 
   # ---------------------------------------------------------------------------
   # Stage 2 (T-2.2 / amendment A5): the CONTRACT-EVIDENCE environment for the
@@ -1122,9 +1142,13 @@ jobs:
       - name: Upload p95 evidence artifacts
         if: always()
         uses: actions/upload-artifact@v5
+        # Evidence upload must never mask the gate's verdict (GitHub artifact
+        # storage quota, 2026-09-15: run #320 went red with every test green).
+        continue-on-error: true
         with:
           name: p95-evidence
           path: /tmp/p95-evidence/
+          retention-days: 14
 
   # ---------------------------------------------------------------------------
   # Stage 2 (T-2.5 / amendment A4): seller-link liveness from an egress-enabled
@@ -1186,6 +1210,10 @@ jobs:
       - name: Upload link-liveness artifacts
         if: always()
         uses: actions/upload-artifact@v5
+        # Evidence upload must never mask the gate's verdict (GitHub artifact
+        # storage quota, 2026-09-15: run #320 went red with every test green).
+        continue-on-error: true
         with:
           name: link-liveness
           path: /tmp/link-liveness/
+          retention-days: 14

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -33,6 +34,13 @@ class QuizIn(BaseModel):
     budget_max_toman: int = Field(gt=0, le=2_000_000_000)
     materials: list[str] = Field(default_factory=list, max_length=6)
     patterns: list[str] = Field(default_factory=list, max_length=3)
+    #: ADR-019: how the engine reads the window. ``split_total`` (default) —
+    #: the window is the living-room TOTAL and every category gets its share
+    #: (``recommender_config.json::budget.category_share``); ``per_item`` — the
+    #: pre-2026-09-14 rule, one window for every category. Not stored on the
+    #: quiz row: it is a request option, and the saved quiz keeps meaning
+    #: "the total" whatever the engine's default becomes.
+    budget_mode: Literal["split_total", "per_item"] | None = None
     project_id: str | None = None
     client_name: SafeText(max_length=200) = ""
 
