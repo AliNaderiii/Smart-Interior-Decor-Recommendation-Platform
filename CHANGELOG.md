@@ -22,6 +22,20 @@ capability · PATCH = fix, docs, dependency or CI change).
 
 ## [Unreleased]
 
+### Fixed — CI: an evidence upload can no longer fail a green gate (2026-09-15)
+
+PR #35's first run (#320) went red although every test had passed: the
+account's GitHub Actions **artifact storage quota** was exhausted, so every
+`actions/upload-artifact` step failed — and because those steps were plain
+steps, the backend job died at step 7 (before pytest even ran), the frontend
+and e2e jobs died on their last step after passing, and six dependent jobs were
+skipped. All ten upload steps (`ci.yml`, `stage4-verify.yml` and the reviewed
+copy `ci/github-ci.yml`) now carry `continue-on-error: true` and an explicit
+`retention-days` (7 for the bulky e2e/Lighthouse/dist bundles, 14 for JSON
+evidence, 30 for the stage-4 latency proof) instead of GitHub's 90-day default.
+No job downloads another job's artifact, so nothing else changes; a missing
+artifact shows as a step warning, the gate's verdict stays the tests'.
+
 ### Fixed — the quiz budget is the room's total and is now split per category (ADR-019, P4-B·3, 2026-09-14)
 
 The questionnaire asks for **one** number and promises to split it («بودجه کل
